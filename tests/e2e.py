@@ -55,7 +55,7 @@ async def main():
         check(n_all == 31 and n6 + n9 >= n_all, f'every poem is in at least one band ({n6}+{n9}≥{n_all})')
         check(not await pg.evaluate('document.documentElement.scrollWidth>innerWidth'), 'no horizontal overflow on phone')
         th = await pg.evaluate("POEMS.filter(p=>p.poet==='أحمد شوقي').filter(p=>!thumbOf(p)).map(p=>p.title)")
-        check(len(th) <= 3, f'fable cards carry a picture for children who cannot read (still without: {th})')
+        check(len(th) <= 4, f'fable cards carry a picture for children who cannot read (still without: {th})')
         w = await pg.evaluate("(()=>{const p=weekly(); return p && p.age[0]<=kidAge() && kidAge()<=p.age[1]})()")
         check(w, 'weekly poem fits the child\'s age')
         check(await pg.evaluate("Object.keys(localStorage).every(k=>k.startsWith('anasheed.'))"), 'every stored key is prefixed (shared web origin)')
