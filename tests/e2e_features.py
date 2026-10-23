@@ -32,7 +32,7 @@ async def main():
         await pg.click('#kNew'); await pg.fill('#pIn', 'ليلى'); await pg.click('#pOk'); await pg.wait_for_timeout(200)
         check(await pg.locator('#sheet [data-a]').count() == 8, 'new child is asked for an age')
         await pg.click('#sheet [data-a="7"]'); await pg.wait_for_timeout(300)
-        check(await pg.get_attribute('#ages .chip.on', 'data-age') == '6', 'age 7 → poems for 6–8 shown by default')
+        check(await pg.get_attribute('#ages .chip.on', 'data-age') == 'me' and all(a[0] <= 7 <= a[1] for a in await pg.evaluate("[...document.querySelectorAll('#grid .card')].map(c=>poemById(c.dataset.id).age)")), 'age 7 → only poems for age 7 shown by default')
         check(await pg.input_value('#speed') == '1', 'age 7 → slowest reading pace')
         await pg.evaluate('gateUntil=Date.now()+600000')  # the parent gate itself is tested in e2e.py
 

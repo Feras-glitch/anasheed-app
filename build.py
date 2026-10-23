@@ -83,6 +83,14 @@ if missing or bad or problems:
 images_d = json.load(open(P('content', 'images.json'), encoding='utf-8'))
 for k in IMG_OFF:
     images_d[k] = None
+# card pictures chosen by hand (a random word's picture misled children choosing by picture)
+thumbs = {k: v for k, v in json.load(open(P('content', 'thumbs.json'), encoding='utf-8')).items() if not k.startswith('_')}
+for pid, src in thumbs.items():
+    assert any(p['id'] == pid for p in poems), f'thumbs.json: unknown poem {pid}'
+    if src in images_d:
+        images_d['@thumb:' + pid] = '@' + src  # an alias: the picture is not stored twice
+    else:  # a small JPEG kept in content/thumbs/
+        images_d['@thumb:' + pid] = 'data:image/jpeg;base64,' + base64.b64encode(open(P(src), 'rb').read()).decode()
 G.update(OVR)
 story_d = json.load(open(P('content', 'story.json'), encoding='utf-8'))
 for pid, sc in story_d.items():

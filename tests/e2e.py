@@ -44,14 +44,18 @@ async def main():
 
         # home
         check(await pg.locator('#wk').count() == 1, 'weekly challenge banner shown')
+        mine = await pg.evaluate("[...document.querySelectorAll('#grid .card')].map(c=>poemById(c.dataset.id).age)")
+        check(mine and all(a[0] <= 10 <= a[1] for a in mine), f'by default the list shows only poems for the child\'s age ({len(mine)})')
         await pg.click('#ages .chip[data-age="all"]'); n_all = await pg.locator('#grid .card').count()
         await pg.click('#ages .chip[data-age="6"]'); n6 = await pg.locator('#grid .card').count()
         await pg.click('#ages .chip[data-age="9"]'); n9 = await pg.locator('#grid .card').count()
+        nine = await pg.evaluate("POEMS.filter(p=>p.age[0]<=9&&p.age[1]>=9).length")
+        check(n9 >= nine, f'the 9–12 band includes every poem whose range reaches 9 ({n9} ≥ {nine})')
         await pg.click('#ages .chip[data-age="all"]')
-        check(n_all == 31 and n6 + n9 == n_all, f'age filters partition the list ({n6}+{n9}={n_all})')
+        check(n_all == 31 and n6 + n9 >= n_all, f'every poem is in at least one band ({n6}+{n9}≥{n_all})')
         check(not await pg.evaluate('document.documentElement.scrollWidth>innerWidth'), 'no horizontal overflow on phone')
-        th = await pg.evaluate("[...document.querySelectorAll('#grid .card')].filter(c=>c.querySelector('img.thumb')).length")
-        check(th >= 25, f'cards carry a picture for children who cannot read ({th}/31)')
+        th = await pg.evaluate("POEMS.filter(p=>p.poet==='أحمد شوقي').filter(p=>!thumbOf(p)).map(p=>p.title)")
+        check(len(th) <= 3, f'fable cards carry a picture for children who cannot read (still without: {th})')
         w = await pg.evaluate("(()=>{const p=weekly(); return p && p.age[0]<=kidAge() && kidAge()<=p.age[1]})()")
         check(w, 'weekly poem fits the child\'s age')
         check(await pg.evaluate("Object.keys(localStorage).every(k=>k.startsWith('anasheed.'))"), 'every stored key is prefixed (shared web origin)')
@@ -103,7 +107,7 @@ async def main():
         await pg.wait_for_timeout(9800); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(500)
         txt = await pg.text_content('#sheet')
-        check('أنشدتَ غيباً' in txt, 'celebration names the level reached')
+        check('غيباً! 🧠' in txt, 'celebration names the level reached')
         await pg.click('#sheet button:has-text("تمام")'); await pg.wait_for_timeout(100)
         check('🧠' in await pg.text_content('#segBox'), 'a whole, audible take from memory marks the segment memorised')
         check(await pg.text_content('#timer') == '٠:٠٠', 'timer reset after stop')
@@ -141,10 +145,12 @@ async def main():
         check(await pg.locator('#quizBox [data-q]').count() == 3, 'three quiz types offered')
         await pg.click('#quizBox [data-q="complete"]')
         check(await pg.locator('#quizBox .opt').count() == 3, 'complete-the-verse has 3 options')
-        for _ in range(5):
+        nq = await pg.evaluate('qs.length')
+        check(nq >= 3 and all(not v[0].rstrip().endswith('ـ') for v in await pg.evaluate('qs.map(i=>cur.verses[i])')), f'no question splits a word between question and answer ({nq} questions)')
+        for _ in range(nq):
             right = await pg.evaluate("(()=>{const q=document.querySelector('#quizBox .q').textContent; const first=q.split('…')[0].trim(); const v=cur.verses.find(v=>first.startsWith(v[0].trim())); return v[1]})()")
             await pg.locator('#quizBox .opt', has_text=right).first.click(); await pg.wait_for_timeout(1000)
-        check('٥ من ٥' in await pg.text_content('#quizBox'), 'perfect score registers')
+        check(await pg.evaluate('score') == nq, 'perfect score registers')
         check('⭐' in await pg.text_content('#quizBox'), 'quiz badge awarded')
         await pg.click('#qMenu'); await pg.click('#quizBox [data-q="meaning"]'); await pg.wait_for_timeout(100)
         n_img = await pg.locator('#quizBox .imgs').count(); n_opt = await pg.locator('#quizBox .opt').count()
@@ -165,10 +171,11 @@ async def main():
 
         # a finished quiz never awards a star to another poem
         await pg.click('#modeQuiz'); await pg.click('#quizBox [data-q="complete"]')
-        for _ in range(5):
+        nq = await pg.evaluate('qs.length')
+        for _ in range(nq):
             right = await pg.evaluate("(()=>{const q=document.querySelector('#quizBox .q').textContent; const first=q.split('…')[0].trim(); const v=cur.verses.find(v=>first.startsWith(v[0].trim())); return v[1]})()")
             await pg.locator('#quizBox .opt', has_text=right).first.click()
-            if _ < 4: await pg.wait_for_timeout(1000)
+            if _ < nq - 1: await pg.wait_for_timeout(1000)
         await pg.click('#back'); await pg.click('#grid .card[data-id="٦"]'); await pg.wait_for_timeout(1300)
         check(not await pg.evaluate("st('٦').quiz"), 'leaving right after the last answer gives no star to the next poem')
         await pg.click('#back'); await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(200)
