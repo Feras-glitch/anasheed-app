@@ -81,7 +81,7 @@ step('facts', lambda: ev("""({href:location.href, secure:isSecureContext, native
   types:Object.fromEntries(['audio/mp4','audio/mp4;codecs=mp4a.40.2','audio/webm;codecs=opus'].map(t=>[t,typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported(t)])),
   headerTop:document.querySelector('header').getBoundingClientRect().top, chipTop:document.querySelector('#kidChip').getBoundingClientRect().top,
   safeTop:getComputedStyle(document.querySelector('header')).paddingTop, innerW:innerWidth, innerH:innerHeight, dpr:devicePixelRatio,
-  fonts: document.fonts.check('700 20px Amiri','أ')})"""))
+  fonts: document.fonts.check('700 20px Amiri','أ'), screenH:screen.height, loadMs:Math.round(performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd)})"""))
 
 step('make_kid', lambda: ev("kids.push('تجربة'); LS.set('kids',kids); closeSheet(); setKid('تجربة'); kid"))
 time.sleep(1); shot('02-home')
@@ -89,9 +89,12 @@ time.sleep(1); shot('02-home')
 def back_test():
     ev("openPoem('١'); screen")
     time.sleep(1); shot('03-poem')
+    ev("openWord('ثعلب','الثعلب',0); 'sheet'"); time.sleep(0.8)
+    adb('shell', 'input', 'keyevent', '4'); time.sleep(1.5)
+    out = {'sheet_closed_by_back': ev("!document.querySelector('#pop').classList.contains('on')"), 'screen_after_first_back': ev('screen')}
     adb('shell', 'input', 'keyevent', '4'); time.sleep(2)
     f = focus(); alive = PKG in f
-    out = {'focus_after_back': f, 'app_still_open': alive}
+    out.update({'focus_after_back': f, 'app_still_open': alive})
     if alive:
         out['screen_after_back'] = ev('screen')
     else:

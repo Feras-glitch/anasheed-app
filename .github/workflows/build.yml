@@ -58,9 +58,13 @@ jobs:
       - run: scripts/ci_run.sh "cap add" npx cap add android
       - run: scripts/ci_run.sh "patch" python3 scripts/patch_android.py
       - run: scripts/ci_run.sh "cap sync" npx cap sync android
-      - name: Gradle assemble
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Gradle assemble (retries if Maven Central rate-limits)
         working-directory: android
-        run: chmod +x gradlew && ../scripts/ci_run.sh "gradle" ./gradlew assembleDebug --no-daemon
+        run: |
+          chmod +x gradlew
+          for i in 1 2 3; do ../scripts/ci_run.sh "gradle" ./gradlew assembleDebug --no-daemon && exit 0; echo "retry $i"; sleep 45; done
+          exit 1
       - run: mkdir -p out && cp android/app/build/outputs/apk/debug/app-debug.apk "out/Anasheed-${APP_VERSION}.apk"
       - uses: actions/upload-artifact@v4
         with: { name: android, path: out/*.apk }

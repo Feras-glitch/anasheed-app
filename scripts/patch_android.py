@@ -16,6 +16,15 @@ for d in os.listdir(os.path.join(R, 'icons', 'android')):
     for f in os.listdir(os.path.join(R, 'icons', 'android', d)):
         os.makedirs(os.path.join(res, d), exist_ok=True)
         shutil.copy(os.path.join(R, 'icons', 'android', d, f), os.path.join(res, d, f))
+# Android 15 forces edge-to-edge for targetSdk 35 and the WebView doesn't report safe-area insets,
+# so the header slid under the status bar. Opt out: the app is laid out between the system bars.
+sty = os.path.join(res, 'values', 'styles.xml')
+x = open(sty, encoding='utf-8').read()
+item = '<item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>'
+if item not in x:
+    x = re.sub(r'(<style name="AppTheme\.NoActionBar(?:Launch)?"[^>]*>)', r'\1\n        ' + item, x)
+    assert item in x, 'styles.xml: AppTheme.NoActionBar not found'
+open(sty, 'w', encoding='utf-8').write(x)
 bg = os.path.join(res, 'values', 'ic_launcher_background.xml')
 open(bg, 'w').write('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#EBCB9A</color>\n</resources>\n')
 

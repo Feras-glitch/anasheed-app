@@ -38,7 +38,10 @@ for s in re.split(r'\n### ', src)[1:]:
         p['note'] = '👨‍👧 يُستحسن أن تقرأها مع والدك: قصتها حزينة.'
     poems.append(p)
 
-from glossary import G
+import glossary
+G = dict(glossary.G)
+OVR = getattr(glossary, 'OVR', {})
+IMG_OFF = getattr(glossary, 'IMG_OFF', [])
 
 def key(w):
     w = re.sub('[ً-ْٰـ]', '', w)
@@ -47,11 +50,25 @@ def key(w):
 toks = {key(w) for p in poems for v in p['verses'] for h in v for w in h.split()}
 missing = [k for k in G if k not in toks]
 bad = [(p['id'], i + 1) for p in poems for i, v in enumerate(p['verses']) if len(v) != 2 or not all(x.strip() for x in v)]
+# overrides: "poem|word" or "poem:verse|word" must point to a real word in that poem/verse
+def ovr_ok(k):
+    loc, _, w = k.partition('|')
+    pid, _, vn = loc.partition(':')
+    p = next((x for x in poems if x['id'] == pid), None)
+    if not p:
+        return False
+    vs = [p['verses'][int(vn) - 1]] if vn else p['verses']
+    return any(key(t) == w for v in vs for h in v for t in h.split())
+missing += [k for k in list(OVR) + list(IMG_OFF) if not ovr_ok(k)]
 print(f'{len(poems)} poems · glossary {len(G)} · missing keys {missing} · malformed verses {bad}', file=sys.stderr)
 if missing or bad:
     sys.exit('build failed: fix the problems above')
 
-images = open(P('content', 'images.json'), encoding='utf-8').read()
+images_d = json.load(open(P('content', 'images.json'), encoding='utf-8'))
+for k in IMG_OFF:
+    images_d[k] = None
+images = json.dumps(images_d, ensure_ascii=False)
+G.update(OVR)
 story = open(P('content', 'story.json'), encoding='utf-8').read()
 story_d = json.loads(story)
 for pid, sc in story_d.items():
@@ -116,7 +133,11 @@ open(os.path.join(www, 'sw.js'), 'w', encoding='utf-8').write(f"""const C='anash
 const FILES=['./','index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',e=>{{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)));self.skipWaiting()}});
 self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
-self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).then(r=>{{const x=r.clone();caches.open(C).then(c=>c.put(e.request,x));return r}}).catch(()=>caches.match(e.request,{{ignoreSearch:true}}).then(r=>r||caches.match('index.html'))))}});
+// network first, but never wait more than 3 s for a slow connection
+self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return;
+  const cached=()=>caches.match(e.request,{{ignoreSearch:true}}).then(r=>r||caches.match('index.html'));
+  const net=fetch(e.request).then(r=>{{if(r.ok){{const x=r.clone();caches.open(C).then(c=>c.put(e.request,x))}}return r}});
+  e.respondWith(Promise.race([net,new Promise((_,rej)=>setTimeout(rej,3000))]).catch(()=>cached().then(r=>r||net)))}});
 """)
 
 # ---------- dist: single file ----------

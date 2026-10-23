@@ -117,7 +117,12 @@ async def main():
         check(await pg.locator('#ba [data-ba]').count() == 1, 'before/after offered for the poem with 2 recordings')
         async with pg.expect_download() as dl:
             await pg.click('#rlist .r >> nth=0 >> [data-sh]')
-        check((await dl.value).suggested_filename.startswith('أنشودتي-'), 'share falls back to download on desktop')
+        fn = (await dl.value).suggested_filename
+        check(fn.startswith('أنشودتي-') and fn.endswith('.wav'), f'share converts to WAV and falls back to download on desktop ({fn})')
+        import wave, tempfile, os
+        wp = os.path.join(tempfile.mkdtemp(), 'x.wav'); await (await dl.value).save_as(wp)
+        with wave.open(wp) as w: secs = w.getnframes() / w.getframerate(); ch = w.getnchannels()
+        check(1.5 < secs < 4 and ch == 1, f'WAV is valid mono audio of the right length ({secs:.1f}s)')
         await pg.click('#recFilter .chip:has-text("النماذج")'); await pg.wait_for_timeout(200)
         check(await pg.locator('#rlist .r').count() == 1, 'models filter')
 
@@ -139,6 +144,73 @@ async def main():
         async with pg.expect_download() as dl:
             await pg.click('#goParent'); await pg.click('#aExport')
         check((await dl.value).suggested_filename.endswith('.json'), 'backup export downloads JSON')
+
+        # ---- audit round 2 ----
+        # homographs: the same written word gets the meaning of its own poem
+        await pg.click('#back'); await pg.wait_for_timeout(200)
+        await pg.click('#grid .card[data-id="١١"]'); await pg.wait_for_timeout(200)
+        await pg.click('#verses .verse[data-i="3"] .w[data-k="بهر"]'); await pg.wait_for_timeout(150)
+        txt = await pg.text_content('#sheet')
+        check('أدهش' in txt and await pg.locator('#sheet img').count() == 0, 'بَهَرَ in Hafez means "dazzled", no cat picture')
+        await pg.click('#mClose'); await pg.click('#back'); await pg.wait_for_timeout(200)
+        await pg.click('#grid .card[data-id="٣٣"]'); await pg.wait_for_timeout(200)
+        await pg.click('#verses .w[data-k="بهر"]'); await pg.wait_for_timeout(150)
+        check('بقط' in await pg.text_content('#sheet') and await pg.locator('#sheet img').count() == 1, 'بِهِرٍّ in the cat fable keeps its meaning and picture')
+        await pg.click('#mClose'); await pg.click('#back'); await pg.wait_for_timeout(200)
+        await pg.click('#grid .card[data-id="٣٨"]'); await pg.wait_for_timeout(200)
+        await pg.click('#segBox .chip[data-s="2"]')
+        await pg.click('#verses .verse[data-i="12"] .w[data-k="بينا"]'); m13 = await pg.text_content('#sheet'); await pg.click('#mClose')
+        await pg.click('#segBox .chip[data-s="0"]')
+        await pg.click('#verses .verse[data-i="0"] .w[data-k="بينا"]'); m1 = await pg.text_content('#sheet'); await pg.click('#mClose')
+        check('واضح' in m13 and 'بينما' in m1, 'verse-level meaning: بَيِّنا vs بَينا in the same poem')
+        # parent edits a meaning for one verse only
+        await pg.click('#verses .verse[data-i="0"] .w[data-k="بينا"]'); await pg.click('#sheet summary')
+        await pg.fill('#mIn', 'معنى تجريبي'); await pg.click('#mSave'); await pg.wait_for_timeout(100)
+        await pg.click('#segBox .chip[data-s="2"]')
+        await pg.click('#verses .verse[data-i="12"] .w[data-k="بينا"]'); still = await pg.text_content('#sheet'); await pg.click('#mClose')
+        await pg.click('#segBox .chip[data-s="0"]')
+        await pg.click('#verses .verse[data-i="0"] .w[data-k="بينا"]'); edited = await pg.text_content('#sheet')
+        check('معنى تجريبي' in edited and 'واضح' in still, 'parent edit applies to that verse only')
+        await pg.click('#sheet summary'); await pg.click('#mDel'); await pg.wait_for_timeout(100)
+
+        # following a poem to its end earns 👂 without any model
+        await pg.click('#modeSing')
+        check(not await pg.evaluate("!!st('٣٨').heard"), '👂 not given before the end')
+        for _ in range(3):
+            for _ in range(6): await pg.click('#nextV')
+            if await pg.locator('#nextSeg').count(): await pg.click('#nextSeg')
+        await pg.wait_for_timeout(200)
+        check(await pg.evaluate("!!st('٣٨').heard"), 'reaching the last verse earns 👂 (no model needed)')
+
+        # next-segment button at the end of a segment
+        await pg.click('#back'); await pg.click('#grid .card[data-id="١٣"]'); await pg.wait_for_timeout(200)
+        await pg.click('#segBox .chip[data-s="0"]'); await pg.click('#modeSing')
+        for _ in range(6): await pg.click('#nextV')
+        check(await pg.locator('#nextSeg').count() == 1, 'next-segment button shown at segment end')
+        await pg.click('#nextSeg'); await pg.wait_for_timeout(150)
+        check(await pg.get_attribute('#verses .verse >> nth=0', 'data-i') == '6', 'next segment opens')
+
+        # save sheet survives a stray tap outside; back gesture doesn't drop it
+        await record(pg)
+        await pg.mouse.click(195, 40); await pg.wait_for_timeout(200)
+        check(await pg.locator('#keep').count() == 1, 'tapping outside does not discard a recording')
+        await pg.go_back(); await pg.wait_for_timeout(300)
+        check(await pg.locator('#keep').count() == 1 and await pg.evaluate('screen') == 'poem', 'back gesture does not discard a recording')
+        await pg.click('#redo'); await pg.wait_for_timeout(100)
+
+        # back gesture navigation
+        await pg.go_back(); await pg.wait_for_timeout(300)
+        check(await pg.evaluate('screen') == 'home', 'back gesture returns to home')
+        await pg.click('#grid .card >> nth=0'); await pg.wait_for_timeout(100); await pg.click('#back'); await pg.click('#grid .card >> nth=1'); await pg.wait_for_timeout(400)
+        check(await pg.evaluate('screen') == 'poem', 'fast back-then-open is not bounced to home')
+        await pg.click('#back')
+
+        # failed save is reported, not silently swallowed
+        await pg.click('#grid .card[data-id="٤"]'); await pg.wait_for_timeout(200)
+        await pg.evaluate('db.close()')
+        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(300)
+        check('تعذّر' in await pg.text_content('#toast') and await pg.locator('#keep').count() == 1, 'storage failure reported and the take is kept on screen')
+        await pg.click('#redo')
 
         # persistence
         await pg.reload(); await pg.wait_for_timeout(600)
