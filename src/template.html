@@ -329,18 +329,21 @@ function earned(before,after){ return BADGES.filter(([k])=>!before[k]&&after[k])
 
 // ---------- IndexedDB (recordings) ----------
 // 'rec' holds the audio; 'meta' holds everything else, so lists never load the audio of every recording
-let db=null, dbOpening=null;
+let db=null, dbReq=null;
 const metaOf = r => { const {buf,blob,b64,...m}=r; m.size=(buf&&buf.byteLength)||(blob&&blob.size)||m.size||0; return m; };
-function openDB(){ if(db) return Promise.resolve(db); if(dbOpening) return dbOpening;
-  const pr=new Promise(res=>{ try{ const r=indexedDB.open('anasheed',2);
-    r.onupgradeneeded=e=>{ const d=e.target.result, tx=e.target.transaction;
-      const recS=d.objectStoreNames.contains('rec')?tx.objectStore('rec'):d.createObjectStore('rec',{keyPath:'id',autoIncrement:true});
-      if(!d.objectStoreNames.contains('meta')){ const metaS=d.createObjectStore('meta',{keyPath:'id'}); recS.openCursor().onsuccess=ev=>{ const c=ev.target.result; if(c){ metaS.put(metaOf(c.value)); c.continue(); } }; } };
-    r.onsuccess=e=>{ db=e.target.result; db.onclose=()=>{db=null}; db.onversionchange=()=>{ try{db.close()}catch(x){} db=null; }; res(db); };
-    r.onerror=()=>res(null);
-  }catch(e){ res(null); } });
-  // a failed attempt is forgotten, so the next save tries again
-  dbOpening=pr; pr.then(()=>{ if(dbOpening===pr) dbOpening=null; }); return pr; }
+// one open request at a time; nobody ever waits more than 4 s for it (a window of an older version can block the upgrade)
+function openDB(){ if(db) return Promise.resolve(db);
+  return new Promise(res=>{ let done=false; const fin=v=>{ if(!done){ done=true; res(v); } }; setTimeout(()=>fin(db),4000);
+    try{
+      if(!dbReq){ const r=indexedDB.open('anasheed',2); dbReq=r;
+        r.onupgradeneeded=e=>{ const d=e.target.result, tx=e.target.transaction;
+          const recS=d.objectStoreNames.contains('rec')?tx.objectStore('rec'):d.createObjectStore('rec',{keyPath:'id',autoIncrement:true});
+          if(!d.objectStoreNames.contains('meta')){ const metaS=d.createObjectStore('meta',{keyPath:'id'}); recS.openCursor().onsuccess=ev=>{ const c=ev.target.result; if(c){ metaS.put(metaOf(c.value)); c.continue(); } }; } };
+        r.onsuccess=e=>{ db=e.target.result; db.onclose=()=>{db=null}; db.onversionchange=()=>{ try{db.close()}catch(x){} db=null; }; dbReq=null; };
+        r.onerror=()=>{ dbReq=null; };
+        r.onblocked=()=>toast('أغلق «أنشودتي» في النوافذ أو التبويبات الأخرى ثم أعد المحاولة',6000); }
+      dbReq.addEventListener('success',()=>fin(db)); dbReq.addEventListener('error',()=>fin(null));
+    }catch(e){ dbReq=null; fin(null); } }); }
 const dbReady = openDB();
 // run a transaction; if the connection died (iOS does this in the background), reopen once and retry
 async function store(names,mode,fn){
@@ -366,12 +369,12 @@ const recDel = id => store(['rec','meta'],'readwrite',tx=>{ const done=txDone(tx
 
 // ---------- navigation ----------
 let screen='home', ignorePop=0;
-function show(id,fromPop){ if(!fromPop){ const inner=history.state&&history.state.inner; if(id!=='home' && !inner) history.pushState({inner:1},''); else if(id==='home' && inner){ ignorePop++; history.back(); } } screen=id; document.body.classList.toggle('inner',id!=='home'); if(id!=='poem'){ stopPlay(); if(modelMode){ modelMode=false; $('#autoOn').checked=true; } clearTimeout(qTimer); decCache.clear(); } $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); $('#back').style.display = id==='home'?'none':''; $('#bar').style.display = id==='poem'?'':'none'; window.scrollTo(0,0); if(id!=='poem'){ stopAuto(); if(rec&&rec.state==='recording') rec.stop(); } }
-$('#back').onclick = ()=>{ if(rec&&rec.state==='recording'){ rec.stop(); return; } show('home'); renderHome(); };
+function show(id,fromPop){ if(!fromPop){ const inner=history.state&&history.state.inner; if(id!=='home' && !inner) history.pushState({inner:1},''); else if(id==='home' && inner){ ignorePop++; history.back(); } } screen=id; document.body.classList.toggle('inner',id!=='home'); if(id!=='poem'){ stopPlay(); if(modelMode){ modelMode=false; $('#autoOn').checked=true; } clearTimeout(qTimer); decCache.clear(); } $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); $('#back').style.display = id==='home'?'none':''; $('#bar').style.display = id==='poem'?'':'none'; window.scrollTo(0,0); if(id!=='poem'){ stopAuto(); stopRec(); } if(id!=='archive') $$('#rlist audio').forEach(a=>a.pause()); }
+$('#back').onclick = ()=>{ if(recBusy()) return; show('home'); renderHome(); };
 // back: close a sheet → stop a recording → go home; returns false when there is nothing to go back from
 function handleBack(){
   if($('#pop').classList.contains('on')){ if(!sheetModal) closeSheet(); else toast('اختر «احفظ» أو «أعد المحاولة»'); return true; }
-  if(rec&&rec.state==='recording'){ rec.stop(); return true; }
+  if(recBusy()) return true;
   if(screen!=='home'){ show('home',true); renderHome(); return true; }
   return false;
 }
@@ -382,7 +385,7 @@ window.addEventListener('popstate',()=>{
 // Android hardware back (native app): handled here directly, so it never depends on browser history rules
 try{ if(isNative() && window.Capacitor.Plugins.App) window.Capacitor.Plugins.App.addListener('backButton',()=>{ if(!handleBack()) window.Capacitor.Plugins.App.exitApp(); }); }catch(e){}
 // while recording, these buttons only stop the recording (the save sheet then appears), like ➜
-const recBusy = () => { if(rec&&rec.state==='recording'){ rec.stop(); return true; } return recStarting; };
+const recBusy = () => { if(rec&&rec.state==='recording'){ stopRec(); return true; } return recStarting||recStopping; };
 $('#goArchive').onclick = ()=>{ if(recBusy()) return; renderArchive(); show('archive'); };
 $('#goParent').onclick = async ()=>{ if(recBusy()) return; if(!await parentGate()) return; renderParent(); show('parent'); };
 // parent gate: a 3-second press keeps small hands away from deleting and importing; it stays open 10 minutes
@@ -391,21 +394,21 @@ function parentGate(){ if(Date.now()<gateUntil) return Promise.resolve(true);
   return new Promise(res=>{ let done=false; const fin=v=>{ if(!done){ done=true; res(v); } };
     openSheet(`<h3>👨‍👧 للوالد</h3><p>اضغط على الزر واستمر ٣ ثوانٍ.</p><button class="btn p" id="gateBtn" style="position:relative;overflow:hidden;width:100%;justify-content:center;font-size:20px;padding:16px;touch-action:none;user-select:none;-webkit-user-select:none"><span id="gateFill" style="position:absolute;inset:0;width:0;background:rgba(255,255,255,.35)"></span><span style="position:relative">اضغط مطوّلاً</span></button><div class="row"><button class="btn" id="gateNo">إلغاء</button></div>`,()=>fin(false));
     const b=$('#gateBtn'), f=$('#gateFill'); let t=null;
-    const down=e=>{ e.preventDefault(); f.style.transition='width 3s linear'; f.style.width='100%'; t=setTimeout(()=>{ gateUntil=Date.now()+600000; fin(true); closeSheet(); },3000); };
-    const up=()=>{ clearTimeout(t); f.style.transition='none'; f.style.width='0'; };
+    const down=e=>{ e.preventDefault(); if(t) return; f.style.transition='width 3s linear'; f.style.width='100%'; t=setTimeout(()=>{ gateUntil=Date.now()+600000; fin(true); closeSheet(); },3000); };
+    const up=()=>{ clearTimeout(t); t=null; f.style.transition='none'; f.style.width='0'; };
     b.addEventListener('pointerdown',down); ['pointerup','pointerleave','pointercancel'].forEach(x=>b.addEventListener(x,up)); b.oncontextmenu=e=>e.preventDefault();
     $('#gateNo').onclick=()=>closeSheet(); }); }
 
 // ---------- home ----------
 let ageF='all', poetF='all';
 function ageOk(p){ if(ageF==='all') return true;
-  if(ageF==='me'){ const a=kidAge(); return !a || (p.age[0]<=a && a<=p.age[1]); }
+  if(ageF==='me'){ const a=kidAge()&&Math.max(6,kidAge()); return !a || (p.age[0]<=a && a<=p.age[1]); }
   const [lo,hi]=ageF==='6'?[6,8]:[9,12]; return p.age[0]<=hi && p.age[1]>=lo; }
 // the weekly poem must suit the child: within the child's age when known, otherwise the youngest end of the band
-function weekly(){ const a=kidAge(); const fits=p=> a ? (p.age[0]<=a && a<=p.age[1]) : ageF==='9' ? p.age[0]>=9 : p.age[0]<=7;
+function weekly(){ const a=kidAge()&&Math.max(6,kidAge()); const fits=p=> a ? (p.age[0]<=a && a<=p.age[1]) : ageF==='9' ? p.age[0]>=9 : p.age[0]<=7;
   const pool=POEMS.filter(p=>p.verses.length<=16 && fits(p)); if(!pool.length) return null; const wk=Math.floor((Date.now()/864e5+4)/7); return pool[wk%pool.length]; }
 // a picture on every card: children who cannot read yet choose by the picture
-const thumbOf = p => { if(STORY[p.id]) return STORY[p.id][0].img; const th=IMAGES['@thumb:'+p.id]; if(th) return th[0]==='@' ? IMAGES[th.slice(1)] : th;
+const thumbOf = p => { if(STORY[p.id]?.[0]?.img) return STORY[p.id][0].img; const th=IMAGES['@thumb:'+p.id]; if(th) return th[0]==='@' ? IMAGES[th.slice(1)] : th;
   for(const w of String(p.title).split(/\s+/)){ const k=wkey(w); if(!k) continue; const o=`${p.id}|${k}`; const u=(o in IMAGES)?IMAGES[o]:IMAGES[k]; if(u) return u; } return null; };
 function renderHome(){
   const w=weekly();
@@ -429,7 +432,7 @@ let cur=null, segs=[[0,0]], seg=0, curLine=0, mode='read', level=1, auto=null, p
 const rng = () => segs[seg];
 function openPoem(id){
   cur=poemById(id); if(!cur) return;
-  segs=segments(cur); const s=st(cur.id); seg=Math.min(s.seg||0,segs.length-1); curLine=rng()[0]; mode='read'; level=1;
+  segs=segments(cur); const s=st(cur.id); seg=Math.max(0,Math.min(Math.floor(num(s.seg)),segs.length-1)); curLine=rng()[0]; mode='read'; level=1;
   $('#pTitle').textContent=cur.title; $('#pPoet').textContent=cur.poet;
   $('#pNote').innerHTML = cur.note?`<div class="note">${esc(cur.note)}</div>`:'';
   $('#modeStory').style.display = STORY[cur.id]?'':'none';
@@ -481,11 +484,12 @@ function setModeUI(){
   $('#quizBox').style.display = mode==='quiz'?'':'none';
   $('#storyBox').style.display = mode==='story'?'':'none';
   $('#verses').style.display = (mode==='quiz'||mode==='story')?'none':'';
+  $('#prevV').style.visibility = $('#nextV').style.visibility = (mode==='quiz'||mode==='story')?'hidden':'';
 }
-$('#modeRead').onclick=()=>{mode='read';stopAuto();stopPlay();setModeUI();renderVerses()};
+$('#modeRead').onclick=()=>{if(rec&&rec.state==='recording') return toast('أوقف التسجيل أولاً'); mode='read';stopAuto();stopPlay();setModeUI();renderVerses()};
 $('#modeSing').onclick=()=>{mode='sing';curLine=rng()[0];setModeUI();renderVerses();scrollCur()};
-$('#modeQuiz').onclick=()=>{mode='quiz';stopAuto();stopPlay();setModeUI();quizMenu()};
-$('#modeStory').onclick=()=>{mode='story';stopAuto();stopPlay();setModeUI();renderStory()};
+$('#modeQuiz').onclick=()=>{if(rec&&rec.state==='recording') return toast('أوقف التسجيل أولاً'); mode='quiz';stopAuto();stopPlay();setModeUI();quizMenu()};
+$('#modeStory').onclick=()=>{if(rec&&rec.state==='recording') return toast('أوقف التسجيل أولاً'); mode='story';stopAuto();stopPlay();setModeUI();renderStory()};
 let paceOpen=false; $('#paceT').onclick=()=>{ paceOpen=!paceOpen; setModeUI(); };
 // the level is locked while recording: switching to the full text mid-take must not count as reciting from memory
 $$('#lvlBox .chip[data-l]').forEach(c=>c.onclick=()=>{ if(rec&&rec.state==='recording') return toast('غيّر مستوى الحفظ قبل التسجيل أو بعده'); level=+c.dataset.l; peek=-1; setModeUI(); renderVerses(); if(level===4) toast('المس أي بيت لتلمحه لحظة'); });
@@ -520,8 +524,8 @@ async function storyPlay(a,b,byVerse,el){
     await playBuf(buf,sp[0],sp[1],sess); }
   if(sess.alive) stopPlay(); $$('#storyBox .sv.cur').forEach(v=>v.classList.remove('cur'));
 }
-function step(d){ if(mode!=='sing'){mode='sing';setModeUI()} const [a,b]=rng(); curLine=Math.max(a,Math.min(b-1,curLine+d)); renderVerses(); scrollCur(); }
-$('#nextV').onclick=()=>step(1); $('#prevV').onclick=()=>step(-1);
+function step(d){ if(mode==='quiz'||mode==='story') return; if(mode!=='sing'){mode='sing';setModeUI()} const [a,b]=rng(); curLine=Math.max(a,Math.min(b-1,curLine+d)); renderVerses(); scrollCur(); }
+$('#nextV').onclick=()=>{ step(1); if(auto) startAuto(); }; $('#prevV').onclick=()=>{ step(-1); if(auto) startAuto(); };
 document.addEventListener('keydown',e=>{ if(screen!=='poem'||mode==='quiz'||mode==='story'||$('#pop').classList.contains('on')||/INPUT|TEXTAREA/.test(document.activeElement.tagName)||(e.key===' '&&document.activeElement.tagName==='BUTTON')) return; if(e.key==='ArrowDown'||e.key===' '){e.preventDefault();step(1)} if(e.key==='ArrowUp'){e.preventDefault();step(-1)} });
 // auto advance paced by the verse's word count
 const SPW=[0,1.15,0.95,0.8,0.66,0.55];
@@ -536,20 +540,23 @@ function openWord(k, w, i){
   if(!k) return; const m=M(k,i)||''; const im=IMG(k,i); const vk=`${cur.id}:${i+1}|${k}`;
   openSheet(`<h3>${esc(w)}</h3>${im?`<img src="${im}" alt="" style="width:100%;max-width:360px;display:block;margin:0 auto 10px;border-radius:16px">`:''}
     <div style="font-size:21px;min-height:30px">${m?esc(m):'<span class="small">لم يُكتب معنى بعد</span>'}</div>
-    <details style="margin-top:12px"><summary class="small">تعديل المعنى (للوالد)</summary><input id="mIn" value="${esc(m)}" style="margin-top:8px">
-    <div class="row"><button class="btn p s" id="mSave">حفظ</button>${LS.get('meanings',{})[vk]?'<button class="btn s" id="mDel">استرجاع الأصلي</button>':''}</div></details>
+    ${Date.now()<gateUntil?`<details style="margin-top:12px"><summary class="small">تعديل المعنى (للوالد)</summary><input id="mIn" value="${esc(m)}" style="margin-top:8px">
+    <div class="row"><button class="btn p s" id="mSave">حفظ</button>${LS.get('meanings',{})[vk]?'<button class="btn s" id="mDel">استرجاع الأصلي</button>':''}</div></details>`:'<div style="margin-top:12px"><button class="btn s" id="mEdit">✎ للوالد</button></div>'}
     <div class="row"><button class="btn" id="mClose">إغلاق</button></div>`);
   const restore=()=>{ const u=LS.get('meanings',{}); delete u[vk]; LS.set('meanings',u); if(PRESET[vk]!==undefined) meanings[vk]=PRESET[vk]; else delete meanings[vk]; };
-  $('#mSave').onclick=()=>{ const v=$('#mIn').value.trim(); if(v){ const u=LS.get('meanings',{}); u[vk]=v; meanings[vk]=v; LS.set('meanings',u); } else restore(); closeSheet(); renderVerses(); };
+  if($('#mEdit')) $('#mEdit').onclick=async()=>{ if(await parentGate()) openWord(k,w,i); };
+  if($('#mSave')) $('#mSave').onclick=()=>{ const v=$('#mIn').value.trim(); if(v){ const u=LS.get('meanings',{}); u[vk]=v; meanings[vk]=v; LS.set('meanings',u); } else restore(); closeSheet(); renderVerses(); };
   if($('#mDel')) $('#mDel').onclick=()=>{ restore(); closeSheet(); renderVerses(); };
   $('#mClose').onclick=closeSheet;
 }
 
 // ---------- recording ----------
-let rec=null, recStarting=false, t0=0, tick=null, lastBlob=null, wakeLock=null, recMarks=[], vu=null, modelMode=false, stageWho={}, autoStepping=false;
+let rec=null, recStarting=false, recStopping=false, t0=0, tick=null, lastBlob=null, wakeLock=null, recMarks=[], vu=null, modelMode=false, stageWho={}, autoStepping=false;
+// stopping takes a moment on a slow phone: a second tap in that moment must not start a new recorder
+function stopRec(){ if(rec && rec.state==='recording' && !recStopping){ recStopping=true; rec.stop(); } }
 $('#recBtn').onclick = async ()=>{
-  if(rec && rec.state==='recording'){ rec.stop(); return; }
-  if(recStarting) return; // a double tap must not start a second recorder
+  if(rec && rec.state==='recording'){ stopRec(); return; }
+  if(recStarting||recStopping) return; // a double tap must not start a second recorder
   try{ const ac0=actx(); if(ac0.resume) ac0.resume(); }catch(e){}
   if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) return openSheet('<h3>التسجيل غير متاح هنا</h3><p>المتصفح يمنع الميكروفون حين يُفتح الملف مباشرة. ثبّت تطبيق «أنشودتي» على الجهاز، أو افتحه من رابطه على الإنترنت.</p><div class="row"><button class="btn" onclick="closeSheet()">حسناً</button></div>');
   if(typeof MediaRecorder==='undefined') return toast('هذا المتصفح لا يدعم التسجيل');
@@ -565,11 +572,13 @@ $('#recBtn').onclick = async ()=>{
     const r = new MediaRecorder(stream, mime?{mimeType:mime}:{}); rec=r; const myChunks=[];
     const recLvl=level, recSeg=seg, recModelMode=modelMode, [rA,rB]=rng();
     r.ondataavailable=e=>{ if(e.data && e.data.size) myChunks.push(e.data) };
+    let myT0=0;
     r.onstop = async ()=>{
+      recStopping=false;
       const loud=vu?vu.stop():1; vu=null; const marks=recMarks.slice();
       stream.getTracks().forEach(t=>t.stop()); clearInterval(tick); stopAuto(); try{wakeLock&&wakeLock.release()}catch(x){} wakeLock=null;
       $('#recBtn').classList.remove('live'); $('#recBtn').textContent='●'; $('#timer').textContent=fmt(0);
-      const dur=(Date.now()-t0)/1000;
+      const dur=(Date.now()-myT0)/1000;
       if(dur<1.5) return toast('التسجيل قصير جداً — اضغط الزر الأحمر، أنشد، ثم اضغطه مرة أخرى',3500);
       const blob=new Blob(myChunks,{type:r.mimeType||mime||'audio/webm'}); lastBlob=blob;
       const url=URL.createObjectURL(blob);
@@ -602,8 +611,8 @@ $('#recBtn').onclick = async ()=>{
       $('#redo').onclick=()=>closeSheet();
     };
     stopPlay(); if(mode!=='sing'){mode='sing';curLine=rng()[0];setModeUI();renderVerses();scrollCur()}
-    r.start(250); t0=Date.now(); recMarks=[[curLine,0,0]]; vu=startVU(stream);
-    try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(x){}
+    r.start(250); t0=myT0=Date.now(); recMarks=[[curLine,0,0]]; vu=startVU(stream);
+    try{ navigator.wakeLock?.request('screen').then(l=>{ if(rec===r && r.state==='recording') wakeLock=l; else l.release(); }).catch(()=>{}); }catch(x){}
     $('#recBtn').classList.add('live'); $('#recBtn').textContent='■';
     tick=setInterval(()=>$('#timer').textContent=fmt((Date.now()-t0)/1000),250);
     if(!recModelMode) startAuto(); else toast('اضغط ⬇ مع بداية كل بيت جديد',3000);
@@ -830,8 +839,13 @@ async function shareFiles(items,text,title){ // items: [{blob,type,name}]
   try{ const fs=items.map(it=>new File([it.blob],it.name,{type:it.type||'application/octet-stream'}));
     if(navigator.canShare && navigator.canShare({files:fs})){ await navigator.share({files:fs,title,text}); return true; } }
   catch(e){ if(e && e.name==='AbortError'){ toast('أُلغيت المشاركة'); return false; } }
-  for(const it of items){ const u=URL.createObjectURL(it.blob), a=document.createElement('a'); a.href=u; a.download=it.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),60000); }
-  toast(items.length>1?`نُزّلت ${AR(items.length)} ملفات`:'نُزّل الملف'); return true;
+  const dl=it=>{ const u=URL.createObjectURL(it.blob), a=document.createElement('a'); a.href=u; a.download=it.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),60000); };
+  if(items.length===1){ dl(items[0]); toast('نُزّل الملف'); return true; }
+  // browsers block several automatic downloads: each part gets its own button, and the backup counts only when all were saved
+  return new Promise(res=>{ let done=false; const got=new Set(); const fin=v=>{ if(!done){ done=true; res(v); } };
+    openSheet(`<h3>💾 ${AR(items.length)} ملفات</h3><p class="small">احفظ كل ملف بلمسته، واحتفظ بها معاً.</p>${items.map((it,i)=>`<div class="row"><button class="btn" data-part="${i}">⬇ ${esc(it.name)}</button></div>`).join('')}<div class="row"><button class="btn" id="partsClose">إغلاق</button></div>`,()=>fin(got.size===items.length));
+    $$('#sheet [data-part]').forEach(b=>b.onclick=()=>{ dl(items[+b.dataset.part]); got.add(+b.dataset.part); b.classList.add('g'); b.textContent='✓ '+items[+b.dataset.part].name; if(got.size===items.length) setTimeout(closeSheet,600); });
+    $('#partsClose').onclick=()=>closeSheet(); });
 }
 const shareBlob = (blob,type,base,text,title) => shareFiles([{blob,type,name:safeName(`${base}.${extOf(type)}`)}],text,title);
 
@@ -856,7 +870,7 @@ async function renderArchive(){
     <button class="btn s g" data-sh title="مشاركة">📤</button><button class="btn s" data-md title="نموذج">${r.model?'★':'☆'}</button><button class="btn s d" data-del title="حذف">🗑</button><button class="btn p pl" data-pl>▶ استمع · ${fmt(r.dur)}</button></div>`).join('');
   $$('#rlist .r').forEach(el=>{ const r=list.find(x=>String(x.id)===el.dataset.id);
     // the audio is loaded only when asked for: a long archive never loads every recording at once
-    el.querySelector('[data-pl]').onclick=async e=>{ const b=e.currentTarget; const full=await recGet(r.id); if(!full||!full.blob) return toast('تعذّر فتح التسجيل');
+    el.querySelector('[data-pl]').onclick=async e=>{ const b=e.currentTarget; if(b.disabled) return; b.disabled=true; const full=await recGet(r.id); if(!full||!full.blob) return toast('تعذّر فتح التسجيل');
       const u=URL.createObjectURL(full.blob); archURLs.push(u); const a=document.createElement('audio'); a.controls=true; a.src=u; a.style.width='100%'; fixDur(a); b.replaceWith(a); a.play().catch(()=>{}); };
     el.querySelector('[data-sh]').onclick=()=>shareRec(r);
     el.querySelector('[data-md]').onclick=async()=>{ if(!await parentGate()) return; await recPatch(r.id,{model:!r.model}); toast(!r.model?'صار نموذجاً لهذا النشيد':'لم يعد نموذجاً'); renderArchive(); };
@@ -958,7 +972,7 @@ async function renderParent(){
   if(pKid) $('#pKids').insertAdjacentHTML('beforeend',`<span class="small" style="align-self:center">العمر: ${kidAge(pKid)?AR(kidAge(pKid)):'—'}</span><button class="btn s" id="kidAge">تغيير العمر</button>`);
   if($('#kidAge')) $('#kidAge').onclick=async()=>{ await ageSheet(pKid); if(pKid===kid) applyKidPrefs(); renderParent(); };
   renderModelList();
-  await dbReady; const recs=(await recAll()).filter(r=>!r.model&&r.who===pKid);
+  const recs=(await recMeta()).filter(r=>!r.model&&r.who===pKid);
   const ps=allPoems(); const B=ps.map(p=>({p,b:badges(p,pKid),s:(KS(pKid)[p.id])||{}}));
   const cnt=k=>B.filter(x=>x.b[k]).length; const mins=Math.round(recs.reduce((a,r)=>a+(r.dur||0),0)/60);
   const wk=recs.filter(r=>Date.now()-r.when<7*864e5).length; const lastT=Math.max(0,...recs.map(r=>r.when),...B.map(x=>x.s.last||0));
@@ -995,31 +1009,32 @@ async function doExport(withRecs){
   const head={added,meanings:LS.get('meanings',{}),kids,kidInfo,stats:S,parentName:LS.get('parentName','')};
   const items=[]; let pieces=[], size=0, partNo=1, nRec=0;
   const open_=()=>{ pieces=[JSON.stringify({app:'anasheed',v:4,backup:bid,part:partNo}).slice(0,-1)+(partNo===1?','+JSON.stringify(head).slice(1,-1):'')+',"recs":[']; size=0; };
-  const close_=()=>{ pieces.push(']}'); items.push(new Blob(pieces,{type:'application/json'})); partNo++; };
+  const close_=last=>{ pieces.push(last?'],"last":true}':'],"last":false}'); items.push(new Blob(pieces,{type:'application/json'})); partNo++; };
   open_();
   try{
     if(withRecs){ toast('جارٍ تجهيز النسخة…',4000); const metas=(await recMeta()).sort((a,b)=>a.when-b.when); let firstInPart=true;
       for(const m of metas){ const full=await recGet(m.id); if(!full||!full.blob) continue; const {id,size:_s,...rest}=metaOf(full);
         const s=JSON.stringify(Object.assign(rest,{b64:await blobB64(full.blob)}));
-        if(size && size+s.length>(window.__bkPart||60*1024*1024)){ close_(); open_(); firstInPart=true; }
+        if(size && size+s.length>(window.__bkPart||60*1024*1024)){ close_(false); open_(); firstInPart=true; }
         pieces.push((firstInPart?'':',')+s); firstInPart=false; size+=s.length; nRec++; } }
-    close_();
+    close_(true);
   }catch(e){ return toast('تعذّر تجهيز النسخة: '+String(e&&e.message||e).slice(0,80),5000); }
   const files=items.map((b,i)=>({blob:b,type:'application/json',name:safeName(base+(items.length>1?`-جزء${i+1}`:'')+'.json')}));
   const ok=await shareFiles(files,'نسخة احتياطية من أنشودتي','نسخة احتياطية');
-  if(ok){ LS.set('lastBackup',Date.now()); if(withRecs) LS.set('lastBackupRecs',nRec); toast(withRecs?`النسخة فيها ${AR(nRec)} تسجيل${files.length>1?' في '+AR(files.length)+' ملفات':''} ✓`:'حُفظت النسخة ✓',4000); if(screen==='parent') renderParent(); }
+  if(ok){ if(withRecs) LS.set('lastBackup',Date.now()); toast(withRecs?`النسخة فيها ${AR(nRec)} تسجيل${files.length>1?' في '+AR(files.length)+' ملفات':''} ✓`:'حُفظت النسخة ✓',4000); if(screen==='parent') renderParent(); }
 }
 function mergeStat(a,b){ a=a&&typeof a==='object'?a:{}; b=b&&typeof b==='object'?b:{}; const ints=x=>(Array.isArray(x)?x:[]).map(Number).filter(Number.isFinite); const newer=num(b.last)>num(a.last)?b:a;
   return {heard:(a.heard||b.heard)?1:0, rec:Math.max(num(a.rec),num(b.rec)), lvl:Math.max(num(a.lvl),num(b.lvl)), quiz:Math.min(100,Math.max(num(a.quiz),num(b.quiz))),
-    mem:[...new Set([...ints(a.mem),...ints(b.mem)])], seen:[...new Set([...ints(a.seen),...ints(b.seen)])], seg:num(newer.seg), last:Math.max(num(a.last),num(b.last))}; }
+    mem:[...new Set([...ints(a.mem),...ints(b.mem)])], seen:[...new Set([...ints(a.seen),...ints(b.seen)])], seg:Math.max(0,Math.floor(num(newer.seg))), last:Math.max(num(a.last),num(b.last))}; }
 $('#aImportBtn').onclick=async()=>{ if(!await parentGate()) return; $('#aImport').click(); };
 $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value=''; if(!fs.length) return;
-  let nOk=0, nFail=0, nSkip=0, bad=0, any=false;
+  let nOk=0, nFail=0, nSkip=0, bad=0, any=false; const groups={};
   const have=new Set((await recMeta()).map(x=>x.who+'|'+x.poem+'|'+x.when));
   for(const f of fs){ let o; try{ o=JSON.parse(await f.text()); }catch(x){ bad++; continue; }
     if(!o || o.app!=='anasheed'){ bad++; continue; } any=true;
+    if(o.backup){ const g=(groups[o.backup] ||= {parts:new Set(),last:0}); g.parts.add(num(o.part)); if(o.last===true) g.last=num(o.part); }
     if(Array.isArray(o.added)) for(const a of o.added){ if(validPoem(a) && !added.some(b=>b.id===String(a.id)) && !POEMS.some(p=>String(p.id)===String(a.id))) added.push(cleanPoem(a)); }
-    if(o.meanings && typeof o.meanings==='object'){ const u=LS.get('meanings',{}); for(const [k,v] of Object.entries(o.meanings)) if(typeof v==='string'){ u[k]=v; meanings[k]=v; } LS.set('meanings',u); }
+    if(o.meanings && typeof o.meanings==='object'){ const u=LS.get('meanings',{}); for(const [k,v] of Object.entries(o.meanings)) if(typeof v==='string' && !(k in u)){ u[k]=v; meanings[k]=v; } LS.set('meanings',u); }
     if(Array.isArray(o.kids)) for(const k of o.kids){ if(typeof k==='string' && k.trim() && k.length<40 && !kids.includes(k.trim())) kids.push(k.trim()); }
     if(o.kidInfo && typeof o.kidInfo==='object') for(const [k,v] of Object.entries(o.kidInfo)){ if(!kidInfo[k] && v && num(v.age)) kidInfo[k]={age:num(v.age)}; }
     // progress is merged field by field: an older backup never wipes newer progress
@@ -1027,12 +1042,15 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
     if(typeof o.parentName==='string' && o.parentName && !LS.get('parentName','')){ LS.set('parentName',o.parentName); $('#parentName').value=o.parentName; }
     if(Array.isArray(o.recs)) for(const x of o.recs){ if(!x||typeof x.b64!=='string'){ nFail++; continue; } const key=x.who+'|'+x.poem+'|'+x.when; if(have.has(key)){ nSkip++; continue; }
       try{ const bin=atob(x.b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
-        const {b64,id,size,...rest}=x; ['dur','lvl','seg','when','loud'].forEach(k=>rest[k]=num(rest[k])); rest.who=String(rest.who||'—'); rest.title=String(rest.title||''); rest.poem=String(rest.poem||'');
+        const {b64,id,size,...rest}=x; ['dur','lvl','seg','when','loud'].forEach(k=>rest[k]=num(rest[k])); rest.who=String(rest.who||'—'); rest.title=String(rest.title||''); rest.poem=String(rest.poem||''); rest.model=!!rest.model;
+        rest.marks=Array.isArray(rest.marks)?rest.marks.filter(m=>Array.isArray(m)).map(m=>[num(m[0]),num(m[1]),num(m[2])]):[];
         if(await recPut(Object.assign(rest,{blob:new Blob([u],{type:typeof x.type==='string'?x.type:'audio/webm'})}))!=null){ nOk++; have.add(key); } else nFail++; }catch(err){ nFail++; } } }
   if(!any) return toast(bad?'هذا ليس ملف نسخة احتياطية من «أنشودتي»':'لم يُستورد شيء',4500);
   LS.set('added',added); LS.set('kids',kids); LS.set('kidInfo',kidInfo); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome();
+  const missing=[]; for(const g of Object.values(groups)){ const max=g.last||Math.max(...g.parts); for(let i=1;i<=max;i++) if(!g.parts.has(i)) missing.push(i); if(!g.last) missing.push(max+1); }
   const parts=['تم الاستيراد']; if(nOk) parts.push(AR(nOk)+' تسجيل'); if(nSkip) parts.push(AR(nSkip)+' موجود مسبقاً'); if(nFail) parts.push('⚠️ تعذّر '+AR(nFail)); if(bad) parts.push('⚠️ '+AR(bad)+' ملف غير صالح');
-  if(nFail) openSheet(`<h3>⚠️ لم تُستورد كل التسجيلات</h3><p>${parts.join(' · ')}</p><p class="small">لا تحذف ملف النسخة. جرّب مرة أخرى بعد إعادة تشغيل التطبيق.</p><div class="row"><button class="btn" onclick="closeSheet()">حسناً</button></div>`);
+  if(missing.length) parts.push('⚠️ ينقص من النسخة: الجزء '+missing.map(AR).join('، '));
+  if(nFail||bad||missing.length) openSheet(`<h3>⚠️ لم تكتمل الاستعادة</h3><p>${parts.join(' · ')}</p><p class="small">${missing.length?'اختر أجزاء النسخة كلها معاً ثم استوردها مرة أخرى. ':''}لا تحذف ملفات النسخة. جرّب مرة أخرى بعد إعادة تشغيل التطبيق.</p><div class="row"><button class="btn" onclick="closeSheet()">حسناً</button></div>`);
   else toast(parts.join(' · ')+' ✓',4500); };
 
 // ---------- start ----------

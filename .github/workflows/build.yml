@@ -126,8 +126,6 @@ jobs:
     needs: android
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    permissions:
-      contents: write   # publishes the screenshots to the ci-device branch
     steps:
       - uses: actions/checkout@v4
         with: { persist-credentials: false }
@@ -148,11 +146,26 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none -camera-front none
           script: python3 tests/android_device.py apk/*.apk $RUNNER_TEMP/device
-      - name: Publish results to branch ci-device
+      - name: Results summary
         if: always()
+        run: echo "::notice title=device results::$(head -c 3500 $RUNNER_TEMP/device/results.json | awk 'BEGIN{ORS="%0A"}{print}')"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: device-results, path: '${{ runner.temp }}/device' }
+
+  device-results:
+    # the only job that writes to the repository runs no third-party code: it just publishes the screenshots
+    needs: android-device
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: device-results, path: device }
+      - name: Publish results to branch ci-device
         run: |
-          echo "::notice title=device results::$(head -c 3500 $RUNNER_TEMP/device/results.json | awk 'BEGIN{ORS="%0A"}{print}')"
-          cd $RUNNER_TEMP/device && git init -q && git checkout -q -b ci-device
+          cd device && git init -q && git checkout -q -b ci-device
           git config user.name ci && git config user.email ci@users.noreply.github.com
           git add -A && git commit -q -m "device run ${{ github.run_number }}"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-device

@@ -39,18 +39,13 @@ ks = os.environ.get('ANDROID_KEYSTORE_PATH', '')
 pw = os.environ.get('ANDROID_KEYSTORE_PASSWORD', '')
 if not (ks and os.path.exists(ks) and pw):
     raise SystemExit('missing signing key: add ANDROID_KEYSTORE and ANDROID_KEYSTORE_PASSWORD in Settings → Secrets → Actions')
-# the shipped APK is a release build (not debuggable: nobody with a cable can read the children's recordings);
-# the debug build, signed with the same key, is only used by the emulator test, which needs the WebView inspector
+# the shipped APK is a release build (not debuggable: nobody with a cable can read the children's recordings).
+# The debug build used by the emulator test keeps Gradle's own throwaway debug key: signed with another key,
+# it can never be installed over a family's app to read its data.
 s += f'''
 android {{
     signingConfigs {{
         release {{
-            storeFile file("{ks}")
-            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias "anasheed"
-            keyPassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-        }}
-        debug {{
             storeFile file("{ks}")
             storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias "anasheed"

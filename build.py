@@ -31,6 +31,10 @@ for s in re.split(r'\n### ', src)[1:]:
     poet = re.sub(r'\s*\(.*$', '', poet or 'حكمة عربية').strip()
     body = body.split('\n---')[0]
     lines = [l.strip() for l in body.split('\n') if ' / ' in l and not l.startswith('(')]
+    # a vocalized line with a "/" that is not " / " is a verse that would be dropped silently
+    for l in body.split('\n'):
+        if '/' in l and ' / ' not in l and 'http' not in l and len(re.findall('[ًٌٍَُِّْ]', l)) > 8:
+            problems.append(f'{num}: a verse needs " / " with a space on each side: {l.strip()[:50]}')
     for l in lines:
         if l.count(' / ') != 1:
             problems.append(f'{num}: a verse needs exactly one " / ": {l[:50]}')
@@ -95,7 +99,7 @@ G.update(OVR)
 story_d = json.load(open(P('content', 'story.json'), encoding='utf-8'))
 for pid, sc in story_d.items():
     p = next((x for x in poems if x['id'] == pid), None)
-    assert p and all(0 <= s['v'] < len(p['verses']) for s in sc), f'story {pid} points to a missing verse'
+    assert p and sc and all(0 <= s['v'] < len(p['verses']) for s in sc), f'story {pid} is empty or points to a missing verse'
 lessons = {k: v for k, v in json.load(open(P('content', 'lessons.json'), encoding='utf-8')).items() if not k.startswith('_')}
 assert all(any(p['id'] == k for p in poems) for k in lessons), 'lessons.json: unknown poem id'
 

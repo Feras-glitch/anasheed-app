@@ -19,6 +19,13 @@ function create() {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   // never navigate away from the app (a file dropped on the window would replace it, with no way back)
   win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); });
+  // backups and shared recordings go straight to the Downloads folder, with no dialog that could be cancelled unnoticed
+  session.defaultSession.on('will-download', (e, item) => {
+    const fs = require('fs'), dir = app.getPath('downloads'), ext = path.extname(item.getFilename()), base = path.basename(item.getFilename(), ext);
+    let f = path.join(dir, item.getFilename()), n = 1;
+    while (fs.existsSync(f)) f = path.join(dir, `${base} (${n++})${ext}`);
+    item.setSavePath(f);
+  });
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
   // CI smoke test: ANASHEED_SMOKE=<file> → write page facts there and quit
   if (process.env.ANASHEED_SMOKE) {

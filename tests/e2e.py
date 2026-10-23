@@ -125,6 +125,15 @@ async def main():
         await pg.dblclick('#keep'); await pg.wait_for_timeout(600)
         check(await pg.evaluate('recMeta().then(a=>a.length)') == n0 + 1, 'a double tap on 💾 saves once')
         if await pg.locator('#sheet button:has-text("تمام")').count(): await pg.click('#sheet button:has-text("تمام")')
+        # a double tap on ■ stops once and never starts a hidden recorder
+        g0 = await pg.evaluate('__gum')
+        await pg.click('#recBtn'); await pg.wait_for_timeout(2600); await pg.dblclick('#recBtn'); await pg.wait_for_timeout(900)
+        check(await pg.locator('#keep').count() == 1 and await pg.evaluate("!rec || rec.state!=='recording'") and await pg.evaluate('__gum') == g0 + 1, 'a double tap on ■ stops the take once and starts nothing')
+        await pg.click('#redo')
+        # no switching to the full text in the middle of a take
+        await pg.click('#recBtn'); await pg.wait_for_timeout(1200); await pg.click('#modeRead'); await pg.wait_for_timeout(150)
+        check(await pg.evaluate('mode') == 'sing', 'the text view cannot be opened during a take')
+        await pg.wait_for_timeout(1500); await pg.click('#recBtn'); await pg.wait_for_timeout(700); await pg.click('#redo')
         # 🎧 while recording keeps the take
         await pg.click('#recBtn'); await pg.wait_for_timeout(2000); await pg.click('#goArchive'); await pg.wait_for_timeout(500)
         check(await pg.locator('#keep').count() == 1 and await pg.evaluate('screen') == 'poem', '🎧 during a recording stops it and offers to save it')
@@ -159,6 +168,7 @@ async def main():
         opts = [o.strip() for o in opts if o.strip()]  # picture questions have no text
         check(not any(o[0] in 'وفب' and o[1:3] != 'ال' for o in opts), f'meaning options read naturally {opts}')
         await pg.click('#quizBox .opt >> nth=0'); await pg.wait_for_timeout(1900)
+        check(not await pg.is_visible('#nextV'), 'the verse arrows are hidden during a quiz')
         # keys during a quiz do not throw the quiz away
         await pg.keyboard.press('Space'); await pg.wait_for_timeout(100)
         check(await pg.evaluate('mode') == 'quiz', 'space during a quiz keeps the quiz')
