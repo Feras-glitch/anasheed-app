@@ -174,7 +174,10 @@ def features():
     out['echo_button'] = ev("getComputedStyle(document.querySelector('#echoBtn')).display!=='none'")
     ev("document.querySelector('#echoBtn').click(); 'e'"); time.sleep(2.5); shot('11-echo')
     out['echo_bar'] = ev("document.querySelector('#pbText').textContent")
-    l1 = ev('curLine'); time.sleep(5); out['echo_moves'] = [l1, ev('curLine')]
+    seen = []
+    for _ in range(28):  # one verse = listen + the child's turn (1.25× the verse + 1.2 s); sample long enough for two
+        c = ev('curLine'); seen.append(c) if (not seen or seen[-1] != c) else None; time.sleep(0.5)
+    out['echo_moves'] = seen
     ev("stopPlay(); 's'")
     out['certificate_px'] = ev("certificate(cur).then(()=>new Promise(r=>setTimeout(r,1500))).then(()=>{const i=document.querySelector('#certImg'); return i?i.naturalWidth:0})")
     shot('12-certificate')
