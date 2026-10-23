@@ -150,7 +150,8 @@ async def main():
         n_img = await pg.locator('#quizBox .imgs').count(); n_opt = await pg.locator('#quizBox .opt').count()
         check(n_opt == 3, f'meaning quiz has 3 options (image question: {bool(n_img)})')
         opts = await pg.locator('#quizBox .opt').all_text_contents()
-        check(not any(o.strip()[:1] in 'وفب' and not o.strip()[1:3] == 'ال' for o in opts), f'meaning options read naturally {opts}')
+        opts = [o.strip() for o in opts if o.strip()]  # picture questions have no text
+        check(not any(o[0] in 'وفب' and o[1:3] != 'ال' for o in opts), f'meaning options read naturally {opts}')
         await pg.click('#quizBox .opt >> nth=0'); await pg.wait_for_timeout(1900)
         # keys during a quiz do not throw the quiz away
         await pg.keyboard.press('Space'); await pg.wait_for_timeout(100)
