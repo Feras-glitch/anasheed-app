@@ -90,13 +90,13 @@ R['device'] = {'sdk': adb('shell', 'getprop', 'ro.build.version.sdk').strip(), '
 step('launch', launch)
 shot('01-first-launch')
 
-step('facts', lambda: ev("""({href:location.href, secure:isSecureContext, native:Capacitor.isNativePlatform(),
+step('facts', lambda: ev("""(async()=>({href:location.href, secure:isSecureContext, native:Capacitor.isNativePlatform(),
   plugins:Object.keys(Capacitor.Plugins||{}).filter(k=>/Share|Filesystem/.test(k)), cards:document.querySelectorAll('#grid .card').length,
   kidSheet:!!document.querySelector('#kNew'), mediaRecorder:typeof MediaRecorder,
   types:Object.fromEntries(['audio/mp4','audio/mp4;codecs=mp4a.40.2','audio/webm;codecs=opus'].map(t=>[t,typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported(t)])),
   headerTop:document.querySelector('header').getBoundingClientRect().top, chipTop:document.querySelector('#kidChip').getBoundingClientRect().top,
   safeTop:getComputedStyle(document.querySelector('header')).paddingTop, innerW:innerWidth, innerH:innerHeight, dpr:devicePixelRatio,
-  fonts: document.fonts.check('700 20px Amiri','أ'), screenH:screen.height, loadMs:Math.round(performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd)})"""))
+  fonts: await document.fonts.load('700 20px Amiri','أ').then(f=>f.length>0), fontCairo: await document.fonts.load('700 16px Cairo','أ').then(f=>f.length>0), screenH:screen.height, loadMs:Math.round(performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd)}))()"""))
 
 step('make_kid', lambda: ev("kids.push('تجربة'); LS.set('kids',kids); closeSheet(); setKid('تجربة'); kid"))
 time.sleep(1); shot('02-home')

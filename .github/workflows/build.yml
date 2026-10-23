@@ -87,7 +87,13 @@ jobs:
           KS: ${{ secrets.ANDROID_KEYSTORE }}
           HAS_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
           AS_VAR: ${{ vars.ANDROID_KEYSTORE != '' }}
+          PW_VAR: ${{ vars.ANDROID_KEYSTORE_PASSWORD != '' }}
         run: |
+          if [ "$AS_VAR" = true ] || [ "$PW_VAR" = true ]; then
+            echo "::warning title=Variables::مفتاح التوقيع أو كلمة مروره ما زال في تبويب Variables (المفتاح: $AS_VAR · كلمة المرور: $PW_VAR). احذفهما منه؛ البناء يقرأ من Secrets فقط."
+          else
+            echo "::notice title=Variables::تبويب Variables خالٍ من مفتاح التوقيع وكلمة مروره."
+          fi
           if [ -z "$KS" ]; then
             echo "::error title=signing key::السر ANDROID_KEYSTORE غير موجود (كلمة المرور موجودة: $HAS_PW · أُضيف كمتغير Variable بدل Secret: $AS_VAR). أضفه في Settings ← Secrets and variables ← Actions ← تبويب Secrets ← Repository secrets"; exit 1; fi
           echo "$KS" | base64 -d > "$RUNNER_TEMP/release.p12"
