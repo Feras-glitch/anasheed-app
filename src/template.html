@@ -555,7 +555,10 @@ function spans(r,buf){ // verse index → [start, end] in seconds
 let playSess=null;
 function stopPlay(){ if(playSess){ playSess.stop(); playSess=null; } $('#playBar').style.display='none'; if(Object.keys(stageWho).length){ stageWho={}; if(cur&&screen==='poem') renderVerses(); } }
 function newSess(){ stopPlay(); const s={alive:true,timers:[],src:null,cut:null,repeat:false,stop(){ this.alive=false; this.timers.forEach(clearTimeout); try{this.src&&this.src.stop()}catch(e){} if(this.cut) this.cut(); }}; playSess=s; return s; }
-function playBuf(buf,a,b,sess){ return new Promise(res=>{ const ac=actx(); if(ac.resume) ac.resume(); const src=ac.createBufferSource(); src.buffer=buf; src.connect(ac.destination); src.onended=()=>res(); sess.src=src; src.start(0,a,Math.max(0.05,b-a)); }); }
+function playBuf(buf,a,b,sess){ return new Promise(res=>{ const ac=actx(); if(ac.resume) ac.resume(); const src=ac.createBufferSource(); src.buffer=buf; src.connect(ac.destination);
+  let done=false; const fin=()=>{ if(!done){ done=true; res(); } }; src.onended=fin;
+  // if the audio system is suspended, 'ended' never fires: never let the lesson hang
+  sess.timers.push(setTimeout(fin,(b-a)*1000+2500)); sess.src=src; src.start(0,a,Math.max(0.05,b-a)); }); }
 function pause(ms,sess){ return new Promise(res=>{ const t=setTimeout(res,ms); sess.timers.push(t); sess.cut=()=>{ clearTimeout(t); res(); }; }); }
 function pb(text,turn){ $('#playBar').style.display=''; $('#pbText').textContent=text; $('#playBar').classList.toggle('turn',!!turn); }
 function pbProg(ms){ const i=$('#pbProg'); i.style.transition='none'; i.style.width='0'; void i.offsetWidth; i.style.transition=`width ${ms}ms linear`; i.style.width='100%'; }

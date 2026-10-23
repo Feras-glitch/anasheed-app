@@ -28,7 +28,7 @@ async def main():
     async with async_playwright() as p:
         b = await getattr(p, ENGINE).launch()
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, accept_downloads=True)
-        pg = await ctx.new_page()
+        pg = await ctx.new_page(); pg.set_default_timeout(20000)
         errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto(URL); await pg.wait_for_timeout(800)
@@ -75,4 +75,9 @@ async def main():
         await b.close()
     print(f'\n{len(fails)} failures'); sys.exit(1 if fails else 0)
 
-asyncio.run(main())
+async def guarded():
+    try:
+        await asyncio.wait_for(main(), 300)
+    except asyncio.TimeoutError:
+        print('✗ timed out after the last ✓ above'); sys.exit(1)
+asyncio.run(guarded())

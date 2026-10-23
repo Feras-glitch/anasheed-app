@@ -49,6 +49,7 @@ jobs:
     needs: web
     runs-on: ubuntu-24.04   # Playwright's WebKit libraries are packaged for 24.04
     continue-on-error: true
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
