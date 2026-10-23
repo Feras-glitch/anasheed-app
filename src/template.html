@@ -764,7 +764,8 @@ async function echoYoung(r){
       if(kind===1){ for(const h of [h1,h2]){ await say(h[0],h[1]); if(!sess.alive) break; await turn(Math.round((h[1]-h[0])*1300+900)); } }
       if(kind===2){ await say(h1[0],h1[1]); if(!sess.alive) break; await turn(Math.round((h2[1]-h2[0])*1400+1000),'🗣️ أكمل!'); if(!sess.alive) break; await say(h2[0],h2[1],'👂 هكذا'); }
       if(kind===3){ await turn(Math.round((s1-s0)*1400+1200),'🗣️ البيت كله!'); if(!sess.alive) break; await say(s0,s1,'👂 هكذا'); } } }
-  level=1; const done=sess.alive; stopPlay(); if(cur===p0) renderVerses();
+  // stop only this session: the child may already have started something else (the family theatre, say)
+  const done=sess.alive, mine=!playSess||playSess===sess; if(mine){ level=1; stopPlay(); if(cur===p0) renderVerses(); }
   const took=mic?await mic.stop():null;
   if(took && took.dur>3 && cur===p0) await recPut({poem:p0.id,title:p0.title,who:kid||'—',when:Date.now(),dur:took.dur,blob:took.blob,type:took.blob.type,lvl:0,seg:sg0,model:false,echo:true,marks:[],loud:1});
   if(!done || cur!==p0) return;
