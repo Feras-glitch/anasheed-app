@@ -1,8 +1,21 @@
 """End-to-end check of www/index.html in Chromium with a fake microphone.
 Run: python3 -m http.server -d www 8765 &  then  python3 tests/e2e.py
 """
-import asyncio, sys
+import asyncio, json, math, os, struct, sys, tempfile, wave
 from playwright.async_api import async_playwright
+
+def fake_voice():
+    """A 'singing' microphone: 1.4 s tones with short pauses, so loudness and verse pauses are realistic."""
+    path = os.path.join(tempfile.mkdtemp(), 'voice.wav'); rate = 16000
+    with wave.open(path, 'w') as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+        fr = bytearray()
+        for k in range(20):
+            for i in range(int(rate * 1.6)):
+                v = 0.0 if i > rate * 1.4 else 0.35 * math.sin(2 * math.pi * (220 + 30 * (k % 4)) * i / rate)
+                fr += struct.pack('<h', int(v * 32767))
+        w.writeframes(bytes(fr))
+    return path
 
 URL = 'http://localhost:8765/index.html'
 fails = []
@@ -15,7 +28,7 @@ async def record(pg, secs=2.2):
 
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'])
+        b = await p.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', f'--use-file-for-fake-audio-capture={fake_voice()}'])
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True, permissions=['microphone'], locale='ar-EG', accept_downloads=True)
         pg = await ctx.new_page()
         errs = []
@@ -37,6 +50,21 @@ async def main():
         await pg.click('#ages .chip[data-age="all"]')
         check(n_all == 31 and n6 + n9 == n_all, f'age filters partition the list ({n6}+{n9}={n_all})')
         check(not await pg.evaluate('document.documentElement.scrollWidth>innerWidth'), 'no horizontal overflow on phone')
+        th = await pg.evaluate("[...document.querySelectorAll('#grid .card')].filter(c=>c.querySelector('img.thumb')).length")
+        check(th >= 25, f'cards carry a picture for children who cannot read ({th}/31)')
+        w = await pg.evaluate("(()=>{const p=weekly(); return p && p.age[0]<=kidAge() && kidAge()<=p.age[1]})()")
+        check(w, 'weekly poem fits the child\'s age')
+        check(await pg.evaluate("Object.keys(localStorage).every(k=>k.startsWith('anasheed.'))"), 'every stored key is prefixed (shared web origin)')
+
+        # parent gate: a short tap does not open the parent page; a 3-second press does
+        await pg.click('#goParent'); await pg.wait_for_timeout(200)
+        check(await pg.locator('#gateBtn').count() == 1 and await pg.evaluate('screen') == 'home', 'parent page asks for a long press')
+        bb = await pg.locator('#gateBtn').bounding_box(); await pg.mouse.move(bb['x'] + 20, bb['y'] + 10)
+        await pg.mouse.down(); await pg.wait_for_timeout(600); await pg.mouse.up(); await pg.wait_for_timeout(200)
+        check(await pg.evaluate('screen') == 'home', 'a short press is not enough')
+        await pg.mouse.down(); await pg.wait_for_timeout(3300); await pg.mouse.up(); await pg.wait_for_timeout(300)
+        check(await pg.evaluate('screen') == 'parent', 'a 3-second press opens the parent page')
+        await pg.click('#back'); await pg.wait_for_timeout(200)
 
         # long poem → segments + note
         await pg.click('#grid .card[data-id="٨"]'); await pg.wait_for_timeout(300)
@@ -61,22 +89,44 @@ async def main():
         await pg.click('#verses .verse >> nth=2'); await pg.wait_for_timeout(100)
         check(await pg.locator('#verses .verse >> nth=2').locator('.blank').count() == 0, 'tapping a verse peeks at it')
 
-        # record at level 4 → memorised segment
-        await record(pg)
+        # a 3-second take at level 4 is too short for six verses: no 🧠
+        await record(pg, 3.0)
         check(await pg.locator('#keep').count() == 1, 'save sheet after recording')
         await pg.click('#keep'); await pg.wait_for_timeout(500)
         txt = await pg.text_content('#sheet')
-        check('غيباً' in txt and '🎤' in txt, 'celebration mentions level and new 🎤 badge')
+        check('🎤' in txt, 'celebration announces the new 🎤 badge')
+        check('لتنال 🧠' in txt and '🧠' not in await pg.text_content('#segBox'), 'a take too short for the segment does not earn 🧠')
         await pg.click('#sheet button:has-text("تمام")'); await pg.wait_for_timeout(100)
-        check('🧠' in await pg.text_content('#segBox'), 'segment marked memorised')
+        # the level cannot be switched to the full text mid-take
+        await pg.click('#recBtn'); await pg.wait_for_timeout(700); await pg.click('#lvlBox .chip[data-l="1"]'); await pg.wait_for_timeout(100)
+        check(await pg.evaluate('level') == 4, 'level locked while recording')
+        await pg.wait_for_timeout(9800); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
+        await pg.click('#keep'); await pg.wait_for_timeout(500)
+        txt = await pg.text_content('#sheet')
+        check('أنشدتَ غيباً' in txt, 'celebration names the level reached')
+        await pg.click('#sheet button:has-text("تمام")'); await pg.wait_for_timeout(100)
+        check('🧠' in await pg.text_content('#segBox'), 'a whole, audible take from memory marks the segment memorised')
         check(await pg.text_content('#timer') == '٠:٠٠', 'timer reset after stop')
 
         # too short
         await pg.click('#recBtn'); await pg.wait_for_timeout(500); await pg.click('#recBtn'); await pg.wait_for_timeout(400)
         check('قصير' in await pg.text_content('#toast'), 'too-short recording explained')
 
-        # model recording
+        # double tap on ● starts one recorder only
         await pg.click('#lvlBox .chip[data-l="1"]')
+        await pg.evaluate("window.__gum=0; const o=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getUserMedia=c=>{window.__gum++; return new Promise(r=>setTimeout(r,300)).then(()=>o(c))}; 1")
+        await pg.dblclick('#recBtn'); await pg.wait_for_timeout(2200); await pg.click('#recBtn'); await pg.wait_for_timeout(500)
+        check(await pg.evaluate('__gum') == 1, 'a double tap on ● opens the microphone once')
+        n0 = await pg.evaluate('recMeta().then(a=>a.length)')
+        await pg.dblclick('#keep'); await pg.wait_for_timeout(600)
+        check(await pg.evaluate('recMeta().then(a=>a.length)') == n0 + 1, 'a double tap on 💾 saves once')
+        if await pg.locator('#sheet button:has-text("تمام")').count(): await pg.click('#sheet button:has-text("تمام")')
+        # 🎧 while recording keeps the take
+        await pg.click('#recBtn'); await pg.wait_for_timeout(2000); await pg.click('#goArchive'); await pg.wait_for_timeout(500)
+        check(await pg.locator('#keep').count() == 1 and await pg.evaluate('screen') == 'poem', '🎧 during a recording stops it and offers to save it')
+        await pg.click('#redo')
+
+        # model recording (the parent gate is open from above, so the model box is offered)
         await record(pg)
         await pg.check('#isModel'); await pg.fill('#who', 'بابا'); await pg.click('#keep'); await pg.wait_for_timeout(500)
         check(await pg.is_visible('#modelBtn'), 'model button appears after saving a model')
@@ -99,7 +149,12 @@ async def main():
         await pg.click('#qMenu'); await pg.click('#quizBox [data-q="meaning"]'); await pg.wait_for_timeout(100)
         n_img = await pg.locator('#quizBox .imgs').count(); n_opt = await pg.locator('#quizBox .opt').count()
         check(n_opt == 3, f'meaning quiz has 3 options (image question: {bool(n_img)})')
+        opts = await pg.locator('#quizBox .opt').all_text_contents()
+        check(not any(o.strip()[:1] in 'وفب' and not o.strip()[1:3] == 'ال' for o in opts), f'meaning options read naturally {opts}')
         await pg.click('#quizBox .opt >> nth=0'); await pg.wait_for_timeout(1900)
+        # keys during a quiz do not throw the quiz away
+        await pg.keyboard.press('Space'); await pg.wait_for_timeout(100)
+        check(await pg.evaluate('mode') == 'quiz', 'space during a quiz keeps the quiz')
         await pg.click('#modeQuiz'); await pg.click('#quizBox [data-q="order"]'); await pg.wait_for_timeout(100)
         order = await pg.evaluate('qs[qi]')
         for i in order:
@@ -107,15 +162,35 @@ async def main():
         await pg.wait_for_timeout(1300)
         check(await pg.evaluate('score') == 1, 'ordering round solved correctly scores')
 
-        # story
-        await pg.click('#modeStory'); await pg.wait_for_timeout(200)
-        check(await pg.locator('#storyBox .scene').count() == 4, 'story shows 4 scenes')
+        # a finished quiz never awards a star to another poem
+        await pg.click('#modeQuiz'); await pg.click('#quizBox [data-q="complete"]')
+        for _ in range(5):
+            right = await pg.evaluate("(()=>{const q=document.querySelector('#quizBox .q').textContent; const first=q.split('…')[0].trim(); const v=cur.verses.find(v=>first.startsWith(v[0].trim())); return v[1]})()")
+            await pg.locator('#quizBox .opt', has_text=right).first.click()
+            if _ < 4: await pg.wait_for_timeout(1000)
+        await pg.click('#back'); await pg.click('#grid .card[data-id="٦"]'); await pg.wait_for_timeout(1300)
+        check(not await pg.evaluate("st('٦').quiz"), 'leaving right after the last answer gives no star to the next poem')
+        await pg.click('#back'); await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(200)
+
+        # story: a whole picture book; 👂 only at its end
+        await pg.evaluate("st('١').heard=0")
+        await pg.click('#modeStory'); await pg.wait_for_timeout(300)
+        check(await pg.locator('#storyBox .scene').count() == 4 and await pg.locator('#storyBox .sv').count() == 13, 'story shows 4 pictures and all 13 verses')
+        check(not await pg.evaluate("st('١').heard"), 'opening the story does not earn 👂 yet')
+        await pg.evaluate("document.querySelector('#storyEnd').scrollIntoView()"); await pg.wait_for_timeout(500)
+        check(await pg.evaluate("!!st('١').heard"), 'reaching the end of the story earns 👂')
         await pg.click('#storySing'); check(await pg.is_visible('#verses'), 'story → sing works')
+        # every control a child taps is at least 44 px
+        small = await pg.evaluate("[...document.querySelectorAll('#poem .tools .btn, #lvlBox .chip, #bar .btn, header .btn')].filter(e=>e.offsetParent).map(e=>e.getBoundingClientRect()).filter(r=>Math.min(r.width,r.height)<40).length")
+        check(small == 0, f'no small touch targets on the poem page ({small})')
 
         # archive
         await pg.click('#back'); await pg.click('#goArchive'); await pg.wait_for_timeout(500)
-        check(await pg.locator('#rlist .r').count() == 3, 'archive lists 3 recordings')
-        check(await pg.locator('#ba [data-ba]').count() == 1, 'before/after offered for the poem with 2 recordings')
+        check(await pg.locator('#rlist .r').count() == 5, 'archive lists 5 recordings')
+        check(await pg.locator('#rlist audio').count() == 0, 'archive loads no audio until asked')
+        await pg.click('#rlist .r >> nth=0 >> [data-pl]'); await pg.wait_for_timeout(800)
+        check(await pg.locator('#rlist audio').count() == 1, 'tapping ▶ loads that one recording')
+        check(await pg.locator('#ba [data-ba]').count() == 1, 'before/after offered for the poem with several recordings')
         async with pg.expect_download() as dl:
             await pg.click('#rlist .r >> nth=0 >> [data-sh]')
         fn = (await dl.value).suggested_filename
@@ -207,18 +282,24 @@ async def main():
         check(await pg.evaluate('screen') == 'poem', 'fast back-then-open is not bounced to home')
         await pg.click('#back')
 
-        # failed save is reported, not silently swallowed
+        # the storage connection drops (iOS in the background): the app reconnects and saves
         await pg.click('#grid .card[data-id="٤"]'); await pg.wait_for_timeout(200)
+        n0 = await pg.evaluate('recMeta().then(a=>a.length)')
         await pg.evaluate('db.close()')
-        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(300)
-        check('تعذّر' in await pg.text_content('#toast') and await pg.locator('#keep').count() == 1, 'storage failure reported and the take is kept on screen')
+        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(600)
+        check(await pg.evaluate('recMeta().then(a=>a.length)') == n0 + 1, 'saving still works after the storage connection dropped')
+        if await pg.locator('#sheet button:has-text("تمام")').count(): await pg.click('#sheet button:has-text("تمام")')
+        # storage really gone: the failure is reported, the take stays, and it can be sent away
+        await pg.evaluate("db.close(); db=null; indexedDB.open=()=>{ throw new Error('gone') }; 1")
+        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(400)
+        check('تعذّر' in await pg.text_content('#saveErr') and await pg.locator('#keep').count() == 1 and await pg.locator('#saveShare').count() == 1, 'storage failure reported, the take kept, and it can be sent away')
         await pg.click('#redo')
 
         # persistence
         await pg.reload(); await pg.wait_for_timeout(600)
         check(await pg.locator('#kNew').count() == 0, 'no name prompt after reload')
         on = await pg.locator('#grid .card[data-id="٨"] .badges span.on').count()
-        mem = await pg.evaluate("JSON.parse(localStorage.getItem('stats2'))['سارة']['٨'].mem")
+        mem = await pg.evaluate("JSON.parse(localStorage.getItem('anasheed.stats2'))['سارة']['٨'].mem")
         check(on == 1 and mem == [2], f'progress persists (🎤 on, segment 3 memorised: {mem})')
 
         check(not errs, f'no JS errors {errs}')
@@ -234,4 +315,5 @@ async def main():
     print(f'\n{len(fails)} failures')
     sys.exit(1 if fails else 0)
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())

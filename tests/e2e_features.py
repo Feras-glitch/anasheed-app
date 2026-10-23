@@ -3,6 +3,8 @@ family theater, certificate, easy quiz, conversation cards, parent model session
 Run with the same server as tests/e2e.py."""
 import asyncio, os, sys, tempfile, wave
 from playwright.async_api import async_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from e2e import fake_voice
 
 URL = 'http://localhost:8765/index.html'
 fails = []
@@ -19,7 +21,7 @@ async def record_marked(pg, verses=3, step=1.6):
 
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'])
+        b = await p.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', f'--use-file-for-fake-audio-capture={fake_voice()}', '--autoplay-policy=no-user-gesture-required'])
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True, permissions=['microphone'], accept_downloads=True)
         pg = await ctx.new_page()
         errs = []
@@ -32,6 +34,7 @@ async def main():
         await pg.click('#sheet [data-a="7"]'); await pg.wait_for_timeout(300)
         check(await pg.get_attribute('#ages .chip.on', 'data-age') == '6', 'age 7 → poems for 6–8 shown by default')
         check(await pg.input_value('#speed') == '1', 'age 7 → slowest reading pace')
+        await pg.evaluate('gateUntil=Date.now()+600000')  # the parent gate itself is tested in e2e.py
 
         # ---- pictures are separate files in the app build ----
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
@@ -87,6 +90,9 @@ async def main():
         check(await pg.locator('#mnNext').count() == 1, 'after saving: go on to the next poem without a model')
         await pg.click('#mnStop'); await pg.wait_for_timeout(300)
         check(await pg.is_visible('#echoBtn'), '«ردّد بعدي» appears once a marked model exists')
+        await pg.click('#modeStory'); await pg.wait_for_timeout(600)
+        check(await pg.locator('#storyBox .splay:visible').count() >= 1, 'story pictures play their verses in the parent\'s voice')
+        await pg.click('#modeSing')
 
         # ---- karaoke listen, then echo ----
         await pg.evaluate("window.__seen=new Set(); window.__iv=setInterval(()=>__seen.add(curLine),50)")
@@ -128,7 +134,7 @@ async def main():
         # ---- certificate after memorising ----
         await pg.click('#back'); await pg.click('#grid .card[data-id="١٦"]'); await pg.wait_for_timeout(300)
         await pg.click('#modeSing'); await pg.click('#lvlBox .chip[data-l="4"]')
-        await pg.click('#recBtn'); await pg.wait_for_timeout(2200); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
+        await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(600)
         check(await pg.locator('#celCert').count() == 1, 'memorising earns a certificate button')
         await pg.click('#celCert'); await pg.wait_for_timeout(1500)
@@ -142,8 +148,10 @@ async def main():
 
         # ---- archive player shows a real length ----
         await pg.click('#back'); await pg.click('#goArchive'); await pg.wait_for_timeout(1500)
+        await pg.click('#rlist .r >> nth=0 >> [data-pl]'); await pg.wait_for_timeout(1500)
         d = await pg.evaluate("[...document.querySelectorAll('#rlist audio')].map(a=>a.duration)")
         check(d and all(x and x != float('inf') for x in d), f'archive audio durations known {d[:3]}')
+        check('٠:' in await pg.text_content('#rlist .r >> nth=1 >> [data-pl]'), 'each recording shows its length before loading')
         check(await pg.locator('#rlist .tag:has-text("🦜")').count() >= 1, 'marked models labelled in the archive')
 
         # ---- backup with recordings → restore into a fresh install ----
@@ -154,7 +162,7 @@ async def main():
         n_rec = await pg.evaluate('recAll().then(a=>a.length)')
         ctx2 = await b.new_context(viewport={'width': 390, 'height': 844}); pg2 = await ctx2.new_page()
         await pg2.goto(URL); await pg2.wait_for_timeout(500)
-        await pg2.evaluate("closeSheet()"); await pg2.click('#goParent'); await pg2.set_input_files('#aImport', bp); await pg2.wait_for_timeout(1500)
+        await pg2.evaluate("closeSheet(); gateUntil=Date.now()+600000"); await pg2.click('#goParent'); await pg2.set_input_files('#aImport', bp); await pg2.wait_for_timeout(1500)
         got = await pg2.evaluate('recAll().then(a=>a.length)')
         check(got == n_rec and n_rec > 0, f'backup carries recordings to a new install ({got}/{n_rec})')
         check('ليلى' in await pg2.text_content('#kidChip') and await pg2.evaluate("kidAge('ليلى')") == 7, 'children and ages restored')

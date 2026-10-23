@@ -17,6 +17,8 @@ function create() {
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(allow.includes(perm)));
   session.defaultSession.setPermissionCheckHandler((wc, perm) => allow.includes(perm));
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  // never navigate away from the app (a file dropped on the window would replace it, with no way back)
+  win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); });
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
   // CI smoke test: ANASHEED_SMOKE=<file> → write page facts there and quit
   if (process.env.ANASHEED_SMOKE) {

@@ -18,15 +18,24 @@ sys.path.insert(0, P('content'))
 # ---------- poems ----------
 src = open(P('content', 'texts.md'), encoding='utf-8').read()
 poems = []
+problems = []
 for s in re.split(r'\n### ', src)[1:]:
     head, _, body = s.partition('\n')
     m = re.match(r'(\S+)\.\s*(.+?)(?:\s+—\s+(.+))?$', head.strip())
     if not m:
+        # a heading that does not parse would drop its poem silently
+        if any(' / ' in l for l in body.split('\n---')[0].split('\n')):
+            problems.append(f'heading not understood: {head.strip()!r}')
         continue
     num, title, poet = m.groups()
     poet = re.sub(r'\s*\(.*$', '', poet or 'حكمة عربية').strip()
     body = body.split('\n---')[0]
     lines = [l.strip() for l in body.split('\n') if ' / ' in l and not l.startswith('(')]
+    for l in lines:
+        if l.count(' / ') != 1:
+            problems.append(f'{num}: a verse needs exactly one " / ": {l[:50]}')
+        if re.match(r'(المصدر|ملاحظة|http)', l) or 'http' in l:
+            problems.append(f'{num}: a note line contains " / " and would become a verse: {l[:50]}')
     if not lines:
         continue
     age = re.search(r'(\d+)[–-](\d+)\s*سن', body)
@@ -63,8 +72,12 @@ def ovr_ok(k):
     vs = [p['verses'][int(vn) - 1]] if vn else p['verses']
     return any(key(t) == w for v in vs for h in v for t in h.split())
 missing += [k for k in list(OVR) + list(IMG_OFF) if not ovr_ok(k)]
+ids = [p['id'] for p in poems]
+problems += [f'poem id used twice: {i}' for i in sorted({i for i in ids if ids.count(i) > 1})]
 print(f'{len(poems)} poems · glossary {len(G)} · missing keys {missing} · malformed verses {bad}', file=sys.stderr)
-if missing or bad:
+for x in problems:
+    print('✗', x, file=sys.stderr)
+if missing or bad or problems:
     sys.exit('build failed: fix the problems above')
 
 images_d = json.load(open(P('content', 'images.json'), encoding='utf-8'))
@@ -149,10 +162,11 @@ json.dump({
               {'src': 'icons/maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]
 }, open(os.path.join(www, 'manifest.webmanifest'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 precache = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'] + img_files
+# only this app's caches are ever deleted: the origin may host other sites of the same account
 open(os.path.join(www, 'sw.js'), 'w', encoding='utf-8').write(f"""const C='anasheed-{version}';
 const FILES={json.dumps(precache)};
 self.addEventListener('install',e=>{{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)));self.skipWaiting()}});
-self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
+self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('anasheed-')&&k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
 // network first, but never wait more than 3 s for a slow connection
 self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return;
   const cached=()=>caches.match(e.request,{{ignoreSearch:true}}).then(r=>r||caches.match('index.html'));

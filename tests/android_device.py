@@ -194,4 +194,32 @@ step('persist_after_restart', persistence)
 shot('10-after-restart')
 
 json.dump(R, open(os.path.join(OUT, 'results.json'), 'w'), ensure_ascii=False, indent=1)
+
+# the release waits for this test, so it must fail loudly when the app misbehaves on the device
+def g(*path):
+    x = R
+    for k in path:
+        x = x.get(k) if isinstance(x, dict) else None
+    return x
+CHECKS = {
+    'installs': 'Success' in str(R.get('install')),
+    'secure native page': g('facts', 'secure') is True and g('facts', 'native') is True,
+    'all poems listed': (g('facts', 'cards') or 0) >= 31,
+    'fonts inside the app': g('facts', 'fonts') is True,
+    'back closes the sheet first': g('back_button', 'back1_sheet_closed') is True,
+    'back then goes home': g('back_button', 'back2_screen') == 'home' and g('back_button', 'back2_app_open') is True,
+    'back on home leaves the app': g('back_button', 'back3_exits_from_home') is True,
+    'records with the microphone': g('record', 'live_while_recording') is True and g('record', 'save_sheet') is True,
+    'recording saved': bool(g('record', 'recordings')),
+    'share sheet opens': 'resolver' in str(g('share', 'focus_during_share')).lower() or 'chooser' in str(g('share', 'focus_during_share')).lower(),
+    'echo offered after a marked model': g('features', 'echo_button') is True,
+    'certificate drawn': g('features', 'certificate_px') == 1600,
+    'data survives a restart': (g('persist_after_restart', 'recordings') or 0) >= 1,
+}
+bad = [k for k, ok in CHECKS.items() if not ok]
+for k, ok in CHECKS.items():
+    print(('✓ ' if ok else '✗ ') + k)
+if bad:
+    print('::error title=android device::' + ' · '.join(bad))
+    sys.exit(1)
 print('done')
