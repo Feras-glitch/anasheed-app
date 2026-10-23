@@ -280,13 +280,19 @@ const recDel = id => new Promise(res=>{ if(!db) return res(); const t=db.transac
 let screen='home', ignorePop=0;
 function show(id,fromPop){ if(!fromPop){ const inner=history.state&&history.state.inner; if(id!=='home' && !inner) history.pushState({inner:1},''); else if(id==='home' && inner){ ignorePop++; history.back(); } } screen=id; $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); $('#back').style.display = id==='home'?'none':''; $('#bar').style.display = id==='poem'?'':'none'; window.scrollTo(0,0); if(id!=='poem'){ stopAuto(); if(rec&&rec.state==='recording') rec.stop(); } }
 $('#back').onclick = ()=>{ if(rec&&rec.state==='recording'){ rec.stop(); return; } show('home'); renderHome(); };
+// back: close a sheet → stop a recording → go home; returns false when there is nothing to go back from
+function handleBack(){
+  if($('#pop').classList.contains('on')){ if(!sheetModal) closeSheet(); else toast('اختر «احفظ» أو «أعد المحاولة»'); return true; }
+  if(rec&&rec.state==='recording'){ rec.stop(); return true; }
+  if(screen!=='home'){ show('home',true); renderHome(); return true; }
+  return false;
+}
 window.addEventListener('popstate',()=>{
-  const reArm=()=>history.pushState({inner:1},'');
-  if(ignorePop>0){ ignorePop--; if(screen!=='home') reArm(); return; }
-  if($('#pop').classList.contains('on')){ if(!sheetModal) closeSheet(); else toast('اختر «احفظ» أو «أعد المحاولة»'); if(screen!=='home') reArm(); return; }
-  if(rec&&rec.state==='recording'){ rec.stop(); reArm(); return; }
-  if(screen!=='home'){ show('home',true); renderHome(); }
+  if(ignorePop>0){ ignorePop--; if(screen!=='home') history.pushState({inner:1},''); return; }
+  handleBack(); if(screen!=='home') history.pushState({inner:1},'');
 });
+// Android hardware back (native app): handled here directly, so it never depends on browser history rules
+try{ if(isNative() && window.Capacitor.Plugins.App) window.Capacitor.Plugins.App.addListener('backButton',()=>{ if(!handleBack()) window.Capacitor.Plugins.App.exitApp(); }); }catch(e){}
 $('#goArchive').onclick = ()=>{ renderArchive(); show('archive'); };
 $('#goParent').onclick = ()=>{ renderParent(); show('parent'); };
 

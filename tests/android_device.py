@@ -64,6 +64,21 @@ def ev(expr):
                 raise RuntimeError(json.dumps(r['exceptionDetails'], ensure_ascii=False)[:500])
             return r.get('result', {}).get('value')
 
+def cdp(method, params):
+    global mid
+    mid += 1
+    ws.send(json.dumps({'id': mid, 'method': method, 'params': params}))
+    while True:
+        m = json.loads(ws.recv())
+        if m.get('id') == mid:
+            return m
+
+def tap(sel):  # a trusted touch through DevTools, like a child's finger
+    xy = ev("(()=>{const e=document.querySelector(%s); e.scrollIntoView({block:'center'}); const b=e.getBoundingClientRect(); return [b.x+b.width/2,b.y+b.height/2]})()" % json.dumps(sel))
+    for t in ('mousePressed', 'mouseReleased'):
+        cdp('Input.dispatchMouseEvent', {'type': t, 'x': xy[0], 'y': xy[1], 'button': 'left', 'clickCount': 1})
+    time.sleep(0.8)
+
 def launch():
     adb('shell', 'am', 'start', '-W', '-n', f'{PKG}/.MainActivity')
     time.sleep(6)
@@ -87,17 +102,17 @@ step('make_kid', lambda: ev("kids.push('تجربة'); LS.set('kids',kids); close
 time.sleep(1); shot('02-home')
 
 def back_test():
-    ev("openPoem('١'); screen")
-    time.sleep(1); shot('03-poem')
-    ev("openWord('ثعلب','الثعلب',0); 'sheet'"); time.sleep(0.8)
-    adb('shell', 'input', 'keyevent', '4'); time.sleep(1.5)
-    out = {'sheet_closed_by_back': ev("!document.querySelector('#pop').classList.contains('on')"), 'screen_after_first_back': ev('screen')}
+    ev("closeSheet(); show('home',true); renderHome(); 'ok'")
+    tap('#grid .card[data-id="١"]'); shot('03-poem')
+    out = {'opened_by_tap': ev('screen')}
+    tap('#verses .w.has'); out['sheet_open'] = ev("document.querySelector('#pop').classList.contains('on')")
+    adb('shell', 'input', 'keyevent', '4'); time.sleep(1.2)
+    out['back1_sheet_closed'] = ev("!document.querySelector('#pop').classList.contains('on')"); out['back1_screen'] = ev('screen')
+    adb('shell', 'input', 'keyevent', '4'); time.sleep(1.2)
+    out['back2_screen'] = ev('screen'); out['back2_app_open'] = PKG in focus()
     adb('shell', 'input', 'keyevent', '4'); time.sleep(2)
-    f = focus(); alive = PKG in f
-    out.update({'focus_after_back': f, 'app_still_open': alive})
-    if alive:
-        out['screen_after_back'] = ev('screen')
-    else:
+    out['back3_exits_from_home'] = PKG not in focus()
+    if out['back3_exits_from_home']:
         out['relaunch'] = launch()
     return out
 step('back_button', back_test)
