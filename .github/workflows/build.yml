@@ -39,8 +39,9 @@ jobs:
           scripts/ci_run.sh "e2e" python tests/e2e.py
       - uses: actions/upload-artifact@v4
         with: { name: www, path: www }
+      - run: cp "dist/أنشودتي.html" dist/Anasheed.html
       - uses: actions/upload-artifact@v4
-        with: { name: html, path: dist }
+        with: { name: html, path: dist/Anasheed.html }
 
   android:
     needs: web
@@ -51,7 +52,7 @@ jobs:
         with: { name: www, path: www }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 21 }
       - run: scripts/ci_run.sh "npm install" npm install --no-audit --no-fund
       - run: scripts/ci_run.sh "cap add" npx cap add android
@@ -82,6 +83,12 @@ jobs:
           mkdir -p build && cp ../icons/icon.ico build/icon.ico
           ../scripts/ci_run.sh "npm install" npm install --no-audit --no-fund
           ../scripts/ci_run.sh "electron-builder" npx electron-builder --win --publish never -c.extraMetadata.version=$APP_VERSION
+      - name: Smoke test the Windows app
+        shell: bash
+        run: |
+          ANASHEED_SMOKE="$PWD/smoke.json" timeout 90 electron/out/win-unpacked/Anasheed.exe || true
+          cat smoke.json
+          python -c "import json,sys; f=json.load(open('smoke.json')); bad=[k for k in ('secure','mic','recorder','idb','amiri') if not f[k]]; ok=f['cards']>=31 and not bad; print('::error title=windows smoke::'+json.dumps(f)) if not ok else print('windows smoke ok'); sys.exit(0 if ok else 1)"
       - uses: actions/upload-artifact@v4
         with: { name: windows, path: electron/out/*.exe }
 
@@ -120,4 +127,4 @@ jobs:
           body: |
             **أندرويد (هاتف/تابلت):** نزّل ملف `.apk` وافتحه، واسمح بالتثبيت من مصادر غير معروفة إن طُلب.
             **ويندوز:** `Anasheed-Setup` للتثبيت، أو `Anasheed-Portable` للتشغيل دون تثبيت. إن ظهرت رسالة «Windows protected your PC» اضغط More info ← Run anyway.
-            **ملف واحد:** `أنشودتي.html` للمعاينة السريعة (التسجيل لا يعمل فيه على الهاتف).
+            **ملف واحد:** `Anasheed.html` للمعاينة السريعة (التسجيل لا يعمل فيه على الهاتف).
