@@ -31,7 +31,7 @@ function create() {
         cards: document.querySelectorAll('#grid .card').length,
         secure: window.isSecureContext, mic: !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia),
         recorder: typeof MediaRecorder!=='undefined', idb: await dbReady.then(()=>!!db),
-        amiri: await document.fonts.ready.then(()=>document.fonts.check('24px Amiri','أنشودتي')), version: VERSION }))()`);
+        amiri: (await document.fonts.load('24px Amiri','أنشودتي')).length>0 && (await document.fonts.load('24px Cairo','أنشودتي')).length>0, version: VERSION }))()`);
       fs.writeFileSync(out, JSON.stringify(facts));
       } catch (err) { fs.writeFileSync(out, JSON.stringify({ stage: 'js error', err: String(err) })); }
       app.exit(0);
