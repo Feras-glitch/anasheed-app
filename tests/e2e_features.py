@@ -89,11 +89,11 @@ async def main():
         check(await pg.is_visible('#echoBtn'), '«ردّد بعدي» appears once a marked model exists')
 
         # ---- karaoke listen, then echo ----
-        await pg.click('#modelBtn'); await pg.wait_for_timeout(700)
+        await pg.evaluate("window.__seen=new Set(); window.__iv=setInterval(()=>__seen.add(curLine),50)")
+        await pg.click('#modelBtn'); await pg.wait_for_timeout(300)
         check(await pg.is_visible('#playBar'), 'listening plays verse by verse with a play bar')
-        seen = set()
-        for _ in range(16):
-            seen.add(await pg.evaluate('curLine')); await pg.wait_for_timeout(400)
+        await pg.wait_for_timeout(6500)
+        seen = set(await pg.evaluate("clearInterval(__iv), [...__seen]"))
         check(len(seen) >= 4 and 0 in seen, f'highlight follows the model across all verses {sorted(seen)}')
         if await pg.is_visible('#pbStop'): await pg.click('#pbStop')
         await pg.click('#echoBtn'); await pg.wait_for_timeout(300)
