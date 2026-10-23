@@ -1,0 +1,10 @@
+node_modules/
+/android/
+/www/
+/dist/
+/fonts/
+electron/node_modules/
+electron/out/
+electron/app/
+electron/build/
+__pycache__/

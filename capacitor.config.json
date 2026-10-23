@@ -1,0 +1,6 @@
+{
+  "appId": "com.feras.anasheed",
+  "appName": "أنشودتي",
+  "webDir": "www",
+  "android": { "backgroundColor": "#fbf6ec" }
+}
