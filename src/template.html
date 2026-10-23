@@ -744,7 +744,9 @@ function halves(buf,s0,s1){ const rr=frameRms(buf); const a=Math.max(1,Math.floo
 async function sessionRecorder(){ try{ if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined') return null;
   const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}); const mime=['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(m=>MediaRecorder.isTypeSupported(m))||'';
   const r=new MediaRecorder(stream,mime?{mimeType:mime}:{}), ch=[], t0=Date.now(); r.ondataavailable=e=>{ if(e.data&&e.data.size) ch.push(e.data); }; r.start(500);
-  return {stop:()=>new Promise(res=>{ r.onstop=()=>{ stream.getTracks().forEach(x=>x.stop()); res({blob:new Blob(ch,{type:r.mimeType||mime||'audio/webm'}),dur:(Date.now()-t0)/1000}); }; try{ r.stop(); }catch(e){ res(null); } })};
+  // the microphone is always released, even if the recorder never reports that it stopped
+  return {stop:()=>new Promise(res=>{ let done=false; const fin=v=>{ if(!done){ done=true; stream.getTracks().forEach(x=>x.stop()); res(v); } };
+    r.onstop=()=>fin({blob:new Blob(ch,{type:r.mimeType||mime||'audio/webm'}),dur:(Date.now()-t0)/1000}); setTimeout(()=>fin(null),2500); try{ r.stop(); }catch(e){ fin(null); } })};
   }catch(e){ return null; } }
 async function echoYoung(r){
   const ac0=actx(); if(ac0.resume) ac0.resume();

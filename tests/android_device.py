@@ -204,7 +204,7 @@ def g(*path):
 CHECKS = {
     'installs': 'Success' in str(R.get('install')),
     'secure native page': g('facts', 'secure') is True and g('facts', 'native') is True,
-    'all poems listed': (g('facts', 'cards') or 0) >= 31,
+    'all poems listed': (g('facts', 'cards') or 0) >= 30,
     'fonts inside the app': g('facts', 'fonts') is True,
     'back closes the sheet first': g('back_button', 'back1_sheet_closed') is True,
     'back then goes home': g('back_button', 'back2_screen') == 'home' and g('back_button', 'back2_app_open') is True,

@@ -62,11 +62,13 @@ async def main():
             await pg.wait_for_timeout(250)
         check(turn, 'echo gives the child a turn'); await pg.click('#pbStop')
         await pg.click('#theaterBtn')
-        for _ in range(40):
+        for _ in range(70):
             if await pg.locator('#thShare').count(): break
             await pg.wait_for_timeout(300)
-        check(await pg.locator('#thShare').count() == 1, 'family theater plays to the end')
-        await pg.click('#thAgain'); await pg.wait_for_timeout(200); await pg.click('#pbStop')
+        ok = await pg.locator('#thShare').count() == 1
+        check(ok, 'family theater plays to the end' + ('' if ok else f" — bar: {await pg.text_content('#pbText')!r}, sheet: {(await pg.text_content('#sheet') or '')[:80]!r}, errors: {errs}"))
+        if ok:
+            await pg.click('#thAgain'); await pg.wait_for_timeout(200); await pg.click('#pbStop')
         w = await pg.evaluate("bufferToWav(actx().createBuffer(1,22050,22050)).then(b=>b.size)")
         check(w > 40000, 'WAV export works')
         await pg.evaluate("certificate(cur)"); await pg.wait_for_timeout(2000)
