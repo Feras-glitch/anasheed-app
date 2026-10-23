@@ -47,7 +47,7 @@ jobs:
   webkit:
     # Safari's engine: the closest CI gets to an iPhone
     needs: web
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # Playwright's WebKit libraries are packaged for 24.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
