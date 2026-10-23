@@ -98,7 +98,7 @@ table.t th{background:var(--sand);font-weight:700}
 .kpi b{display:block;font-size:26px;color:var(--accent)}
 h2.sec{font-family:Amiri,serif;margin:16px 0 8px}
 @media (max-height:500px) and (orientation:landscape){header{position:static}.bar{padding:4px 12px calc(4px + env(safe-area-inset-bottom))}.rec{width:46px;height:46px;font-size:20px}body{padding-bottom:64px}.poemhead{padding:10px 14px}}
-@media (max-width:360px){header h1{font-size:16px}header h1 span{display:none}.chip.kid{max-width:28vw}}
+@media (max-width:360px){header{gap:6px;padding-left:10px;padding-right:10px}header h1{font-size:15px}header h1 span,.chip.kid .ki{display:none}.chip.kid{max-width:31vw;padding:4px 10px}header .btn.s{padding:6px 9px}}
 @media (max-width:480px){.verse{grid-template-columns:1fr;gap:0;font-size:22px;line-height:1.9}.verse>div:nth-child(3){padding-right:28px}header h1{font-size:18px}}
 </style>
 </head>
@@ -249,7 +249,7 @@ const KS = (k=kid) => (S[k||'—'] ||= {});
 const st = (id,k=kid) => { const o=KS(k); return o[id] ||= {heard:0,rec:0,lvl:0,quiz:0,mem:[],seg:0,last:0}; };
 const saveS = () => LS.set('stats2',S);
 function setKid(k){ kid=k; LS.set('kid',k); renderKidChip(); renderHome(); }
-function renderKidChip(){ $('#kidChip').textContent = '👤 '+(kid||'من أنت؟'); }
+function renderKidChip(){ $('#kidChip').innerHTML = '<span class="ki">👤 </span>'+esc(kid||'من أنت؟'); }
 async function kidSheet(first){
   const list = kids.map(k=>`<button class="btn ${k===kid?'p':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
   openSheet(`<h3>${first?'أهلاً! من سينشد؟':'من سينشد الآن؟'}</h3><div class="row">${list}<button class="btn g" id="kNew">➕ اسم جديد</button></div>`);
