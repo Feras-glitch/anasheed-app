@@ -303,8 +303,12 @@ let db;
 const dbReady = new Promise(res=>{ try{ const r=indexedDB.open('anasheed',1);
   r.onupgradeneeded=e=>e.target.result.createObjectStore('rec',{keyPath:'id',autoIncrement:true});
   r.onsuccess=e=>{db=e.target.result;res()}; r.onerror=()=>res(); }catch(e){res()} });
-const recAll = () => new Promise(res=>{ if(!db) return res([]); const t=db.transaction('rec').objectStore('rec').getAll(); t.onsuccess=()=>res(t.result||[]); t.onerror=()=>res([]) });
-const recPut = o => new Promise(res=>{ if(!db) return res(null); try{ const t=db.transaction('rec','readwrite').objectStore('rec').put(o); t.onsuccess=()=>res(t.result); t.onerror=()=>res(null); }catch(e){ res(null) } });
+// audio is stored as an ArrayBuffer, not a Blob: Safari refuses Blobs in IndexedDB in private browsing
+const fromStore = r => (r && r.buf && !r.blob) ? Object.assign(r,{blob:new Blob([r.buf],{type:r.type||'audio/webm'})}) : r;
+const recAll = () => new Promise(res=>{ if(!db) return res([]); const t=db.transaction('rec').objectStore('rec').getAll(); t.onsuccess=()=>res((t.result||[]).map(fromStore)); t.onerror=()=>res([]) });
+const recPut = async o => { if(!db) return null; let row=o;
+  try{ if(o.blob instanceof Blob){ const {blob, ...rest}=o; row=Object.assign(rest,{buf:await blob.arrayBuffer()}); } }catch(e){ return null; }
+  return new Promise(res=>{ try{ const t=db.transaction('rec','readwrite').objectStore('rec').put(row); t.onsuccess=()=>res(t.result); t.onerror=()=>res(null); }catch(e){ res(null) } }); };
 const recDel = id => new Promise(res=>{ if(!db) return res(); const t=db.transaction('rec','readwrite').objectStore('rec').delete(id); t.onsuccess=()=>res(); t.onerror=()=>res() });
 
 // ---------- navigation ----------
