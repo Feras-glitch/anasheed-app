@@ -92,8 +92,8 @@ jobs:
           [ -z "$EXE" ] && { echo "::error title=windows smoke::no unpacked exe"; exit 1; }
           ANASHEED_SMOKE="$PWD/smoke.json" /usr/bin/timeout 90 "$EXE" --enable-logging > run.log 2>&1 || echo "exit code $?" >> run.log
           if [ ! -f smoke.json ]; then echo "::error title=windows smoke::no smoke.json%0A$(tail -n 30 run.log | awk 'BEGIN{ORS="%0A"}{print}')"; exit 1; fi
-          cat smoke.json; cat smoke.json.log 2>/dev/null || true
-          python -c "import json,sys; f=json.load(open('smoke.json')); ok=f.get('cards',0)>=31 and not [k for k in ('secure','mic','recorder','idb','amiri') if not f.get(k)]; print('::error title=windows smoke::'+json.dumps(f)) if not ok else print('windows smoke ok'); sys.exit(0 if ok else 1)"
+          echo "::notice title=smoke result::$(cat smoke.json) $(head -c 1500 smoke.json.log 2>/dev/null | awk 'BEGIN{ORS="%0A"}{print}')"
+          node -e "const f=require('./smoke.json'); const bad=['secure','mic','recorder','idb','amiri'].filter(k=>!f[k]); if((f.cards||0)<31||bad.length){console.log('::error title=windows smoke::'+JSON.stringify(f)); process.exit(1)} console.log('windows smoke ok')"
       - uses: actions/upload-artifact@v4
         with: { name: windows, path: electron/out/*.exe }
 
