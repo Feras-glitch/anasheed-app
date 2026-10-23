@@ -44,6 +44,25 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: html, path: dist/Anasheed.html }
 
+  webkit:
+    # Safari's engine: the closest CI gets to an iPhone
+    needs: web
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: www }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: WebKit smoke test
+        run: |
+          scripts/ci_run.sh "pip" python -m pip install -q playwright==1.49.1
+          scripts/ci_run.sh "webkit install" python -m playwright install --with-deps webkit
+          (python -m http.server -d www 8765 >/dev/null 2>&1 &)
+          sleep 1
+          scripts/ci_run.sh "webkit" python tests/webkit_smoke.py webkit
+
   android:
     needs: web
     runs-on: ubuntu-latest
