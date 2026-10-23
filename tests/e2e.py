@@ -26,11 +26,12 @@ async def main():
         # first run: who are you
         check(await pg.locator('#kNew').count() == 1, 'first launch asks for the child name')
         await pg.click('#kNew'); await pg.fill('#pIn', 'سارة'); await pg.click('#pOk'); await pg.wait_for_timeout(200)
+        await pg.click('#sheet [data-a="10"]'); await pg.wait_for_timeout(200)
         check('سارة' in await pg.text_content('#kidChip'), 'kid chip shows the name')
 
         # home
         check(await pg.locator('#wk').count() == 1, 'weekly challenge banner shown')
-        n_all = await pg.locator('#grid .card').count()
+        await pg.click('#ages .chip[data-age="all"]'); n_all = await pg.locator('#grid .card').count()
         await pg.click('#ages .chip[data-age="6"]'); n6 = await pg.locator('#grid .card').count()
         await pg.click('#ages .chip[data-age="9"]'); n9 = await pg.locator('#grid .card').count()
         await pg.click('#ages .chip[data-age="all"]')
@@ -66,7 +67,7 @@ async def main():
         await pg.click('#keep'); await pg.wait_for_timeout(500)
         txt = await pg.text_content('#sheet')
         check('غيباً' in txt and '🎤' in txt, 'celebration mentions level and new 🎤 badge')
-        await pg.click('#sheet .btn.p'); await pg.wait_for_timeout(100)
+        await pg.click('#sheet button:has-text("تمام")'); await pg.wait_for_timeout(100)
         check('🧠' in await pg.text_content('#segBox'), 'segment marked memorised')
         check(await pg.text_content('#timer') == '٠:٠٠', 'timer reset after stop')
 
@@ -82,7 +83,7 @@ async def main():
         check('سارة' in await pg.text_content('#kidChip'), 'saving a model does not switch the child')
 
         # second kid recording at level 1 for before/after
-        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(400); await pg.click('#sheet .btn.p')
+        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(400); await pg.click('#sheet button:has-text("تمام")')
 
         # quizzes on a short poem
         await pg.click('#back'); await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(200)

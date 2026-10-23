@@ -160,6 +160,29 @@ def rotate():
     return w
 step('landscape', rotate)
 
+def features():
+    out = {}
+    ev("closeSheet(); startModel('١',0); 'ok'"); time.sleep(1.5)
+    ev("document.querySelector('#recBtn').click(); 'rec'"); time.sleep(2.5)
+    out['vu_visible'] = ev("document.querySelector('#bar').classList.contains('recording')")
+    for _ in range(2):
+        ev("document.querySelector('#nextV').click(); 'n'"); time.sleep(1.6)
+    ev("document.querySelector('#recBtn').click(); 's'"); time.sleep(2)
+    ev("document.querySelector('#keep').click(); 'k'"); time.sleep(2)
+    out['next_sheet'] = ev("!!document.querySelector('#mnStop')")
+    ev("document.querySelector('#mnStop') && document.querySelector('#mnStop').click(); 'c'"); time.sleep(1)
+    out['echo_button'] = ev("getComputedStyle(document.querySelector('#echoBtn')).display!=='none'")
+    ev("document.querySelector('#echoBtn').click(); 'e'"); time.sleep(2.5); shot('11-echo')
+    out['echo_bar'] = ev("document.querySelector('#pbText').textContent")
+    l1 = ev('curLine'); time.sleep(5); out['echo_moves'] = [l1, ev('curLine')]
+    ev("stopPlay(); 's'")
+    out['certificate_px'] = ev("certificate(cur).then(()=>new Promise(r=>setTimeout(r,1500))).then(()=>{const i=document.querySelector('#certImg'); return i?i.naturalWidth:0})")
+    shot('12-certificate')
+    ev("closeSheet(); 'c'")
+    out['picture_file'] = ev("(()=>{const s=STORY['١'][0].img; return s.slice(0,12)})()")
+    return out
+step('features', features)
+
 def persistence():
     adb('shell', 'am', 'force-stop', PKG); time.sleep(1)
     launch()

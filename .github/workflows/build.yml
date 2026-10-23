@@ -37,6 +37,7 @@ jobs:
           (python -m http.server -d www 8765 >/dev/null 2>&1 &)
           sleep 1
           scripts/ci_run.sh "e2e" python tests/e2e.py
+          scripts/ci_run.sh "e2e features" python tests/e2e_features.py
       - uses: actions/upload-artifact@v4
         with: { name: www, path: www }
       - run: cp "dist/أنشودتي.html" dist/Anasheed.html
@@ -108,7 +109,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: { name: www, path: electron/app }
+        with: { name: html, path: electron/app }
+      - name: The Windows app uses the self-contained page (pictures inside, works from file://)
+        shell: bash
+        run: mv electron/app/Anasheed.html electron/app/index.html
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Build Windows installer + portable exe

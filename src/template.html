@@ -97,8 +97,20 @@ table.t th{background:var(--sand);font-weight:700}
 .kpi{background:var(--card);border-radius:14px;padding:12px;box-shadow:var(--shadow);text-align:center}
 .kpi b{display:block;font-size:26px;color:var(--accent)}
 h2.sec{font-family:Amiri,serif;margin:16px 0 8px}
+.vu{position:absolute;top:0;left:0;right:0;height:6px;background:#f1e4c9;display:none}.vu i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2e8b6f,#e0a030,#c43f3f);transition:width .08s}
+.bar.recording .vu{display:block}
+.playbar{position:sticky;top:64px;z-index:9;background:#2b2118;color:#fff;border-radius:16px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow)}
+.playbar b{flex:1;font-size:18px}.playbar .prog{position:absolute;left:14px;right:14px;bottom:4px;height:4px;border-radius:4px;background:rgba(255,255,255,.2);overflow:hidden}.playbar .prog i{display:block;height:100%;width:0;background:#e0a030}
+.playbar{position:sticky}.playbar.turn{background:var(--accent2)}
+.verse .who{position:absolute;left:8px;bottom:4px;font-family:Cairo;font-size:13px;background:var(--accent);color:#fff;border-radius:999px;padding:0 8px}
+.modeBanner{background:#e9f3ee;border:2px dashed var(--accent2);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:15px}
+.ages{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.ages .btn{min-width:56px;justify-content:center;font-size:20px}
+.cert img{width:100%;border-radius:12px;box-shadow:var(--shadow)}
+.talk{background:#fff8e1;border-radius:var(--radius);padding:14px 16px;margin:12px 0;box-shadow:var(--shadow)}.talk ol{margin:6px 0 0;padding-inline-start:22px}.talk li{margin:6px 0;font-size:18px}
+.mlist .r{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--sand)}.mlist .r span{flex:1}
 @media (max-height:500px) and (orientation:landscape){header{position:static}.bar{padding:4px 12px calc(4px + env(safe-area-inset-bottom))}.rec{width:46px;height:46px;font-size:20px}body{padding-bottom:64px}.poemhead{padding:10px 14px}}
 @media (max-width:360px){header{gap:6px;padding-left:10px;padding-right:10px}header h1{font-size:15px}header h1 span,.chip.kid .ki{display:none}.chip.kid{max-width:31vw;padding:4px 10px}header .btn.s{padding:6px 9px}}
+@media (max-width:420px){body.inner header h1 span{display:none}body.inner .chip.kid{max-width:38vw}}
 @media (max-width:480px){.verse{grid-template-columns:1fr;gap:0;font-size:22px;line-height:1.9}.verse>div:nth-child(3){padding-right:28px}header h1{font-size:18px}}
 </style>
 </head>
@@ -134,7 +146,12 @@ h2.sec{font-family:Amiri,serif;margin:16px 0 8px}
         <button class="btn s" id="modeQuiz">❓ اختبر نفسك</button>
         <button class="btn s" id="modeStory" style="display:none">🖼 حكاية مصوّرة</button>
         <button class="btn s g" id="modelBtn" style="display:none">🔊 اسمع النموذج</button>
+        <button class="btn s g" id="echoBtn" style="display:none">🦜 ردّد بعدي</button>
+        <button class="btn s" id="theaterBtn" style="display:none">🎭 مسرح العائلة</button>
+        <button class="btn s" id="talkBtn" style="display:none">💬 حديث مع والدك</button>
+        <button class="btn s p" id="certBtn" style="display:none">🏅 شهادتي</button>
       </div>
+      <div id="modeBanner"></div>
       <div class="sub" id="segBox"></div>
       <div class="sub" id="lvlBox" style="display:none">
         <span>الحفظ:</span>
@@ -147,6 +164,7 @@ h2.sec{font-family:Amiri,serif;margin:16px 0 8px}
       <div class="small" id="hint" style="margin-top:8px">المس كلمة لترى معناها · الكلمات المظلّلة لها صورة · المس بيتاً لتبدأ منه</div>
       <div id="secureWarn"></div>
     </div>
+    <div class="playbar" id="playBar" style="display:none"><b id="pbText"></b><button class="btn s" id="pbRepeat" title="أعد البيت">🔁</button><button class="btn s d" id="pbStop" title="إيقاف">⏹</button><span class="prog"><i id="pbProg"></i></span></div>
     <div class="verses" id="verses"></div>
     <div class="quiz" id="quizBox" style="display:none"></div>
     <div id="storyBox" style="display:none"></div>
@@ -167,7 +185,10 @@ h2.sec{font-family:Amiri,serif;margin:16px 0 8px}
     <h2 class="sec">👨‍👧 الأطفال</h2>
     <div class="row"><button class="btn" id="kidAdd">➕ أضف طفلاً</button><button class="btn d" id="kidDel">🗑 احذف الطفل المختار</button></div>
     <h2 class="sec">🔊 النماذج الصوتية</h2>
-    <p class="small">افتح أي نشيد، اضغط الزر الأحمر وأنشده بصوتك، ثم اختر «هذا تسجيل نموذج». يظهر للطفل زر «اسمع النموذج» في ذلك النشيد.</p>
+    <p class="small">سجّل الأناشيد بصوتك نموذجاً للأطفال. اضغط ⬇ مع بداية كل بيت وأنت تُنشد، فيصير للطفل «ردّد بعدي» بيتاً بيتاً.</p>
+    <div class="row"><button class="btn g" id="modelSession">🎙 ابدأ جلسة تسجيل النماذج</button></div>
+    <label>اسمك كما يظهر على النماذج</label><input id="parentName" placeholder="بابا">
+    <div class="mlist" id="modelList"></div>
     <h2 class="sec">➕ أناشيد إضافية</h2>
     <p class="small">اكتب كل بيت في سطر، وافصل بين الشطرين بعلامة <b>/</b>. يُحفظ في هذا الجهاز.</p>
     <label>العنوان</label><input id="aTitle" placeholder="مثال: موطني">
@@ -185,6 +206,7 @@ h2.sec{font-family:Amiri,serif;margin:16px 0 8px}
 </main>
 
 <div class="bar" id="bar" style="display:none">
+  <div class="vu" id="vu"><i></i></div>
   <div style="display:flex;align-items:center;gap:12px">
     <button class="btn s" id="prevV" title="البيت السابق">⬆</button>
     <div class="rec" id="recBtn" title="سجّل">●</div>
@@ -203,6 +225,7 @@ const POEMS = /*__POEMS__*/;
 const PRESET = /*__MEANINGS__*/;
 const IMAGES = /*__IMAGES__*/;
 const STORY = /*__STORY__*/;
+const LESSONS = /*__LESSONS__*/;
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -248,13 +271,21 @@ let kid = LS.get('kid', kids[0]||null); if(kid && !kids.includes(kid)) kid = kid
 const KS = (k=kid) => (S[k||'—'] ||= {});
 const st = (id,k=kid) => { const o=KS(k); return o[id] ||= {heard:0,rec:0,lvl:0,quiz:0,mem:[],seg:0,last:0}; };
 const saveS = () => LS.set('stats2',S);
-function setKid(k){ kid=k; LS.set('kid',k); renderKidChip(); renderHome(); }
+let kidInfo = LS.get('kidInfo',{});
+const kidAge = (k=kid) => (kidInfo[k]||{}).age||0;
+function ageSheet(name){ return new Promise(res=>{ let done=false; const fin=v=>{if(!done){done=true;res(v)}};
+  openSheet(`<h3>كم عمر ${esc(name)}؟</h3><div class="ages">${[5,6,7,8,9,10,11,12].map(a=>`<button class="btn" data-a="${a}">${AR(a)}</button>`).join('')}</div><div class="row" style="justify-content:center"><button class="btn s" id="aSkip">تخطَّ</button></div>`,()=>fin(0));
+  $$('#sheet [data-a]').forEach(b=>b.onclick=()=>{ kidInfo[name]=Object.assign(kidInfo[name]||{},{age:+b.dataset.a}); LS.set('kidInfo',kidInfo); fin(+b.dataset.a); closeSheet(); });
+  $('#aSkip').onclick=()=>closeSheet(); }); }
+// the child's age sets sensible defaults: the poem list, the reading pace, the quiz level
+function applyKidPrefs(){ const a=kidAge(); if(!a) return; ageF = a<=8?'6':'9'; $$('#ages .chip').forEach(c=>c.classList.toggle('on',c.dataset.age===ageF)); $('#speed').value = a<=7?1:a<=9?2:3; }
+function setKid(k){ kid=k; LS.set('kid',k); applyKidPrefs(); renderKidChip(); renderHome(); }
 function renderKidChip(){ $('#kidChip').innerHTML = '<span class="ki">👤 </span>'+esc(kid||'من أنت؟'); }
 async function kidSheet(first){
   const list = kids.map(k=>`<button class="btn ${k===kid?'p':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
   openSheet(`<h3>${first?'أهلاً! من سينشد؟':'من سينشد الآن؟'}</h3><div class="row">${list}<button class="btn g" id="kNew">➕ اسم جديد</button></div>`);
   $$('#sheet [data-k]').forEach(b=>b.onclick=()=>{setKid(b.dataset.k);closeSheet();toast('أهلاً '+b.dataset.k+' 👋')});
-  $('#kNew').onclick=async()=>{ const n=await prompt2('اكتب اسمك','الاسم'); if(!n) return; if(!kids.includes(n)){kids.push(n);LS.set('kids',kids)} setKid(n); toast('أهلاً '+n+' 👋'); };
+  $('#kNew').onclick=async()=>{ const n=await prompt2('اكتب اسمك','الاسم'); if(!n) return; if(!kids.includes(n)){kids.push(n);LS.set('kids',kids)} if(!kidAge(n)) await ageSheet(n); setKid(n); toast('أهلاً '+n+' 👋'); };
 }
 $('#kidChip').onclick=()=>kidSheet(false);
 
@@ -278,7 +309,7 @@ const recDel = id => new Promise(res=>{ if(!db) return res(); const t=db.transac
 
 // ---------- navigation ----------
 let screen='home', ignorePop=0;
-function show(id,fromPop){ if(!fromPop){ const inner=history.state&&history.state.inner; if(id!=='home' && !inner) history.pushState({inner:1},''); else if(id==='home' && inner){ ignorePop++; history.back(); } } screen=id; $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); $('#back').style.display = id==='home'?'none':''; $('#bar').style.display = id==='poem'?'':'none'; window.scrollTo(0,0); if(id!=='poem'){ stopAuto(); if(rec&&rec.state==='recording') rec.stop(); } }
+function show(id,fromPop){ if(!fromPop){ const inner=history.state&&history.state.inner; if(id!=='home' && !inner) history.pushState({inner:1},''); else if(id==='home' && inner){ ignorePop++; history.back(); } } screen=id; document.body.classList.toggle('inner',id!=='home'); if(id!=='poem'){ stopPlay(); modelMode=false; } $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); $('#back').style.display = id==='home'?'none':''; $('#bar').style.display = id==='poem'?'':'none'; window.scrollTo(0,0); if(id!=='poem'){ stopAuto(); if(rec&&rec.state==='recording') rec.stop(); } }
 $('#back').onclick = ()=>{ if(rec&&rec.state==='recording'){ rec.stop(); return; } show('home'); renderHome(); };
 // back: close a sheet → stop a recording → go home; returns false when there is nothing to go back from
 function handleBack(){
@@ -324,7 +355,7 @@ function openPoem(id){
   $('#pNote').innerHTML = cur.note?`<div class="note">${esc(cur.note)}</div>`:'';
   $('#modeStory').style.display = STORY[cur.id]?'':'none';
   $('#secureWarn').innerHTML = (window.isSecureContext && navigator.mediaDevices) ? '' : '<div class="warn">التسجيل لا يعمل حين يُفتح الملف بهذه الطريقة. ثبّت تطبيق «أنشودتي» أو افتحه من رابطه.</div>';
-  renderSegs(); setModeUI(); renderVerses(); show('poem'); loadLast(); loadModel();
+  qEasy=null; renderSegs(); setModeUI(); renderVerses(); show('poem'); loadLast(); loadModel(); renderBanner();
 }
 function renderSegs(){
   if(segs.length<2){ $('#segBox').innerHTML=''; return; }
@@ -332,7 +363,7 @@ function renderSegs(){
   $('#segBox').innerHTML = '<span>المقطع:</span>'+segs.map((r,i)=>`<span class="chip ${i===seg?'on':''}" data-s="${i}">${AR(r[0]+1)}–${AR(r[1])}${ms.has(i)?' 🧠':''}</span>`).join('');
   $$('#segBox .chip').forEach(c=>c.onclick=()=>goSeg(+c.dataset.s));
 }
-function goSeg(i){ seg=i; st(cur.id).seg=seg; saveS(); curLine=rng()[0]; stopAuto(); renderSegs(); if(mode==='quiz') quizMenu(); else { renderVerses(); scrollCur(); } loadModel();
+function goSeg(i){ stopPlay(); seg=i; if(!modelMode) st(cur.id).seg=seg; saveS(); curLine=rng()[0]; stopAuto(); renderSegs(); if(mode==='quiz') quizMenu(); else { renderVerses(); scrollCur(); } loadModel();
 }
 function hideWord(w){ // keep the article/prefix + first letter of the stem
   const D=/[ً-ْٰـ]/, sw=strip(w);
@@ -349,11 +380,12 @@ function hemi(txt,hide,i){
 }
 function renderVerses(){
   const [a,b]=rng(); const sing=mode==='sing';
+  if(rec&&rec.state==='recording'){ const l=recMarks[recMarks.length-1]; if(!l||l[0]!==curLine) recMarks.push([curLine,(Date.now()-t0)/1000]); }
   let h='';
   for(let i=a;i<b;i++){ const v=cur.verses[i]; const vis=!sing||level===1||i===peek;
     const h1 = vis?hemi(v[0],0,i) : level===4?hemi(v[0],'blank') : level===3?hemi(v[0],'first') : hemi(v[0],0,i);
     const h2 = vis?hemi(v[1],0,i) : level===4?hemi(v[1],'blank') : hemi(v[1],level===2?'blank':'first');
-    h+=`<div class="verse ${sing?(i===curLine?'cur':(i<curLine?'dim':'')):''}" data-i="${i}"><span class="vn">${AR(i+1)}</span><div>${h1}</div><div>${h2}</div></div>`; }
+    h+=`<div class="verse ${sing?(i===curLine?'cur':(i<curLine?'dim':'')):''}" data-i="${i}"><span class="vn">${AR(i+1)}</span><div>${h1}</div><div>${h2}</div>${stageWho[i]?`<span class="who">🎤 ${esc(stageWho[i])}</span>`:''}</div>`; }
   if(sing && curLine===b-1){ markSeen(); if(seg<segs.length-1) h+=`<div style="text-align:center;padding:12px"><button class="btn p" id="nextSeg">المقطع التالي ⬅</button></div>`; }
   $('#verses').innerHTML=h;
   if($('#nextSeg')) $('#nextSeg').onclick=e=>{ e.stopPropagation(); goSeg(seg+1); };
@@ -371,16 +403,16 @@ function setModeUI(){
   $('#storyBox').style.display = mode==='story'?'':'none';
   $('#verses').style.display = (mode==='quiz'||mode==='story')?'none':'';
 }
-$('#modeRead').onclick=()=>{mode='read';stopAuto();setModeUI();renderVerses()};
+$('#modeRead').onclick=()=>{mode='read';stopAuto();stopPlay();setModeUI();renderVerses()};
 $('#modeSing').onclick=()=>{mode='sing';curLine=rng()[0];setModeUI();renderVerses();scrollCur()};
-$('#modeQuiz').onclick=()=>{mode='quiz';stopAuto();setModeUI();quizMenu()};
-$('#modeStory').onclick=()=>{mode='story';stopAuto();setModeUI();renderStory()};
+$('#modeQuiz').onclick=()=>{mode='quiz';stopAuto();stopPlay();setModeUI();quizMenu()};
+$('#modeStory').onclick=()=>{mode='story';stopAuto();stopPlay();setModeUI();renderStory()};
 $$('#lvlBox .chip').forEach(c=>c.onclick=()=>{ level=+c.dataset.l; peek=-1; setModeUI(); renderVerses(); if(level===4) toast('المس أي بيت لتلمحه لحظة'); });
 function markHeard(){ const b0=badges(cur); const s=st(cur.id); if(s.heard) return; s.heard=1; s.last=Date.now(); saveS(); const e=earned(b0,badges(cur)); if(e.length) toast('شارة جديدة '+e.map(x=>x[1]+' '+x[2]).join(' · '),3500); }
 function markSeen(){ const s=st(cur.id); const seen=new Set(s.seen||[]); if(seen.has(seg)) return; seen.add(seg); s.seen=[...seen]; saveS(); if(seen.size>=segs.length) markHeard(); }
 function renderStory(){
   const sc=STORY[cur.id]||[]; markHeard();
-  $('#storyBox').innerHTML = sc.map(x=>`<div class="scene"><img src="${x.img}" alt=""><div class="cap">${esc(cur.verses[x.v][0])}<br>${esc(cur.verses[x.v][1])}</div></div>`).join('') + `<div style="text-align:center"><button class="btn p" id="storySing">🎵 الآن أنشدها بصوتك</button></div>`;
+  $('#storyBox').innerHTML = sc.map(x=>`<div class="scene"><img src="${x.img}" alt=""><div class="cap">${esc(cur.verses[x.v][0])}<br>${esc(cur.verses[x.v][1])}</div></div>`).join('') + `<div style="text-align:center"><button class="btn p" id="storySing">🎵 الآن أنشدها بصوتك</button></div>${talkHTML()}`;
   $('#storySing').onclick=()=>$('#modeSing').click();
 }
 function step(d){ if(mode!=='sing'){mode='sing';setModeUI()} const [a,b]=rng(); curLine=Math.max(a,Math.min(b-1,curLine+d)); renderVerses(); scrollCur(); }
@@ -409,74 +441,224 @@ function openWord(k, w, i){
 }
 
 // ---------- recording ----------
-let rec=null, chunks=[], t0=0, tick=null, lastBlob=null, wakeLock=null;
+let rec=null, chunks=[], t0=0, tick=null, lastBlob=null, wakeLock=null, recMarks=[], vu=null, modelMode=false, stageWho={};
 $('#recBtn').onclick = async ()=>{
   if(rec && rec.state==='recording'){ rec.stop(); return; }
+  try{ const ac0=actx(); if(ac0.resume) ac0.resume(); }catch(e){}
   if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) return openSheet('<h3>التسجيل غير متاح هنا</h3><p>المتصفح يمنع الميكروفون حين يُفتح الملف مباشرة. ثبّت تطبيق «أنشودتي» على الجهاز، أو افتحه من رابطه على الإنترنت.</p><div class="row"><button class="btn" onclick="closeSheet()">حسناً</button></div>');
   if(typeof MediaRecorder==='undefined') return toast('هذا المتصفح لا يدعم التسجيل');
   try{
     const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
     const mime = ['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m))||'';
     rec = new MediaRecorder(stream, mime?{mimeType:mime}:{}); chunks=[];
-    const recLvl=level, recSeg=seg;
+    const recLvl=level, recSeg=seg, recModelMode=modelMode;
     rec.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data) };
     rec.onstop = async ()=>{
+      const loud=vu?vu.stop():1; vu=null; const marks=recMarks.slice();
       stream.getTracks().forEach(t=>t.stop()); clearInterval(tick); stopAuto(); try{wakeLock&&wakeLock.release()}catch(x){} wakeLock=null;
       $('#recBtn').classList.remove('live'); $('#recBtn').textContent='●'; $('#timer').textContent=fmt(0);
       const dur=(Date.now()-t0)/1000; if(screen!=='poem') return;
       if(dur<1.5) return toast('التسجيل قصير جداً — اضغط الزر الأحمر، أنشد، ثم اضغطه مرة أخرى',3500);
       lastBlob=new Blob(chunks,{type:rec.mimeType||mime||'audio/webm'});
       const url=URL.createObjectURL(lastBlob);
-      openSheet(`<h3>${esc(cur.title)}</h3><audio controls src="${url}" style="width:100%"></audio>
-        <label>اسم المنشد</label><input id="who" value="${esc(kid||'')}" placeholder="الاسم">
-        <label class="inl" style="margin-top:12px"><input type="checkbox" id="isModel">هذا تسجيل نموذج للتعليم (صوت الوالد/المعلّم)</label>
+      openSheet(`<h3>${esc(cur.title)}</h3>${loud<0.08?'<div class="warn">🔈 الصوت منخفض جداً. اسمع التسجيل؛ وإن لم يكن واضحاً فاقترب من الجهاز وأعد.</div>':''}<audio controls src="${url}" style="width:100%;margin-top:8px"></audio>
+        <label>اسم المنشد</label><input id="who" value="${esc(recModelMode?(LS.get('parentName','')||'بابا'):(kid||''))}" placeholder="الاسم">
+        <label class="inl" style="margin-top:12px"><input type="checkbox" id="isModel" ${recModelMode?'checked':''}>هذا تسجيل نموذج للتعليم (صوت الوالد/المعلّم)</label>
         <div class="row"><button class="btn g" id="keep">💾 احفظ</button><button class="btn" id="redo">🔁 أعد المحاولة</button></div>`,null,true);
       $('#keep').onclick=async()=>{
         const model=$('#isModel').checked; let who=$('#who').value.trim()||(model?'النموذج':kid||'—');
         if(!model && who && !kids.includes(who)){ kids.push(who); LS.set('kids',kids); }
         if(!model && who!==kid) setKid(who);
-        const saved=await recPut({poem:cur.id,title:cur.title,who,when:Date.now(),dur,blob:lastBlob,type:lastBlob.type,lvl:recLvl,seg:recSeg,model});
+        const saved=await recPut({poem:cur.id,title:cur.title,who,when:Date.now(),dur,blob:lastBlob,type:lastBlob.type,lvl:recLvl,seg:recSeg,model,marks,loud});
         if(saved==null) return toast('تعذّر حفظ التسجيل على الجهاز — قد تكون الذاكرة ممتلئة',4500);
         closeSheet(); loadLast(); loadModel();
-        if(model){ toast('حُفظ النموذج ✓ سيظهر زر «اسمع النموذج»'); return; }
+        if(model){ if(recModelMode) return modelNext(); toast('حُفظ النموذج ✓ سيظهر زر «اسمع النموذج»'); return; }
         const b0=badges(cur); const s=st(cur.id); s.rec=(s.rec||0)+1; s.lvl=Math.max(s.lvl||0,recLvl); s.last=Date.now();
         if(recLvl===4){ s.mem=[...new Set([...(s.mem||[]),recSeg])]; } saveS(); renderSegs();
         celebrate(earned(b0,badges(cur)), recLvl);
       };
       $('#redo').onclick=()=>closeSheet();
     };
-    rec.start(250); t0=Date.now();
+    stopPlay(); if(mode!=='sing'){mode='sing';curLine=rng()[0];setModeUI();renderVerses();scrollCur()}
+    rec.start(250); t0=Date.now(); recMarks=[[curLine,0]]; vu=startVU(stream);
     try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(x){}
     $('#recBtn').classList.add('live'); $('#recBtn').textContent='■';
     tick=setInterval(()=>$('#timer').textContent=fmt((Date.now()-t0)/1000),250);
-    if(mode!=='sing'){mode='sing';curLine=rng()[0];setModeUI();renderVerses();scrollCur()}
-    startAuto();
+    if(!recModelMode) startAuto(); else toast('اضغط ⬇ مع بداية كل بيت جديد',3000);
   }catch(e){ openSheet(`<h3>لم يُسمح بالميكروفون</h3><p>اسمح لـ«أنشودتي» باستخدام الميكروفون من إعدادات الجهاز ثم أعد المحاولة.</p><p class="small">${esc(e.name||'')} ${esc(e.message||'')}</p><div class="row"><button class="btn" onclick="closeSheet()">حسناً</button></div>`); }
 };
 async function loadLast(){ await dbReady; const mine=(await recAll()).filter(r=>String(r.poem)===String(cur.id)&&!r.model&&(!kid||r.who===kid)).sort((a,b)=>b.when-a.when);
   $('#playLast').style.display = mine.length?'':'none';
   $('#playLast').onclick=()=>{ const r=mine[0]; openSheet(`<h3>آخر تسجيل — ${esc(r.who)}</h3><div class="small">${new Date(r.when).toLocaleString('ar-EG')}</div><audio controls autoplay src="${URL.createObjectURL(r.blob)}" style="width:100%;margin-top:10px"></audio>`); }; }
-async function loadModel(){ await dbReady; const ms=(await recAll()).filter(r=>String(r.poem)===String(cur.id)&&r.model).sort((a,b)=>b.when-a.when);
-  const m = ms.find(r=>r.seg===seg) || ms.find(r=>segs.length<2) || ms[0];
+async function loadModel(){ await dbReady; if(!cur) return;
+  const all=(await recAll()).filter(r=>String(r.poem)===String(cur.id)); const [a,b]=rng();
+  const covers=r=>(r.marks||[]).length>1 && r.marks.some(m=>m[0]>=a&&m[0]<b);
+  const ms=all.filter(r=>r.model).sort((x,y)=>y.when-x.when);
+  const marked=ms.find(covers), m=marked || ms.find(r=>r.seg===seg) || ms.find(r=>segs.length<2) || ms[0];
   $('#modelBtn').style.display = m?'':'none';
-  $('#modelBtn').onclick=()=>{ const a=new Audio(URL.createObjectURL(m.blob)); openSheet(`<h3>🔊 النموذج</h3><p class="small">استمع جيداً، ثم أنشد مثله.</p>`,()=>a.pause()); $('#sheet').appendChild(a); a.controls=true; a.style.width='100%'; a.play().catch(()=>{});
-    a.onended=()=>markHeard(); }; }
+  $('#echoBtn').style.display = marked?'':'none';
+  $('#modelBtn').onclick=()=>{ if(marked) return karaoke(marked,false); const au=new Audio(URL.createObjectURL(m.blob)); openSheet(`<h3>🔊 النموذج</h3><p class="small">استمع جيداً، ثم أنشد مثله.</p>`,()=>au.pause()); $('#sheet').appendChild(au); au.controls=true; au.style.width='100%'; au.play().catch(()=>{}); au.onended=()=>markHeard(); };
+  $('#echoBtn').onclick=()=>karaoke(marked,true);
+  const voices=new Set(all.filter(covers).map(r=>r.who));
+  $('#theaterBtn').style.display = voices.size>=2?'':'none';
+  $('#talkBtn').style.display = LESSONS[cur.id]?'':'none';
+  $('#certBtn').style.display = badges(cur).mem?'':'none';
+}
+$('#theaterBtn').onclick=()=>theater();
+$('#talkBtn').onclick=()=>openSheet(`<h3>💬 حديث مع والدك</h3>${talkHTML(true)}<div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`);
+$('#certBtn').onclick=()=>certificate(cur);
+function talkHTML(bare){ const q=LESSONS[cur&&cur.id]; if(!q) return ''; const ol=`<ol>${q.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`; return bare?ol:`<div class="talk"><b>💬 حديث مع والدك</b>${ol}</div>`; }
 function celebrate(newB, lvl){
   const lvlMsg = lvl===4?'أنشدتَ غيباً! 🧠':lvl===3?'أنشدتَ من أوائل الكلمات':lvl===2?'أنشدتَ بنصف النص':'';
   openSheet(`<div class="stars">🌟🎉🌟</div><h3 style="text-align:center">أحسنت يا ${esc(kid||'بطل')}!</h3>
     ${lvlMsg?`<p style="text-align:center">${lvlMsg}</p>`:''}
     ${newB.length?`<p style="text-align:center;font-size:20px">شارة جديدة: ${newB.map(([k,i,t])=>i+' '+t).join(' · ')}</p>`:''}
+    ${newB.some(x=>x[0]==='mem')?'<div style="text-align:center;margin-bottom:10px"><button class="btn p" id="celCert">🏅 خذ شهادتك</button></div>':''}
     <p class="small" style="text-align:center">${lvl<4?'جرّب مستوى أصعب من «الحفظ» في وضع الإنشاد.':'اسمع تسجيلك الأول والأخير من «تسجيلاتي» لترى كم تحسّنت.'}</p>
-    <div style="text-align:center"><button class="btn p" onclick="closeSheet()">تمام</button></div>`);
+    <div style="text-align:center"><button class="btn" onclick="closeSheet()">تمام</button></div>`);
+  if($('#celCert')) $('#celCert').onclick=()=>certificate(cur);
 }
 
+// ---------- audio engine: level meter, verse spans, echo, karaoke, family theater ----------
+let AC_=null; const actx=()=>{ if(!AC_) AC_=new (window.AudioContext||window.webkitAudioContext)(); return AC_; };
+function startVU(stream){
+  try{ const ac=actx(); const src=ac.createMediaStreamSource(stream); const an=ac.createAnalyser(); an.fftSize=1024; src.connect(an);
+    const d=new Float32Array(an.fftSize), bar=$('#vu i'); let raf, tot=0, loud=0, quiet=0, warned=false;
+    const loop=()=>{ an.getFloatTimeDomainData(d); let sum=0; for(let i=0;i<d.length;i++) sum+=d[i]*d[i]; const rms=Math.sqrt(sum/d.length);
+      bar.style.width=Math.min(100,rms*400)+'%'; tot++; if(rms>0.02){ loud++; quiet=0; } else quiet++;
+      if(quiet>240 && !warned){ warned=true; toast('🔈 لا أكاد أسمعك — اقترب من الجهاز وأنشد بصوت أعلى',3500); }
+      raf=requestAnimationFrame(loop); };
+    if(ac.resume) ac.resume(); loop(); $('#bar').classList.add('recording');
+    return {stop:()=>{ cancelAnimationFrame(raf); try{src.disconnect()}catch(e){} bar.style.width='0'; $('#bar').classList.remove('recording'); return tot?loud/tot:1; }};
+  }catch(e){ return null; }
+}
+const decCache=new Map();
+async function decodeRec(r){ if(decCache.has(r.id)) return decCache.get(r.id); const buf=await actx().decodeAudioData(await r.blob.arrayBuffer()); decCache.set(r.id,buf); return buf; }
+function frameRms(buf){ if(buf._rms) return buf._rms; const d=buf.getChannelData(0), n=Math.max(1,Math.floor(buf.sampleRate*0.02)), out=new Float32Array(Math.ceil(d.length/n));
+  for(let f=0;f<out.length;f++){ let s=0; const e=Math.min(d.length,(f+1)*n); for(let i=f*n;i<e;i++) s+=d[i]*d[i]; out[f]=Math.sqrt(s/Math.max(1,e-f*n)); } buf._rms=out; return out; }
+// move a verse boundary to the quietest moment near where the button was pressed
+function snap(buf,t,back=1.2,fwd=0.6){ const r=frameRms(buf); const a=Math.max(1,Math.floor((t-back)/0.02)), b=Math.min(r.length-2,Math.ceil((t+fwd)/0.02)); let best=Math.round(t/0.02), bv=Infinity;
+  for(let f=a;f<=b;f++){ const v=r[f-1]+r[f]+r[f+1]; if(v<bv){ bv=v; best=f; } } return Math.min(buf.duration,Math.max(0,best*0.02)); }
+function spans(r,buf){ // verse index → [start, end] in seconds
+  const m=(r.marks||[]).filter((x,i,a)=>i===a.length-1 || a[i+1][1]-x[1]>0.25); const out={};
+  for(let k=0;k<m.length;k++){
+    // a boundary may move to a nearby pause, but never eat more than 40% of either verse
+    const bd=j=>snap(buf,m[j][1],Math.min(1.2,0.4*(m[j][1]-m[j-1][1])),Math.min(0.6,0.4*((j<m.length-1?m[j+1][1]:buf.duration)-m[j][1])));
+    let a=k?bd(k):0, b=k<m.length-1?bd(k+1):buf.duration;
+    if(!k){ const rr=frameRms(buf); let mx=0; for(const v of rr) if(v>mx) mx=v; const thr=Math.max(0.008,mx*0.12); let f=0; while(f<rr.length && rr[f]<thr && f*0.02<b-0.5) f++; a=Math.max(0,f*0.02-0.15); }
+    if(b-a>0.4) out[m[k][0]]=[a,b]; }
+  return out; }
+let playSess=null;
+function stopPlay(){ if(playSess){ playSess.stop(); playSess=null; } $('#playBar').style.display='none'; if(Object.keys(stageWho).length){ stageWho={}; if(cur&&screen==='poem') renderVerses(); } }
+function newSess(){ stopPlay(); const s={alive:true,timers:[],src:null,cut:null,repeat:false,stop(){ this.alive=false; this.timers.forEach(clearTimeout); try{this.src&&this.src.stop()}catch(e){} if(this.cut) this.cut(); }}; playSess=s; return s; }
+function playBuf(buf,a,b,sess){ return new Promise(res=>{ const ac=actx(); if(ac.resume) ac.resume(); const src=ac.createBufferSource(); src.buffer=buf; src.connect(ac.destination); src.onended=()=>res(); sess.src=src; src.start(0,a,Math.max(0.05,b-a)); }); }
+function pause(ms,sess){ return new Promise(res=>{ const t=setTimeout(res,ms); sess.timers.push(t); sess.cut=()=>{ clearTimeout(t); res(); }; }); }
+function pb(text,turn){ $('#playBar').style.display=''; $('#pbText').textContent=text; $('#playBar').classList.toggle('turn',!!turn); }
+function pbProg(ms){ const i=$('#pbProg'); i.style.transition='none'; i.style.width='0'; void i.offsetWidth; i.style.transition=`width ${ms}ms linear`; i.style.width='100%'; }
+$('#pbStop').onclick=()=>stopPlay();
+// listen to the model verse by verse (echo=false), or verse then the child's turn to repeat it (echo=true)
+async function karaoke(r, echo){
+  if(rec&&rec.state==='recording') return toast('أوقف التسجيل أولاً');
+  const ac0=actx(); if(ac0.resume) ac0.resume(); // iOS: unlock audio inside the tap
+  const sess=newSess(); mode='sing'; setModeUI(); pb('⏳ …');
+  let buf; try{ buf=await decodeRec(r); }catch(e){ stopPlay(); return toast('تعذّر تشغيل النموذج'); }
+  if(!sess.alive) return;
+  const sp=spans(r,buf); const [a,b]=rng(); const order=[...Array(b-a)].map((_,k)=>a+k).filter(i=>sp[i]);
+  $('#pbRepeat').style.display=''; $('#pbRepeat').onclick=()=>{ sess.repeat=true; try{sess.src&&sess.src.stop()}catch(e){} if(sess.cut) sess.cut(); };
+  let k=0;
+  while(sess.alive && k<order.length){
+    const i=order[k], [s0,s1]=sp[i]; curLine=i; renderVerses(); scrollCur();
+    sess.repeat=false; pb(echo?'👂 استمع…':'🔊 البيت '+AR(i+1)); pbProg((s1-s0)*1000);
+    await playBuf(buf,s0,s1,sess); if(!sess.alive) break; if(sess.repeat) continue;
+    if(echo){ const ms=Math.round((s1-s0)*1250+1200); pb('🗣️ دورك! ردّد البيت',true); pbProg(ms); await pause(ms,sess); if(!sess.alive) break; if(sess.repeat) continue; }
+    k++; }
+  if(sess.alive){ stopPlay(); markHeard(); if(echo) toast('أحسنت! الآن سجّل المقطع كله بصوتك 🎤',3500); }
+}
+// family theater: each verse sung by a different family voice, stitched into one performance
+async function theater(){
+  if(rec&&rec.state==='recording') return toast('أوقف التسجيل أولاً');
+  const ac0=actx(); if(ac0.resume) ac0.resume();
+  await dbReady; const [a,b]=rng();
+  const all=(await recAll()).filter(r=>String(r.poem)===String(cur.id)&&(r.marks||[]).length>1).sort((x,y)=>y.when-x.when);
+  const byWho={}; for(const r of all){ if(!byWho[r.who] && r.marks.some(m=>m[0]>=a&&m[0]<b)) byWho[r.who]=r; }
+  const voices=Object.values(byWho).sort((x,y)=>x.who.localeCompare(y.who,'ar'));
+  if(voices.length<2) return toast('يحتاج المسرح صوتين على الأقل سجّلا هذا المقطع');
+  const sess=newSess(); mode='sing'; setModeUI(); pb('⏳ نجهّز المسرح…');
+  const dec=[]; for(const r of voices){ try{ const buf=await decodeRec(r); dec.push({r,buf,sp:spans(r,buf)}); }catch(e){} }
+  if(!sess.alive) return;
+  const parts=[]; let turn=0;
+  for(let i=a;i<b;i++){ const c=dec.filter(x=>x.sp[i]); if(!c.length) continue; const x=c[turn++%c.length]; parts.push({i,who:x.r.who,buf:x.buf,s:x.sp[i]}); }
+  if(parts.length<2){ stopPlay(); return toast('لا تكفي الأبيات المسجّلة في هذا المقطع'); }
+  const rate=actx().sampleRate, gap=Math.round(rate*0.35); let len=0; for(const p of parts) len+=Math.round((p.s[1]-p.s[0])*rate)+gap;
+  const out=actx().createBuffer(1,len,rate), od=out.getChannelData(0); let pos=0;
+  for(const p of parts){ const d=p.buf.getChannelData(0), s0=Math.round(p.s[0]*p.buf.sampleRate), n=Math.round((p.s[1]-p.s[0])*rate); p.t=pos/rate; od.set(d.subarray(s0,Math.min(d.length,s0+n)),pos); pos+=n+gap; }
+  stageWho={}; for(const p of parts) stageWho[p.i]=p.who;
+  $('#pbRepeat').style.display='none';
+  for(const p of parts) sess.timers.push(setTimeout(()=>{ curLine=p.i; renderVerses(); scrollCur(); pb('🎭 '+p.who+' ينشد'); },p.t*1000));
+  pbProg(out.duration*1000);
+  await playBuf(out,0,out.duration,sess);
+  if(!sess.alive) return;
+  stopPlay(); markHeard();
+  openSheet(`<h3>🎭 أداء العائلة</h3><p>${[...new Set(parts.map(p=>p.who))].map(esc).join(' · ')}</p><div class="row"><button class="btn g" id="thShare">📤 شارك الأداء</button><button class="btn" id="thAgain">▶ أعد</button></div>`);
+  $('#thShare').onclick=async()=>{ toast('جارٍ تجهيز الملف…',1500); shareBlob(await bufferToWav(out),'audio/wav',`أنشودتي-${cur.title}-العائلة`,`أداء العائلة: «${cur.title}»`,cur.title); };
+  $('#thAgain').onclick=()=>{ closeSheet(); theater(); };
+}
+// WebM durations show as unknown in Android's player: probe once so the bar shows the real length
+function fixDur(a){ a.addEventListener('loadedmetadata',()=>{ if(a.duration===Infinity){ a.currentTime=1e7; a.addEventListener('timeupdate',function f(){ a.removeEventListener('timeupdate',f); a.currentTime=0; }); } },{once:true}); }
+
+// ---------- certificate ----------
+const loadImg = src => new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+function firstImg(p){ for(const v of p.verses) for(const h of v) for(const w of h.split(' ')){ const u=IMAGES[wkey(w)]; if(u) return u; } return null; }
+async function certificate(p){
+  const name=kid||'بطل', W=1600, H=1130, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
+  try{ await Promise.all(['700 80px Amiri','400 40px Cairo'].map(f=>document.fonts.load(f,'أنشودتي'))); }catch(e){}
+  g.fillStyle='#fbf6ec'; g.fillRect(0,0,W,H);
+  g.strokeStyle='#d9771f'; g.lineWidth=14; g.strokeRect(40,40,W-80,H-80); g.strokeStyle='#e0a030'; g.lineWidth=4; g.strokeRect(72,72,W-144,H-144);
+  const src=(STORY[p.id]&&STORY[p.id][0].img)||firstImg(p); let pic=false;
+  if(src){ try{ const im=await loadImg(src), sz=380, x=130, y=(H-sz)/2, r=40; g.save(); g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+sz,y,x+sz,y+sz,r); g.arcTo(x+sz,y+sz,x,y+sz,r); g.arcTo(x,y+sz,x,y,r); g.arcTo(x,y,x+sz,y,r); g.closePath(); g.clip();
+    const s=Math.min(im.width,im.height); g.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,x,y,sz,sz); g.restore(); pic=true; }catch(e){} }
+  const cx=pic?(W+560)/2:W/2, maxW=pic?900:1300;
+  const line=(t,font,size,color,y)=>{ let sz=size; g.font=`${font.replace('{}',sz)}`; while(g.measureText(t).width>maxW && sz>30){ sz-=4; g.font=font.replace('{}',sz); } g.fillStyle=color; g.fillText(t,cx,y); };
+  g.direction='rtl'; g.textAlign='center';
+  line('شهادة حفظ','700 {}px Amiri',100,'#2b2118',250);
+  line('يشهد تطبيق «أنشودتي» بأنّ','400 {}px Cairo',40,'#7a6a5a',345);
+  line(name,'700 {}px Amiri',112,'#d9771f',490);
+  line('حفظ غيباً نشيد','400 {}px Cairo',42,'#2b2118',590);
+  line('«'+p.title+'»','700 {}px Amiri',80,'#2b2118',700);
+  line(p.poet,'400 {}px Cairo',38,'#7a6a5a',780);
+  line(new Date().toLocaleDateString('ar-EG',{day:'numeric',month:'long',year:'numeric'}),'400 {}px Cairo',34,'#7a6a5a',920);
+  g.beginPath(); g.arc(W-230,H-230,92,0,Math.PI*2); g.fillStyle='#e0a030'; g.fill(); g.textAlign='center'; g.font='700 46px Amiri'; g.fillStyle='#fff'; g.fillText('أحسنت',W-230,H-215);
+  let blob=null; try{ blob=await new Promise(r=>c.toBlob(r,'image/png')); }catch(e){}
+  if(!blob) return toast('تعذّر إنشاء الشهادة');
+  openSheet(`<h3>🏅 شهادة ${esc(name)}</h3><div class="cert"><img id="certImg" src="${URL.createObjectURL(blob)}" alt="شهادة"></div><div class="row"><button class="btn p" id="cShare">📤 احفظها أو شاركها</button></div><p class="small">احفظ الصورة ثم اطبعها وعلّقها 🙂</p>`);
+  $('#cShare').onclick=()=>shareBlob(blob,'image/png',`شهادة-${name}-${p.title}`,`شهادة حفظ «${p.title}»`,'شهادة حفظ');
+}
+
+// ---------- parent: model-recording session ----------
+$('#parentName').value=LS.get('parentName','');
+$('#parentName').onchange=()=>LS.set('parentName',$('#parentName').value.trim());
+async function modelCoverage(){ await dbReady; const ms=(await recAll()).filter(r=>r.model&&(r.marks||[]).length>1); const cov={};
+  for(const p of allPoems()){ const sg=segments(p); cov[p.id]=sg.map(([a,b])=>ms.some(r=>String(r.poem)===String(p.id) && r.marks.filter(m=>m[0]>=a&&m[0]<b).length>=Math.ceil((b-a)/2))); }
+  return cov; }
+async function renderModelList(){ const cov=await modelCoverage();
+  $('#modelList').innerHTML = allPoems().map(p=>{ const c=cov[p.id]; const n=c.filter(Boolean).length; return `<div class="r"><span>${esc(p.title)}</span><span class="small">${n===c.length?'✓ مكتمل':AR(n)+' من '+AR(c.length)+(c.length>1?' مقاطع':'')}</span><button class="btn s ${n===c.length?'':'g'}" data-m="${esc(p.id)}">🎙</button></div>`; }).join('');
+  $$('#modelList [data-m]').forEach(b=>b.onclick=()=>{ const c=cov[b.dataset.m]; const s=c.indexOf(false); startModel(b.dataset.m, s<0?0:s); }); }
+async function nextModelTarget(){ const cov=await modelCoverage(); for(const p of allPoems()){ const s=cov[p.id].indexOf(false); if(s>=0) return [p.id,s]; } return null; }
+$('#modelSession').onclick=async()=>{ const t=await nextModelTarget(); if(!t) return toast('كل الأناشيد لها نماذج ✓'); startModel(...t); };
+function startModel(id,s){ openPoem(id); seg=s; curLine=rng()[0]; modelMode=true; mode='sing'; level=1; $('#autoOn').checked=false; renderSegs(); setModeUI(); renderVerses(); loadModel(); renderBanner(); }
+function renderBanner(){ $('#modeBanner').innerHTML = modelMode ? `<div class="modeBanner">🎙 <b>تسجيل النموذج</b> — اضغط ● وأنشد، واضغط ⬇ مع بداية كل بيت جديد، ثم ■ للإنهاء.<div class="row"><button class="btn s" id="mmExit">خروج من هذا الوضع</button></div></div>` : '';
+  if($('#mmExit')) $('#mmExit').onclick=()=>{ modelMode=false; $('#autoOn').checked=true; renderBanner(); }; }
+async function modelNext(){ const t=await nextModelTarget();
+  openSheet(`<h3>✓ حُفظ النموذج</h3><p>صار للأطفال «ردّد بعدي» في هذا المقطع.</p><div class="row">${t?'<button class="btn g" id="mnNext">التالي ⬅</button>':''}<button class="btn" id="mnStop">انتهيت</button></div>`);
+  if(t) $('#mnNext').onclick=()=>{ closeSheet(); startModel(...t); };
+  $('#mnStop').onclick=()=>{ closeSheet(); modelMode=false; $('#autoOn').checked=true; renderBanner(); }; }
+
 // ---------- sharing / download ----------
-const extOf = t => (t||'').includes('json')?'json':(t||'').includes('wav')?'wav':(t||'').includes('mp4')?'m4a':(t||'').includes('ogg')?'ogg':'webm';
+const extOf = t => (t||'').includes('png')?'png':(t||'').includes('json')?'json':(t||'').includes('wav')?'wav':(t||'').includes('mp4')?'m4a':(t||'').includes('ogg')?'ogg':'webm';
 const blobB64 = b => new Promise(r=>{ const f=new FileReader(); f.onload=()=>r(String(f.result).split(',')[1]); f.readAsDataURL(b); });
 // WebM/Opus (what Android records) doesn't play on iPhones or in some players: share as WAV, which plays everywhere
-async function toWav(blob){
-  const AC=window.AudioContext||window.webkitAudioContext; const ac=new AC();
-  const buf=await ac.decodeAudioData(await blob.arrayBuffer()); try{ac.close()}catch(e){}
+async function toWav(blob){ return bufferToWav(await actx().decodeAudioData(await blob.arrayBuffer())); }
+async function bufferToWav(buf){
   const rate=22050, off=new OfflineAudioContext(1, Math.max(1,Math.ceil(buf.duration*rate)), rate);
   const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start();
   const d=(await off.startRendering()).getChannelData(0);
@@ -516,9 +698,9 @@ async function renderArchive(){
   $$('#ba [data-ba]').forEach(b=>b.onclick=()=>beforeAfter(ba[+b.dataset.ba]));
   if(!list.length){ $('#rlist').innerHTML='<div class="empty">لا تسجيلات بعد. افتح نشيداً واضغط الزر الأحمر.</div>'; return; }
   const LV=['','كامل','نصف','أوائل','غيباً'];
-  $('#rlist').innerHTML = list.map(r=>`<div class="r" data-id="${r.id}"><div class="t"><b style="font-family:Amiri,serif;font-size:20px">${r.model?'🔊 ':''}${esc(r.title)}</b><div class="small">${esc(r.who)} · ${new Date(r.when).toLocaleDateString('ar-EG',{month:'long',day:'numeric',year:'numeric'})} · ${fmt(r.dur)}${r.lvl>1?' · '+LV[r.lvl]:''}</div></div>
-    <button class="btn s g" data-sh title="مشاركة">📤</button><button class="btn s" data-md title="نموذج">${r.model?'★':'☆'}</button><button class="btn s d" data-del title="حذف">🗑</button><audio controls preload="none"></audio></div>`).join('');
-  $$('#rlist .r').forEach(el=>{ const r=list.find(x=>x.id==el.dataset.id); const a=el.querySelector('audio'); a.src=URL.createObjectURL(r.blob);
+  $('#rlist').innerHTML = list.map(r=>`<div class="r" data-id="${r.id}"><div class="t"><b style="font-family:Amiri,serif;font-size:20px">${r.model?'🔊 ':''}${esc(r.title)}</b>${r.model&&(r.marks||[]).length>1?' <span class="tag">🦜 أبيات</span>':''}<div class="small">${esc(r.who)} · ${new Date(r.when).toLocaleDateString('ar-EG',{month:'long',day:'numeric',year:'numeric'})} · ${fmt(r.dur)}${r.lvl>1?' · '+LV[r.lvl]:''}</div></div>
+    <button class="btn s g" data-sh title="مشاركة">📤</button><button class="btn s" data-md title="نموذج">${r.model?'★':'☆'}</button><button class="btn s d" data-del title="حذف">🗑</button><audio controls preload="metadata"></audio></div>`).join('');
+  $$('#rlist .r').forEach(el=>{ const r=list.find(x=>x.id==el.dataset.id); const a=el.querySelector('audio'); a.src=URL.createObjectURL(r.blob); fixDur(a);
     el.querySelector('[data-sh]').onclick=()=>shareRec(r);
     el.querySelector('[data-md]').onclick=async()=>{ r.model=!r.model; await recPut(r); toast(r.model?'صار نموذجاً لهذا النشيد':'لم يعد نموذجاً'); renderArchive(); };
     el.querySelector('[data-del]').onclick=async()=>{ if(await ask('حذف هذا التسجيل نهائياً؟','احذف')){ await recDel(r.id); renderArchive(); } }; });
@@ -531,23 +713,26 @@ function beforeAfter(g){
 }
 
 // ---------- quizzes ----------
-let qs=[], qi=0, score=0, qType='';
+let qs=[], qi=0, score=0, qType='', qEasy=null;
+const rhymeOf = x => strip(x).replace(/[\sاوىيه]+$/,'').slice(-1);
 function quizMenu(){
   const [a,b]=rng(); const canOrder=b-a>=3; const hasWords=segWords().length>0;
-  $('#quizBox').innerHTML=`<div class="menu"><button class="btn v" data-q="complete">✍️ أكمل البيت</button>${hasWords?'<button class="btn g" data-q="meaning">💡 ما معنى الكلمة؟</button>':''}${canOrder?'<button class="btn p" data-q="order">🔢 رتّب الأبيات</button>':''}</div>`+(segs.length>1?'<p class="small" style="text-align:center">الأسئلة من المقطع المختار فقط</p>':'');
+  if(qEasy===null) qEasy = kidAge()? kidAge()<=8 : cur.age[0]<=7;
+  $('#quizBox').innerHTML=`<div class="chips" style="justify-content:center"><span class="chip ${qEasy?'on':''}" data-e="1">🐣 سهل</span><span class="chip ${qEasy?'':'on'}" data-e="0">🦅 عادي</span></div><div class="menu"><button class="btn v" data-q="complete">✍️ أكمل البيت</button>${hasWords?'<button class="btn g" data-q="meaning">💡 ما معنى الكلمة؟</button>':''}${canOrder?'<button class="btn p" data-q="order">🔢 رتّب الأبيات</button>':''}</div>`+(segs.length>1?'<p class="small" style="text-align:center">الأسئلة من المقطع المختار فقط</p>':'');
   $$('#quizBox [data-q]').forEach(b=>b.onclick=()=>startQuiz(b.dataset.q));
+  $$('#quizBox [data-e]').forEach(c=>c.onclick=()=>{ qEasy=c.dataset.e==='1'; quizMenu(); });
 }
 function segWords(){ const [a,b]=rng(); const seen=new Set(), out=[]; for(let i=a;i<b;i++) cur.verses[i].forEach((h,hi)=>h.split(' ').forEach(w=>{const k=wkey(w); if(k&&M(k,i)&&!seen.has(k)){seen.add(k);out.push({k,w,i,hi})}})); return out; }
 function startQuiz(t){
   qType=t; qi=0; score=0; const [a,b]=rng(); const idx=[...Array(b-a)].map((_,i)=>a+i);
   if(t==='complete') qs=shuffle(idx).slice(0,5);
-  if(t==='meaning'){ const ws=segWords(); const withImg=shuffle(ws.filter(x=>IMG(x.k,x.i))); qs=shuffle(withImg.slice(0,2).concat(shuffle(ws.filter(x=>!withImg.slice(0,2).includes(x))))).slice(0,5); }
-  if(t==='order'){ const n=Math.min(4,b-a); const starts=shuffle([...Array(b-a-n+1)].map((_,i)=>a+i)); qs=[0,1,2].map(r=>starts[r%starts.length]).map(s=>[...Array(n)].map((_,i)=>s+i)); }
+  if(t==='meaning'){ const ws=segWords(); const withImg=shuffle(ws.filter(x=>IMG(x.k,x.i))); const nImg=qEasy?5:2; qs=shuffle(withImg.slice(0,nImg).concat(shuffle(ws.filter(x=>!withImg.slice(0,nImg).includes(x))))).slice(0,5); }
+  if(t==='order'){ const n=Math.min(qEasy?3:4,b-a); const starts=shuffle([...Array(b-a-n+1)].map((_,i)=>a+i)); qs=[0,1,2].map(r=>starts[r%starts.length]).map(s=>[...Array(n)].map((_,i)=>s+i)); }
   nextQ();
 }
 function finishQuiz(){
   const pct=Math.round(score/qs.length*100); const b0=badges(cur); const s=st(cur.id); s.quiz=Math.max(s.quiz||0,pct); s.last=Date.now(); saveS(); const e=earned(b0,badges(cur));
-  $('#quizBox').innerHTML=`<div class="stars">${'⭐'.repeat(score)}${'☆'.repeat(qs.length-score)}</div><h3 style="text-align:center">${AR(score)} من ${AR(qs.length)}</h3>${e.length?`<p style="text-align:center;font-size:20px">شارة جديدة: ${e.map(([k,i,t])=>i+' '+t).join(' · ')}</p>`:''}<div class="row" style="justify-content:center"><button class="btn p" id="qAgain">مرة أخرى</button><button class="btn" id="qMenu">اختبار آخر</button><button class="btn" id="qBack">عودة للنص</button></div>`;
+  $('#quizBox').innerHTML=`<div class="stars">${'⭐'.repeat(score)}${'☆'.repeat(qs.length-score)}</div><h3 style="text-align:center">${AR(score)} من ${AR(qs.length)}</h3>${e.length?`<p style="text-align:center;font-size:20px">شارة جديدة: ${e.map(([k,i,t])=>i+' '+t).join(' · ')}</p>`:''}${LESSONS[cur.id]?talkHTML():''}<div class="row" style="justify-content:center"><button class="btn p" id="qAgain">مرة أخرى</button><button class="btn" id="qMenu">اختبار آخر</button><button class="btn" id="qBack">عودة للنص</button></div>`;
   $('#qAgain').onclick=()=>startQuiz(qType); $('#qMenu').onclick=quizMenu; $('#qBack').onclick=()=>$('#modeRead').click();
 }
 function answer(btns,ok,rightEl){ btns.forEach(x=>x.disabled=true); if(ok) score++; else if(rightEl) rightEl.classList.add('ok'); setTimeout(()=>{qi++;nextQ()}, ok?900:1700); }
@@ -557,6 +742,8 @@ function nextQ(){
   if(qType==='complete'){
     const i=qs[qi], right=cur.verses[i][1];
     let pool=[...new Set(cur.verses.map(v=>v[1]).filter(x=>x!==right))];
+    // easy: endings from other poems, with a different rhyme, so the child can lean on the sound of the poem
+    if(qEasy) pool=shuffle(POEMS.filter(p=>p.id!==cur.id).flatMap(p=>p.verses.map(v=>v[1]))).filter(x=>rhymeOf(x)!==rhymeOf(right)).slice(0,6);
     if(pool.length<2) pool=pool.concat(shuffle(POEMS.flatMap(p=>p.verses.map(v=>v[1]))).filter(x=>x!==right).slice(0,4));
     const opts=shuffle([right,...shuffle(pool).slice(0,2)]);
     $('#quizBox').innerHTML=head+`<div class="q">${esc(cur.verses[i][0])}<br><span style="color:var(--accent)">… … …</span></div>`+opts.map(o=>`<button class="opt">${esc(o)}</button>`).join('');
@@ -592,6 +779,9 @@ async function renderParent(){
   pKid = pKid && kids.includes(pKid) ? pKid : (kid||kids[0]||null);
   $('#pKids').innerHTML = kids.length? kids.map(k=>`<span class="chip ${k===pKid?'on':''}" data-k="${esc(k)}">${esc(k)}</span>`).join('') : '<span class="small">لا أطفال بعد.</span>';
   $$('#pKids .chip').forEach(c=>c.onclick=()=>{pKid=c.dataset.k;renderParent()});
+  if(pKid) $('#pKids').insertAdjacentHTML('beforeend',`<span class="small" style="align-self:center">العمر: ${kidAge(pKid)?AR(kidAge(pKid)):'—'}</span><button class="btn s" id="kidAge">تغيير العمر</button>`);
+  if($('#kidAge')) $('#kidAge').onclick=async()=>{ await ageSheet(pKid); if(pKid===kid) applyKidPrefs(); renderParent(); };
+  renderModelList();
   await dbReady; const recs=(await recAll()).filter(r=>!r.model&&r.who===pKid);
   const ps=allPoems(); const B=ps.map(p=>({p,b:badges(p,pKid),s:(KS(pKid)[p.id])||{}}));
   const cnt=k=>B.filter(x=>x.b[k]).length; const mins=Math.round(recs.reduce((a,r)=>a+(r.dur||0),0)/60);
@@ -601,7 +791,7 @@ async function renderParent(){
   $('#pTable').innerHTML = pKid ? (rows.length? `<table class="t"><tr><th>النشيد</th><th>الشارات</th><th>أفضل اختبار</th><th>التسجيلات</th></tr>${rows.map(x=>`<tr><td>${esc(x.p.title)}</td><td>${badgeHTML(x.b)}</td><td>${x.s.quiz?AR(x.s.quiz)+'٪':'—'}</td><td>${AR(x.s.rec||0)}</td></tr>`).join('')}</table>` : '<div class="empty">لم يبدأ بعد.</div>') : '';
   renderAdded();
 }
-$('#kidAdd').onclick=async()=>{ const n=await prompt2('اسم الطفل','الاسم'); if(!n) return; if(!kids.includes(n)){kids.push(n);LS.set('kids',kids)} pKid=n; if(!kid) setKid(n); renderParent(); };
+$('#kidAdd').onclick=async()=>{ const n=await prompt2('اسم الطفل','الاسم'); if(!n) return; if(!kids.includes(n)){kids.push(n);LS.set('kids',kids)} await ageSheet(n); pKid=n; if(!kid) setKid(n); renderParent(); };
 $('#kidDel').onclick=async()=>{ if(!pKid) return; if(!await ask(`حذف «${pKid}» وكل تقدّمه؟ (تبقى تسجيلاته في «تسجيلاتي»)`,'احذف')) return; kids=kids.filter(k=>k!==pKid); delete S[pKid]; LS.set('kids',kids); saveS(); if(kid===pKid) setKid(kids[0]||null); pKid=null; renderKidChip(); renderParent(); };
 
 // ---------- add poems / backup ----------
@@ -629,7 +819,7 @@ $('#aImport').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=ne
   }catch(x){ toast('ملف غير صالح') } e.target.value=''; }; r.readAsText(f); };
 
 // ---------- start ----------
-renderKidChip(); renderHome();
+applyKidPrefs(); renderKidChip(); renderHome();
 if(!kid) setTimeout(()=>kidSheet(true),400);
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !isNative() && !/localhost|127\.0\.0\.1/.test(location.hostname)) navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});

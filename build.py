@@ -9,7 +9,7 @@ Outputs:
 Fonts: if fonts/node_modules/@fontsource/{amiri,cairo} exist (CI installs them),
 they are embedded as base64; otherwise the page links Google Fonts.
 """
-import base64, datetime, json, os, re, shutil, sys
+import base64, datetime, hashlib, json, os, re, shutil, sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 P = lambda *a: os.path.join(ROOT, *a)
@@ -67,13 +67,13 @@ if missing or bad:
 images_d = json.load(open(P('content', 'images.json'), encoding='utf-8'))
 for k in IMG_OFF:
     images_d[k] = None
-images = json.dumps(images_d, ensure_ascii=False)
 G.update(OVR)
-story = open(P('content', 'story.json'), encoding='utf-8').read()
-story_d = json.loads(story)
+story_d = json.load(open(P('content', 'story.json'), encoding='utf-8'))
 for pid, sc in story_d.items():
     p = next((x for x in poems if x['id'] == pid), None)
     assert p and all(0 <= s['v'] < len(p['verses']) for s in sc), f'story {pid} points to a missing verse'
+lessons = {k: v for k, v in json.load(open(P('content', 'lessons.json'), encoding='utf-8')).items() if not k.startswith('_')}
+assert all(any(p['id'] == k for p in poems) for k in lessons), 'lessons.json: unknown poem id'
 
 # ---------- fonts ----------
 FS = P('fonts', 'node_modules', '@fontsource')
@@ -103,24 +103,40 @@ def font_css():
 
 version = os.environ.get('APP_VERSION') or datetime.date.today().isoformat()
 tpl = open(P('src', 'template.html'), encoding='utf-8').read()
-page = (tpl.replace('/*__VERSION__*/', version)
-           .replace('/*__POEMS__*/', json.dumps(poems, ensure_ascii=False))
-           .replace('/*__MEANINGS__*/', json.dumps(G, ensure_ascii=False))
-           .replace('/*__IMAGES__*/', images)
-           .replace('/*__STORY__*/', story)
-           .replace('<!--__FONTS__-->', font_css()))
-assert '/*__' not in page, 'unfilled placeholder'
+fonts = font_css()
+def render(images, story):
+    page = (tpl.replace('/*__VERSION__*/', version)
+               .replace('/*__POEMS__*/', json.dumps(poems, ensure_ascii=False))
+               .replace('/*__MEANINGS__*/', json.dumps(G, ensure_ascii=False))
+               .replace('/*__IMAGES__*/', json.dumps(images, ensure_ascii=False))
+               .replace('/*__STORY__*/', json.dumps(story, ensure_ascii=False))
+               .replace('/*__LESSONS__*/', json.dumps(lessons, ensure_ascii=False))
+               .replace('<!--__FONTS__-->', fonts))
+    assert '/*__' not in page, 'unfilled placeholder'
+    return page
 
-# ---------- www (PWA / native shells) ----------
+# ---------- www (PWA / Android): pictures as separate files, so the page opens fast ----------
 www = P('www')
 shutil.rmtree(www, ignore_errors=True)
-os.makedirs(os.path.join(www, 'icons'))
+os.makedirs(os.path.join(www, 'icons')); os.makedirs(os.path.join(www, 'img'))
+img_files = []
+def ext_img(u):
+    if not (isinstance(u, str) and u.startswith('data:image/')):
+        return u
+    head, b64 = u.split(',', 1)
+    raw = base64.b64decode(b64)
+    name = 'img/%s.%s' % (hashlib.sha1(raw).hexdigest()[:12], 'png' if 'png' in head else 'jpg')
+    if name not in img_files:
+        open(os.path.join(www, name), 'wb').write(raw); img_files.append(name)
+    return name
+images_www = {k: ext_img(v) for k, v in images_d.items()}
+story_www = {pid: [dict(s, img=ext_img(s['img'])) for s in sc] for pid, sc in story_d.items()}
 for f in ('icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'):
     shutil.copy(P('icons', f), os.path.join(www, 'icons', f))
 pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">'
        '<link rel="icon" href="icons/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">'
        '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="أنشودتي">')
-open(os.path.join(www, 'index.html'), 'w', encoding='utf-8').write(page.replace('<!--__PWA__-->', pwa))
+open(os.path.join(www, 'index.html'), 'w', encoding='utf-8').write(render(images_www, story_www).replace('<!--__PWA__-->', pwa))
 json.dump({
     'name': 'أنشودتي', 'short_name': 'أنشودتي', 'description': 'مكتبة أناشيد للأطفال بصوتهم',
     'lang': 'ar', 'dir': 'rtl', 'start_url': './', 'scope': './', 'display': 'standalone',
@@ -129,8 +145,9 @@ json.dump({
               {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
               {'src': 'icons/maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]
 }, open(os.path.join(www, 'manifest.webmanifest'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+precache = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'] + img_files
 open(os.path.join(www, 'sw.js'), 'w', encoding='utf-8').write(f"""const C='anasheed-{version}';
-const FILES=['./','index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png'];
+const FILES={json.dumps(precache)};
 self.addEventListener('install',e=>{{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)));self.skipWaiting()}});
 self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
 // network first, but never wait more than 3 s for a slow connection
@@ -140,7 +157,8 @@ self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return;
   e.respondWith(Promise.race([net,new Promise((_,rej)=>setTimeout(rej,3000))]).catch(()=>cached().then(r=>r||net)))}});
 """)
 
-# ---------- dist: single file ----------
+# ---------- dist: one self-contained file (also used by the Windows app) ----------
 os.makedirs(P('dist'), exist_ok=True)
-open(P('dist', 'أنشودتي.html'), 'w', encoding='utf-8').write(page.replace('<!--__PWA__-->', ''))
-print(f'built version {version}: www/index.html {os.path.getsize(os.path.join(www, "index.html"))//1024} KB', file=sys.stderr)
+open(P('dist', 'أنشودتي.html'), 'w', encoding='utf-8').write(render(images_d, story_d).replace('<!--__PWA__-->', ''))
+print(f'built version {version}: www/index.html {os.path.getsize(os.path.join(www, "index.html"))//1024} KB + {len(img_files)} pictures · '
+      f'dist {os.path.getsize(P("dist", "أنشودتي.html"))//1024} KB', file=sys.stderr)
