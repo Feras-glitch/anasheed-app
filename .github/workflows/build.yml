@@ -56,13 +56,18 @@ jobs:
         with: { name: www, path: www }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
+      - name: Install Playwright
+        timeout-minutes: 3
+        run: scripts/ci_run.sh "pip" python -m pip install -q playwright==1.49.1
+      - name: Install WebKit
+        timeout-minutes: 6
+        run: scripts/ci_run.sh "webkit install" python -m playwright install --with-deps webkit
       - name: WebKit smoke test
+        timeout-minutes: 6
         run: |
-          scripts/ci_run.sh "pip" python -m pip install -q playwright==1.49.1
-          scripts/ci_run.sh "webkit install" python -m playwright install --with-deps webkit
           (python -m http.server -d www 8765 >/dev/null 2>&1 &)
           sleep 1
-          scripts/ci_run.sh "webkit" python tests/webkit_smoke.py webkit
+          scripts/ci_run.sh "webkit" timeout 330 python -u tests/webkit_smoke.py webkit
 
   android:
     needs: web
