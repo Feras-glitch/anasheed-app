@@ -811,15 +811,28 @@ $('#aSave').onclick=()=>{
 };
 function renderAdded(){ $('#addedList').innerHTML = added.map(p=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0"><span style="flex:1">${esc(p.title)} — ${esc(p.poet)} (${AR(p.verses.length)} بيتاً)</span><button class="btn s d" data-id="${esc(p.id)}">حذف</button></div>`).join('')||'لا أناشيد مضافة بعد.';
   $$('#addedList button').forEach(b=>b.onclick=async()=>{ if(await ask('حذف هذا النشيد؟','احذف')){added=added.filter(p=>p.id!==b.dataset.id);LS.set('added',added);renderAdded();renderHome()} }); }
-$('#aExport').onclick=()=>{ const data=JSON.stringify({app:'anasheed',v:2,added,meanings:LS.get('meanings',{}),kids,stats:S},null,1);
-  const b=new Blob([data],{type:'application/json'}); shareBlob(b,'application/json','أنشودتي-نسخة-'+new Date().toISOString().slice(0,10),'نسخة احتياطية من أنشودتي','نسخة احتياطية').catch(()=>{}); };
+$('#aExport').onclick=()=>{ openSheet(`<h3>💾 نسخة احتياطية</h3><p class="small">«مع التسجيلات» ينقل أصوات الأطفال إلى جهاز آخر أو بعد إعادة تثبيت التطبيق، والملف أكبر.</p><div class="row"><button class="btn p" id="exAll">مع التسجيلات</button><button class="btn" id="exLite">بلا تسجيلات</button></div>`);
+  $('#exAll').onclick=()=>doExport(true); $('#exLite').onclick=()=>doExport(false); };
+async function doExport(withRecs){
+  closeSheet(); const o={app:'anasheed',v:3,added,meanings:LS.get('meanings',{}),kids,kidInfo,stats:S,parentName:LS.get('parentName','')};
+  if(withRecs){ toast('جارٍ التجهيز…',1500); o.recs=[]; for(const r of await recAll()){ const {blob,buf,id,...rest}=r; o.recs.push(Object.assign(rest,{b64:await blobB64(blob)})); } }
+  const b=new Blob([JSON.stringify(o)],{type:'application/json'});
+  shareBlob(b,'application/json','أنشودتي-نسخة-'+new Date().toISOString().slice(0,10),'نسخة احتياطية من أنشودتي','نسخة احتياطية').catch(()=>{});
+}
 $('#aImportBtn').onclick=()=>$('#aImport').click();
-$('#aImport').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result);
+$('#aImport').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async()=>{ try{ const o=JSON.parse(r.result);
   if(Array.isArray(o.added)) added=added.concat(o.added.filter(a=>a&&a.id&&Array.isArray(a.verses)&&!added.some(b=>b.id===a.id)));
   if(o.meanings && typeof o.meanings==='object'){ const u=LS.get('meanings',{}); Object.assign(u,o.meanings); LS.set('meanings',u); Object.assign(meanings,o.meanings); }
   if(Array.isArray(o.kids)) o.kids.forEach(k=>{ if(!kids.includes(k)) kids.push(k) });
+  if(o.kidInfo && typeof o.kidInfo==='object'){ kidInfo=Object.assign({},o.kidInfo,kidInfo); LS.set('kidInfo',kidInfo); }
   if(o.stats && typeof o.stats==='object') for(const [k,v] of Object.entries(o.stats)) S[k]=Object.assign(S[k]||{},v);
-  LS.set('added',added); LS.set('kids',kids); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome(); toast('تم الاستيراد ✓');
+  if(o.parentName && !LS.get('parentName','')){ LS.set('parentName',o.parentName); $('#parentName').value=o.parentName; }
+  let n=0;
+  if(Array.isArray(o.recs)){ const have=new Set((await recAll()).map(x=>x.who+'|'+x.poem+'|'+x.when));
+    for(const x of o.recs){ if(!x||!x.b64||have.has(x.who+'|'+x.poem+'|'+x.when)) continue;
+      const bin=atob(x.b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+      const {b64,...rest}=x; if(await recPut(Object.assign(rest,{blob:new Blob([u],{type:x.type||'audio/webm'})}))!=null) n++; } }
+  LS.set('added',added); LS.set('kids',kids); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome(); toast('تم الاستيراد ✓'+(n?' · '+AR(n)+' تسجيل':''));
   }catch(x){ toast('ملف غير صالح') } e.target.value=''; }; r.readAsText(f); };
 
 // ---------- start ----------

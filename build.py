@@ -36,6 +36,9 @@ for s in re.split(r'\n### ', src)[1:]:
          'verses': [l.split(' / ', 1) for l in lines]}
     if 'مع الوالد' in meta:
         p['note'] = '👨‍👧 يُستحسن أن تقرأها مع والدك: قصتها حزينة.'
+    pn = re.search(r'^ملاحظة للوالد:\s*(.+)$', body, re.M)
+    if pn:
+        p['note'] = '👨‍👧 ' + pn.group(1).strip()
     poems.append(p)
 
 import glossary

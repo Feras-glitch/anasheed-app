@@ -76,11 +76,22 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - run: scripts/ci_run.sh "npm install" npm install --no-audit --no-fund
       - run: scripts/ci_run.sh "cap add" npx cap add android
+      - name: Signing key from secrets
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE }}
+        run: |
+          if [ -z "$KS" ]; then echo "::error title=signing key::أضف السرّين ANDROID_KEYSTORE و ANDROID_KEYSTORE_PASSWORD في Settings ← Secrets and variables ← Actions"; exit 1; fi
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/release.p12"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
       - run: scripts/ci_run.sh "patch" python3 scripts/patch_android.py
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       - run: scripts/ci_run.sh "cap sync" npx cap sync android
       - uses: gradle/actions/setup-gradle@v4
       - name: Gradle assemble (retries if Maven Central rate-limits)
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           for i in 1 2 3; do ../scripts/ci_run.sh "gradle" ./gradlew assembleDebug --no-daemon && exit 0; echo "retry $i"; sleep 45; done

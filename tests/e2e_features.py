@@ -146,6 +146,22 @@ async def main():
         check(d and all(x and x != float('inf') for x in d), f'archive audio durations known {d[:3]}')
         check(await pg.locator('#rlist .tag:has-text("🦜")').count() >= 1, 'marked models labelled in the archive')
 
+        # ---- backup with recordings → restore into a fresh install ----
+        await pg.click('#back'); await pg.click('#goParent'); await pg.click('#aExport'); await pg.wait_for_timeout(200)
+        async with pg.expect_download() as dl:
+            await pg.click('#exAll')
+        bp = os.path.join(tempfile.mkdtemp(), 'b.json'); await (await dl.value).save_as(bp)
+        n_rec = await pg.evaluate('recAll().then(a=>a.length)')
+        ctx2 = await b.new_context(viewport={'width': 390, 'height': 844}); pg2 = await ctx2.new_page()
+        await pg2.goto(URL); await pg2.wait_for_timeout(500)
+        await pg2.evaluate("closeSheet()"); await pg2.click('#goParent'); await pg2.set_input_files('#aImport', bp); await pg2.wait_for_timeout(1500)
+        got = await pg2.evaluate('recAll().then(a=>a.length)')
+        check(got == n_rec and n_rec > 0, f'backup carries recordings to a new install ({got}/{n_rec})')
+        check('ليلى' in await pg2.text_content('#kidChip') and await pg2.evaluate("kidAge('ليلى')") == 7, 'children and ages restored')
+        ok_audio = await pg2.evaluate("recAll().then(a=>decodeRec(a[0]).then(b=>b.duration>0))")
+        check(ok_audio, 'restored audio still plays')
+        await ctx2.close()
+
         check(not errs, f'no JS errors {errs}')
         await b.close()
     print(f'\n{len(fails)} failures')

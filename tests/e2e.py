@@ -142,8 +142,9 @@ async def main():
         await pg.click('#grid .card >> nth=-1'); await pg.wait_for_timeout(150)
         await pg.wait_for_timeout(200); check('<img' in await pg.text_content('#verses') and not await pg.evaluate('window.__x'), 'user text is escaped, not injected')
         await pg.click('#back')
+        await pg.click('#goParent'); await pg.click('#aExport')
         async with pg.expect_download() as dl:
-            await pg.click('#goParent'); await pg.click('#aExport')
+            await pg.click('#exLite')
         check((await dl.value).suggested_filename.endswith('.json'), 'backup export downloads JSON')
 
         # ---- audit round 2 ----

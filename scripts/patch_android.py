@@ -34,17 +34,22 @@ ver = os.environ.get('APP_VERSION', '1.0.0')
 code = os.environ.get('GITHUB_RUN_NUMBER', '1')
 s = re.sub(r'versionCode \d+', f'versionCode {code}', s)
 s = re.sub(r'versionName "[^"]*"', f'versionName "{ver}"', s)
-s += '''
-android {
-    signingConfigs {
-        debug {
-            storeFile file("../../keys/anasheed.p12")
-            storePassword "android"
+# the signing key lives in GitHub Secrets (ANDROID_KEYSTORE base64 + ANDROID_KEYSTORE_PASSWORD), never in the repo
+ks = os.environ.get('ANDROID_KEYSTORE_PATH', '')
+pw = os.environ.get('ANDROID_KEYSTORE_PASSWORD', '')
+if not (ks and os.path.exists(ks) and pw):
+    raise SystemExit('missing signing key: add ANDROID_KEYSTORE and ANDROID_KEYSTORE_PASSWORD in Settings → Secrets → Actions')
+s += f'''
+android {{
+    signingConfigs {{
+        debug {{
+            storeFile file("{ks}")
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias "anasheed"
-            keyPassword "android"
-        }
-    }
-}
+            keyPassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        }}
+    }}
+}}
 '''
 open(g, 'w', encoding='utf-8').write(s)
 print('android patched: mic permission, icons, signing, version', ver, code)
