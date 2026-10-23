@@ -27,14 +27,16 @@ jobs:
       - name: Fetch fonts (Amiri, Cairo) to embed offline
         run: mkdir -p fonts && cd fonts && npm init -y >/dev/null && npm i @fontsource/amiri@5 @fontsource/cairo@5
       - name: Build
-        run: python3 build.py
+        run: scripts/ci_run.sh "build.py" python3 build.py
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
       - name: End-to-end test (Chromium, fake mic)
         run: |
-          pip install playwright==1.49.1 >/dev/null
-          python3 -m playwright install --with-deps chromium >/dev/null
-          (python3 -m http.server -d www 8765 >/dev/null 2>&1 &)
+          scripts/ci_run.sh "pip" python -m pip install -q playwright==1.49.1
+          scripts/ci_run.sh "playwright install" python -m playwright install --with-deps chromium
+          (python -m http.server -d www 8765 >/dev/null 2>&1 &)
           sleep 1
-          python3 tests/e2e.py
+          scripts/ci_run.sh "e2e" python tests/e2e.py
       - uses: actions/upload-artifact@v4
         with: { name: www, path: www }
       - uses: actions/upload-artifact@v4
@@ -51,13 +53,13 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
-      - run: npm install --no-audit --no-fund
-      - run: npx cap add android
-      - run: python3 scripts/patch_android.py
-      - run: npx cap sync android
+      - run: scripts/ci_run.sh "npm install" npm install --no-audit --no-fund
+      - run: scripts/ci_run.sh "cap add" npx cap add android
+      - run: scripts/ci_run.sh "patch" python3 scripts/patch_android.py
+      - run: scripts/ci_run.sh "cap sync" npx cap sync android
       - name: Gradle assemble
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+        run: chmod +x gradlew && ../scripts/ci_run.sh "gradle" ./gradlew assembleDebug --no-daemon
       - run: mkdir -p out && cp android/app/build/outputs/apk/debug/app-debug.apk "out/Anasheed-${APP_VERSION}.apk"
       - uses: actions/upload-artifact@v4
         with: { name: android, path: out/*.apk }
@@ -78,8 +80,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           mkdir -p build && cp ../icons/icon.ico build/icon.ico
-          npm install --no-audit --no-fund
-          npx electron-builder --win --publish never -c.extraMetadata.version=$APP_VERSION
+          ../scripts/ci_run.sh "npm install" npm install --no-audit --no-fund
+          ../scripts/ci_run.sh "electron-builder" npx electron-builder --win --publish never -c.extraMetadata.version=$APP_VERSION
       - uses: actions/upload-artifact@v4
         with: { name: windows, path: electron/out/*.exe }
 

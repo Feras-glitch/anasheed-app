@@ -186,7 +186,7 @@ h2.sec{font-family:Amiri,serif;margin:16px 0 8px}
   <div style="display:flex;align-items:center;gap:12px">
     <button class="btn s" id="prevV" title="البيت السابق">⬆</button>
     <div class="rec" id="recBtn" title="سجّل">●</div>
-    <span class="timer" id="timer">0:00</span>
+    <span class="timer" id="timer">٠:٠٠</span>
     <button class="btn s" id="nextV" title="البيت التالي">⬇</button>
     <button class="btn s g" id="playLast" style="display:none">▶ اسمعني</button>
   </div>
@@ -313,7 +313,14 @@ function renderSegs(){
   $('#segBox').innerHTML = '<span>المقطع:</span>'+segs.map((r,i)=>`<span class="chip ${i===seg?'on':''}" data-s="${i}">${AR(r[0]+1)}–${AR(r[1])}${ms.has(i)?' 🧠':''}</span>`).join('');
   $$('#segBox .chip').forEach(c=>c.onclick=()=>{ seg=+c.dataset.s; st(cur.id).seg=seg; saveS(); curLine=rng()[0]; stopAuto(); renderSegs(); if(mode==='quiz') quizMenu(); else renderVerses(); loadModel(); });
 }
-function hideWord(w){ const m=w.match(/^([^ً-ْٰـ])([ً-ْٰ]*)/); if(!m) return w; const join=!/[اأإآدذرزوؤءةى]/.test(m[1]); return m[1]+m[2]+(join?'ـ':'')+'<span class="hid">‥</span>'; }
+function hideWord(w){ // keep the article/prefix + first letter of the stem
+  const D=/[ً-ْٰـ]/, sw=strip(w);
+  const pre=['وال','فال','بال','كال','ال','لل'].find(x=>sw.startsWith(x)&&sw.length>x.length+1)||'';
+  let need=pre.length+1, out='', i=0, last='';
+  for(;i<w.length&&need>0;i++){ const c=w[i]; out+=c; if(!D.test(c)){ need--; last=c; } }
+  while(i<w.length && D.test(w[i]) && w[i]!=='ـ') out+=w[i++];
+  if(i>=w.length) return w;
+  return out+(/[اأإآدذرزوؤءةى]/.test(last)?'':'ـ')+'<span class="hid">‥</span>'; }
 function hemi(txt,hide){
   if(hide==='blank') return '<span class="blank"></span>';
   if(hide==='first') return esc(txt).split(' ').map(hideWord).join(' ');
