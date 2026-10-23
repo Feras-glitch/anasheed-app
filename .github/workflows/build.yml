@@ -85,8 +85,12 @@ jobs:
       - name: Signing key from secrets
         env:
           KS: ${{ secrets.ANDROID_KEYSTORE }}
+          SNAMES: ${{ toJSON(secrets) }}
+          VNAMES: ${{ toJSON(vars) }}
         run: |
-          if [ -z "$KS" ]; then echo "::error title=signing key::أضف السرّين ANDROID_KEYSTORE و ANDROID_KEYSTORE_PASSWORD في Settings ← Secrets and variables ← Actions"; exit 1; fi
+          if [ -z "$KS" ]; then
+            s=$(echo "$SNAMES" | jq -r 'keys|join(", ")'); v=$(echo "$VNAMES" | jq -r 'keys|join(", ")')
+            echo "::error title=signing key::السر ANDROID_KEYSTORE غير موجود. الأسرار التي يراها البناء: [$s] — المتغيرات: [$v]"; exit 1; fi
           echo "$KS" | base64 -d > "$RUNNER_TEMP/release.p12"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
       - run: scripts/ci_run.sh "patch" python3 scripts/patch_android.py
