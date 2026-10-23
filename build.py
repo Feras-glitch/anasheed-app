@@ -19,6 +19,8 @@ sys.path.insert(0, P('content'))
 src = open(P('content', 'texts.md'), encoding='utf-8').read()
 poems = []
 problems = []
+FULL = {}  # poem id → all verses of the full poem (an excerpt keeps only some)
+VMAP = {}  # poem id → {verse number in the full poem: verse number in the app}
 for s in re.split(r'\n### ', src)[1:]:
     head, _, body = s.partition('\n')
     m = re.match(r'(\S+)\.\s*(.+?)(?:\s+—\s+(.+))?$', head.strip())
@@ -44,9 +46,31 @@ for s in re.split(r'\n### ', src)[1:]:
         continue
     age = re.search(r'(\d+)[–-](\d+)\s*سن', body)
     meta = body.strip().split('\n')[0]
+    verses = [l.split(' / ', 1) for l in lines]
+    FULL[num] = verses
+    # a very long poem is memorised from an excerpt: "مقتطف للحفظ: 1-5, 11, 13-14" (numbers of the full poem)
+    vmap = {i + 1: i + 1 for i in range(len(verses))}
+    total = None
+    ex = re.search(r'^مقتطف للحفظ:\s*(.+)$', body, re.M)
+    if ex:
+        keep = []
+        for part in ex.group(1).replace('،', ',').split(','):
+            a, _, b = part.strip().partition('-')
+            keep += list(range(int(a), int(b or a) + 1))
+        if not keep or keep != sorted(set(keep)) or keep[-1] > len(verses):
+            problems.append(f'{num}: bad excerpt {ex.group(1)}')
+        else:
+            vmap = {v: i + 1 for i, v in enumerate(keep)}
+            total = len(verses); verses = [verses[v - 1] for v in keep]
     p = {'id': num, 'title': re.sub(r'\s*\(.*?\)\s*', ' ', title).strip(), 'poet': poet,
          'age': [int(age.group(1)), int(age.group(2))] if age else [6, 12],
-         'verses': [l.split(' / ', 1) for l in lines]}
+         'verses': verses}
+    if total:
+        p['excerpt'] = [len(verses), total]
+    VMAP[num] = vmap
+    foot = re.search(r'^حاشية:\s*(.+)$', body, re.M)
+    if foot:
+        p['foot'] = foot.group(1).strip()
     if 'مع الوالد' in meta:
         p['note'] = '👨‍👧 يُستحسن أن تقرأها مع والدك: قصتها حزينة.'
     pn = re.search(r'^ملاحظة للوالد:\s*(.+)$', body, re.M)
@@ -56,15 +80,26 @@ for s in re.split(r'\n### ', src)[1:]:
 
 import glossary
 G = dict(glossary.G)
-OVR = getattr(glossary, 'OVR', {})
-IMG_OFF = getattr(glossary, 'IMG_OFF', [])
+# meanings for poems a parent may add by hand (e.g. «كن بلسماً»): kept, but not checked against the built-in texts
+G_PARENT = getattr(glossary, 'G_PARENT', {})
+# verse numbers in "poem:verse|word" keys refer to the full poem; renumber them for excerpts, drop excluded verses
+def renum(k):
+    loc, _, w = k.partition('|'); pid, _, vn = loc.partition(':')
+    if not vn or pid not in VMAP:
+        return k
+    nv = VMAP[pid].get(int(vn))
+    return f'{pid}:{nv}|{w}' if nv else None
+OVR = {renum(k): v for k, v in getattr(glossary, 'OVR', {}).items() if renum(k)}
+IMG_OFF = [renum(k) for k in getattr(glossary, 'IMG_OFF', []) if renum(k)]
 
 def key(w):
     w = re.sub('[ً-ْٰـ]', '', w)
     return re.sub('[^؀-ۿ]', '', w)
 
 toks = {key(w) for p in poems for v in p['verses'] for h in v for w in h.split()}
-missing = [k for k in G if k not in toks]
+toks_full = {key(w) for vs in FULL.values() for v in vs for h in v for w in h.split()}
+# a meaning for a word that is only in the part of a long poem left out of its excerpt is kept, unused
+missing = [k for k in G if k not in toks and k not in toks_full]
 bad = [(p['id'], i + 1) for p in poems for i, v in enumerate(p['verses']) if len(v) != 2 or not all(x.strip() for x in v)]
 # overrides: "poem|word" or "poem:verse|word" must point to a real word in that poem/verse
 def ovr_ok(k):
@@ -75,6 +110,12 @@ def ovr_ok(k):
         return False
     vs = [p['verses'][int(vn) - 1]] if vn else p['verses']
     return any(key(t) == w for v in vs for h in v for t in h.split())
+def in_full(k):
+    loc, _, w = k.partition('|'); pid = loc.partition(':')[0]
+    return pid in FULL and any(key(x) == w for v in FULL[pid] for h in v for x in h.split())
+skipped = [k for k in list(OVR) + list(IMG_OFF) if not ovr_ok(k) and in_full(k)]
+OVR = {k: v for k, v in OVR.items() if k not in skipped}
+IMG_OFF = [k for k in IMG_OFF if k not in skipped]
 missing += [k for k in list(OVR) + list(IMG_OFF) if not ovr_ok(k)]
 ids = [p['id'] for p in poems]
 problems += [f'poem id used twice: {i}' for i in sorted({i for i in ids if ids.count(i) > 1})]
@@ -96,6 +137,8 @@ for pid, src in thumbs.items():
     else:  # a small JPEG kept in content/thumbs/
         images_d['@thumb:' + pid] = 'data:image/jpeg;base64,' + base64.b64encode(open(P(src), 'rb').read()).decode()
 G.update(OVR)
+for k, v in G_PARENT.items():
+    G.setdefault(k, v)
 story_d = json.load(open(P('content', 'story.json'), encoding='utf-8'))
 for pid, sc in story_d.items():
     p = next((x for x in poems if x['id'] == pid), None)

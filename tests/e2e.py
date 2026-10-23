@@ -52,7 +52,7 @@ async def main():
         nine = await pg.evaluate("POEMS.filter(p=>p.age[0]<=9&&p.age[1]>=9).length")
         check(n9 >= nine, f'the 9–12 band includes every poem whose range reaches 9 ({n9} ≥ {nine})')
         await pg.click('#ages .chip[data-age="all"]')
-        check(n_all == 31 and n6 + n9 >= n_all, f'every poem is in at least one band ({n6}+{n9}≥{n_all})')
+        check(n_all == 30 and n6 + n9 >= n_all, f'every poem is in at least one band ({n6}+{n9}≥{n_all})')
         check(not await pg.evaluate('document.documentElement.scrollWidth>innerWidth'), 'no horizontal overflow on phone')
         th = await pg.evaluate("POEMS.filter(p=>p.poet==='أحمد شوقي').filter(p=>!thumbOf(p)).map(p=>p.title)")
         check(len(th) <= 4, f'fable cards carry a picture for children who cannot read (still without: {th})')
@@ -73,12 +73,12 @@ async def main():
         # long poem → segments + note
         await pg.click('#grid .card[data-id="٨"]'); await pg.wait_for_timeout(300)
         segs = await pg.locator('#segBox .chip').count()
-        check(segs == 6, f'37-verse poem split into 6 segments (got {segs})')
-        check(await pg.locator('#pNote .note').count() == 1, 'parent note shown on أم اليتيم')
+        check(segs == 3, f'the 14-verse excerpt is split into 2 segments, plus «الكل» (got {segs} chips)')
+        check(await pg.locator('#pNote .note').count() == 2 and 'مقتطف للحفظ' in await pg.text_content('#pNote'), 'parent note and «مقتطف للحفظ» shown on أم اليتيم')
         check(await pg.locator('#verses .verse').count() == 6, 'only the current segment is shown')
-        await pg.click('#segBox .chip[data-s="2"]'); await pg.wait_for_timeout(150)
-        check(await pg.get_attribute('#verses .verse >> nth=0', 'data-i') == '12', 'segment 3 starts at verse 13')
-        check(await pg.locator('.vn').first.text_content() == '١٣', 'verse numbers in Arabic digits')
+        await pg.click('#segBox .chip[data-s="1"]'); await pg.wait_for_timeout(150)
+        check(await pg.get_attribute('#verses .verse >> nth=0', 'data-i') == '6', 'segment 2 starts at verse 7')
+        check(await pg.locator('.vn').first.text_content() == '٧', 'verse numbers in Arabic digits')
 
         # memorisation levels
         await pg.click('#modeSing'); await pg.wait_for_timeout(150)
@@ -89,7 +89,8 @@ async def main():
         await pg.click('#lvlBox .chip[data-l="3"]')
         check('‥' in await pg.text_content('#verses'), 'level 3 shows first letters')
         await pg.click('#lvlBox .chip[data-l="4"]')
-        check(await pg.locator('#verses .blank').count() == 12, 'level 4 blanks every hemistich')
+        nv = await pg.locator('#verses .verse').count()
+        check(await pg.locator('#verses .blank').count() == 2 * nv, 'level 4 blanks every hemistich')
         await pg.click('#verses .verse >> nth=2'); await pg.wait_for_timeout(100)
         check(await pg.locator('#verses .verse >> nth=2').locator('.blank').count() == 0, 'tapping a verse peeks at it')
 
@@ -104,12 +105,19 @@ async def main():
         # the level cannot be switched to the full text mid-take
         await pg.click('#recBtn'); await pg.wait_for_timeout(700); await pg.click('#lvlBox .chip[data-l="1"]'); await pg.wait_for_timeout(100)
         check(await pg.evaluate('level') == 4, 'level locked while recording')
-        await pg.wait_for_timeout(9800); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
+        await pg.wait_for_timeout(12800); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(500)
         txt = await pg.text_content('#sheet')
         check('غيباً! 🧠' in txt, 'celebration names the level reached')
         await pg.click('#sheet button:has-text("تمام")'); await pg.wait_for_timeout(100)
-        check('🧠' in await pg.text_content('#segBox'), 'a whole, audible take from memory marks the segment memorised')
+        check('⏳' in await pg.text_content('#segBox') and '🧠' not in await pg.text_content('#segBox'), 'a whole, audible take from memory waits for the parent\'s stamp')
+        await pg.click('#goParent'); await pg.wait_for_timeout(700)
+        await pg.click('#pQueue [data-st="ok"] >> nth=0'); await pg.wait_for_timeout(500)
+        await pg.click('#back'); await pg.wait_for_timeout(900)
+        check('خُتم' in (await pg.text_content('#sheet') or ''), 'the child sees the parent\'s stamp on the home screen')
+        await pg.click('#sheet button:has-text("تمام")')
+        await pg.click('#grid .card[data-id="٨"]'); await pg.wait_for_timeout(400); await pg.click('#modeSing')
+        check('🧠' in await pg.text_content('#segBox'), 'after the stamp the segment is memorised')
         check(await pg.text_content('#timer') == '٠:٠٠', 'timer reset after stop')
 
         # too short
@@ -231,7 +239,7 @@ async def main():
         await pg.fill('#aText', 'شطر <img src=x onerror=window.__x=1> / شطر ب\nشطر ج / شطر د'); await pg.click('#aSave'); await pg.wait_for_timeout(200)
         check(await pg.locator('#addedList button').count() == 1, 'valid poem added')
         await pg.click('#back'); await pg.wait_for_timeout(200)
-        check(await pg.locator('#grid .card').count() == 32, 'added poem on home')
+        check(await pg.locator('#grid .card').count() == 31, 'added poem on home')
         await pg.click('#grid .card >> nth=-1'); await pg.wait_for_timeout(150)
         await pg.wait_for_timeout(200); check('<img' in await pg.text_content('#verses') and not await pg.evaluate('window.__x'), 'user text is escaped, not injected')
         await pg.click('#back')
@@ -318,7 +326,7 @@ async def main():
         check(await pg.locator('#kNew').count() == 0, 'no name prompt after reload')
         on = await pg.locator('#grid .card[data-id="٨"] .badges span.on').count()
         mem = await pg.evaluate("JSON.parse(localStorage.getItem('anasheed.stats2'))['سارة']['٨'].mem")
-        check(on == 1 and mem == [2], f'progress persists (🎤 on, segment 3 memorised: {mem})')
+        check(on == 1 and mem == [1], f'progress persists (🎤 on, segment 2 memorised: {mem})')
 
         check(not errs, f'no JS errors {errs}')
 

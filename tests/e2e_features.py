@@ -81,7 +81,7 @@ async def main():
         # ---- parent model session ----
         await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(400)
         await pg.fill('#parentName', 'بابا'); await pg.dispatch_event('#parentName', 'change')
-        check(await pg.locator('#modelList .r').count() == 31, 'model list covers every poem')
+        check(await pg.locator('#modelList .r').count() == 30, 'model list covers every poem')
         await pg.click('#modelList [data-m="١"]'); await pg.wait_for_timeout(400)
         check(await pg.locator('#modeBanner .modeBanner').count() == 1 and not await pg.is_checked('#autoOn'), 'model mode: banner, manual verse stepping')
         await record_marked(pg, verses=4)
@@ -102,6 +102,8 @@ async def main():
         seen = set(await pg.evaluate("clearInterval(__iv), [...__seen]"))
         check(len(seen) >= 4 and 0 in seen, f'highlight follows the model across all verses {sorted(seen)}')
         if await pg.is_visible('#pbStop'): await pg.click('#pbStop')
+        # a child of 10 gets the classic echo: the whole verse, then their turn
+        await pg.evaluate("kidInfo['ليلى'].age=10")
         await pg.click('#echoBtn'); await pg.wait_for_timeout(300)
         turn = False
         for _ in range(20):
@@ -110,7 +112,16 @@ async def main():
         check(turn, 'echo pauses for the child: «دورك! ردّد البيت»')
         l0 = await pg.evaluate('curLine'); await pg.click('#pbRepeat'); await pg.wait_for_timeout(500)
         check(await pg.evaluate('curLine') == l0 and 'استمع' in await pg.text_content('#pbText'), 'repeat replays the same verse')
-        await pg.click('#pbStop'); await pg.wait_for_timeout(200)
+        await pg.click('#pbStop'); await pg.wait_for_timeout(300)
+        # a child of 7 gets the echo by half-verse, in three rounds, and the turns are recorded for the parent
+        await pg.evaluate("kidInfo['ليلى'].age=7")
+        n0 = await pg.evaluate('recMeta().then(a=>a.filter(r=>r.echo).length)')
+        await pg.evaluate("window.__turns=[]; window.__prev=''; window.__iv2=setInterval(()=>{ const t=document.querySelector('#pbText').textContent; const turn=/دورك|أكمل|البيت كله/.test(t); if(turn && !/دورك|أكمل|البيت كله/.test(__prev)) __turns.push([curLine,t]); __prev=t; },40)")
+        await pg.click('#echoBtn'); await pg.wait_for_timeout(9000)
+        turns = await pg.evaluate("clearInterval(__iv2), __turns")
+        check(len(turns) >= 2 and turns[0][0] == turns[1][0] if len(turns) >= 2 else False, f'young echo: two turns on the same verse (one per hemistich) {turns[:3]}')
+        await pg.evaluate('stopPlay()'); await pg.wait_for_timeout(1500)
+        check(await pg.evaluate('recMeta().then(a=>a.filter(r=>r.echo).length)') == n0 + 1, 'the child\'s echo turns are saved for the parent to hear')
         check(not await pg.is_visible('#playBar'), 'stop hides the play bar')
 
         # ---- family theater (Leila + Baba) ----
@@ -136,15 +147,36 @@ async def main():
         await pg.click('#modeSing'); await pg.click('#lvlBox .chip[data-l="4"]')
         await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(600)
-        check(await pg.locator('#celCert').count() == 1, 'memorising earns a certificate button')
-        await pg.click('#celCert'); await pg.wait_for_timeout(1500)
+        check('بانتظار' in await pg.text_content('#sheet') and await pg.locator('#celCert').count() == 0, 'a take from memory waits for the parent\'s stamp')
+        await pg.click('#sheet button:has-text("تمام")')
+        # the parent listens and stamps
+        await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(700)
+        check(await pg.locator('#pQueue [data-st="ok"]').count() >= 1, 'the parent page lists takes waiting to be heard, memorisation first')
+        check('مهمة الليلة' in await pg.text_content('#pTonight'), 'the parent page proposes tonight\'s task')
+        await pg.click('#pQueue [data-st="ok"] >> nth=0'); await pg.wait_for_timeout(500)
+        check(await pg.evaluate("badges(poemById('١٦')).mem"), 'the parent\'s stamp gives 🧠')
+        await pg.click('#back'); await pg.wait_for_timeout(900)
+        check('خُتم' in (await pg.text_content('#sheet') or '') and await pg.locator('#newsCert').count() == 1, 'the child is told, with the certificate')
+        await pg.click('#newsCert'); await pg.wait_for_timeout(1500)
         cw = await pg.evaluate("document.querySelector('#certImg') && document.querySelector('#certImg').naturalWidth")
         check(cw == 1600, f'certificate image generated ({cw}px)')
         async with pg.expect_download() as dl:
             await pg.click('#cShare')
         check((await dl.value).suggested_filename.endswith('.png'), 'certificate saved as PNG')
         await pg.click('#pop', position={'x': 5, 'y': 5}); await pg.wait_for_timeout(200)
+        await pg.click('#grid .card[data-id="١٦"]'); await pg.wait_for_timeout(500)
         check(await pg.is_visible('#certBtn'), '🏅 stays on the poem page')
+        # the review comes back: due → listed at home → a take from memory moves it further away
+        await pg.evaluate("st('١٦').rev[0].due=Date.now()-1000; saveS()")
+        await pg.click('#back'); await pg.wait_for_timeout(300)
+        check(await pg.locator('#reviewBox [data-rv="١٦"]').count() == 1, 'a memorised poem comes back for review on its day')
+        await pg.click('#reviewBox [data-rv="١٦"]'); await pg.wait_for_timeout(400)
+        await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
+        await pg.click('#keep'); await pg.wait_for_timeout(600)
+        r = await pg.evaluate("st('١٦').rev[0]")
+        r_ok = await pg.evaluate("st('١٦').rev[0].step===1 && st('١٦').rev[0].due>Date.now()+2*864e5")
+        check(r_ok, 'a review from memory schedules the next one further away')
+        await pg.click('#sheet button:has-text("تمام")')
 
         # ---- archive player shows a real length ----
         await pg.click('#back'); await pg.click('#goArchive'); await pg.wait_for_timeout(1500)

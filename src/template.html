@@ -38,7 +38,7 @@ main{padding:0 14px;max-width:760px;margin:0 auto}
 .card .meta{display:flex;gap:8px;margin-top:8px;font-size:13px;color:var(--muted);align-items:center;flex-wrap:wrap}
 .tag{background:var(--sand);border-radius:8px;padding:1px 8px;font-size:13px}
 .badges{display:flex;gap:4px;font-size:19px;margin-inline-start:auto}
-.badges span{filter:grayscale(1);opacity:.28}.badges span.on{filter:none;opacity:1}
+.badges span{filter:grayscale(1);opacity:.28}.badges span.on{filter:none;opacity:1}.badges span.on.due{opacity:.5;filter:grayscale(.6)}
 .banner{background:linear-gradient(135deg,#fff1b8,#f6d7a7);border-radius:var(--radius);padding:14px 16px;margin:4px 0 14px;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:center;gap:12px}
 .banner .big{font-size:34px}.banner b{font-family:"Amiri",serif;font-size:22px;display:block}
 .poemhead{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
@@ -138,6 +138,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
   <section id="home" class="screen on">
     <div id="iosWarn"></div>
     <div id="weekly"></div>
+    <div id="reviewBox"></div>
     <div class="chips" id="ages">
       <span class="chip" data-age="me" id="ageMe" style="display:none">لعمري</span>
       <span class="chip on" data-age="all">الكل</span>
@@ -180,6 +181,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
     </div>
     <div class="playbar" id="playBar" style="display:none"><b id="pbText"></b><button class="btn s" id="pbRepeat" title="أعد البيت">🔁</button><button class="btn s d" id="pbStop" title="إيقاف">⏹</button><span class="prog"><i id="pbProg"></i></span></div>
     <div class="verses" id="verses"></div>
+    <div class="small" id="pFoot" style="text-align:center;margin:10px 4px"></div>
     <div class="quiz" id="quizBox" style="display:none"></div>
     <div id="storyBox" style="display:none"></div>
   </section>
@@ -193,6 +195,8 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 
   <section id="parent" class="screen">
     <h2 class="sec">📊 صفحة الوالد</h2>
+    <div id="pQueue"></div>
+    <div id="pTonight"></div>
     <div class="chips" id="pKids"></div>
     <div class="kpis" id="pKpis"></div>
     <div id="pTable"></div>
@@ -308,7 +312,13 @@ function ageSheet(name){ return new Promise(res=>{ let done=false; const fin=v=>
 // the child's age sets sensible defaults: the poem list, the reading pace, the quiz level
 function applyKidPrefs(){ const a=kidAge(); $('#ageMe').style.display = a?'':'none'; if(!a){ if(ageF==='me') ageF='all'; } else { $('#ageMe').textContent='لعمري ('+AR(a)+')'; ageF='me'; $('#speed').value = a<=7?1:a<=9?2:3; }
   $$('#ages .chip').forEach(c=>c.classList.toggle('on',c.dataset.age===ageF)); }
-function setKid(k){ kid=k; LS.set('kid',k); applyKidPrefs(); renderKidChip(); renderHome(); }
+function setKid(k){ kid=k; LS.set('kid',k); applyKidPrefs(); renderKidChip(); renderHome(); setTimeout(showNews,300); }
+// what the parent decided while the child was away, shown once with a happy tune
+function showNews(){ if(!kid || screen!=='home' || $('#pop').classList.contains('on')) return; const n=takeNews(kid); if(!n.length) return; chime();
+  const line=x=>{ const p=poemById(x.poem), t=p?esc(p.title):''; return x.t==='mem'?`🧠 خُتم حفظ «${t}»${x.whole?' كله':''} ✓`:x.t==='again'?`🔁 «${t}»: نراجعه غداً`:`👂 سُمع إنشاد «${t}»`; };
+  const c=n.find(x=>x.t==='mem'&&x.cert);
+  openSheet(`<div class="stars">🌟💌🌟</div><h3 style="text-align:center">من ${esc(LS.get('parentName','')||'والدك')}</h3>${n.map(x=>`<p style="font-size:20px;text-align:center">${line(x)}</p>`).join('')}${c?'<div style="text-align:center"><button class="btn p" id="newsCert">🏅 الشهادة</button></div>':''}<div style="text-align:center"><button class="btn" onclick="closeSheet()">تمام</button></div>`);
+  if(c) $('#newsCert').onclick=()=>{ const p=poemById(c.poem); if(p) certificate(p); }; }
 function renderKidChip(){ $('#kidChip').innerHTML = '<span class="ki">👤 </span>'+esc(kid||'من أنت؟'); }
 async function kidSheet(first){
   const list = kids.map(k=>`<button class="btn ${k===kid?'p':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
@@ -323,8 +333,18 @@ function segments(p){ const n=p.verses.length; if(n<=12) return [[0,n]]; const o
 
 // badges
 const BADGES=[['heard','👂','سمعتُه أو تابعتُه للآخر'],['sang','🎤','أنشدتُه'],['quiz','⭐','نجحتُ في الاختبار'],['mem','🧠','حفظتُه غيباً']];
-function badges(p,k=kid){ const s=(KS(k)[p.id])||{}; return {heard:!!s.heard, sang:(s.rec||0)>0, quiz:(s.quiz||0)>=80, mem:new Set(s.mem||[]).size>=segments(p).length}; }
-const badgeHTML = b => `<span class="badges">${BADGES.map(([k,i,t])=>`<span class="${b[k]?'on':''}" title="${t}">${i}</span>`).join('')}</span>`;
+function badges(p,k=kid){ const s=(KS(k)[p.id])||{}; const sg=segments(p), m=new Set(s.mem||[]);
+  const mem = sg.every((_,i)=>m.has(i)) && (sg.length<2 || m.has(sg.length));
+  return {heard:!!s.heard, sang:(s.rec||0)>0, quiz:(s.quiz||0)>=80, mem, due: mem && reviewsDue(p.id,k).some(g=>m.has(g))}; }
+const badgeHTML = b => `<span class="badges">${BADGES.map(([k,i,t])=>`<span class="${b[k]?'on':''}${k==='mem'&&b.due?' due':''}" title="${k==='mem'&&b.due?'حان وقت مراجعته':t}">${i}</span>`).join('')}</span>`;
+// ---------- spaced review: a memorised segment comes back after 1, 3, 7, 21 and 60 days ----------
+const REVIEW_DAYS=[1,3,7,21,60];
+function reviewsDue(pid,k=kid){ const s=(S[k||'—']||{})[pid]||{}, r=s.rev||{}; return Object.entries(r).filter(([g,x])=>x&&x.due<=Date.now()).map(([g])=>+g); }
+function scheduleReview(s,g,step){ (s.rev ||= {})[g]={step, due:Date.now()+REVIEW_DAYS[Math.max(0,Math.min(step,REVIEW_DAYS.length-1))]*864e5}; }
+// ---------- news for a child: what the parent decided while the child was away ----------
+const newsOf = k => (LS.get('news',{})[k]||[]);
+function pushNews(k,item){ const n=LS.get('news',{}); (n[k] ||= []).push(item); LS.set('news',n); }
+function takeNews(k){ const n=LS.get('news',{}), x=n[k]||[]; delete n[k]; LS.set('news',n); return x; }
 function earned(before,after){ return BADGES.filter(([k])=>!before[k]&&after[k]); }
 
 // ---------- IndexedDB (recordings) ----------
@@ -369,7 +389,7 @@ const recDel = id => store(['rec','meta'],'readwrite',tx=>{ const done=txDone(tx
 
 // ---------- navigation ----------
 let screen='home', ignorePop=0;
-function show(id,fromPop){ if(!fromPop){ const inner=history.state&&history.state.inner; if(id!=='home' && !inner) history.pushState({inner:1},''); else if(id==='home' && inner){ ignorePop++; history.back(); } } screen=id; document.body.classList.toggle('inner',id!=='home'); if(id!=='poem'){ stopPlay(); if(modelMode){ modelMode=false; $('#autoOn').checked=true; } clearTimeout(qTimer); decCache.clear(); } $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); $('#back').style.display = id==='home'?'none':''; $('#bar').style.display = id==='poem'?'':'none'; window.scrollTo(0,0); if(id!=='poem'){ stopAuto(); stopRec(); } if(id!=='archive') $$('#rlist audio').forEach(a=>a.pause()); }
+function show(id,fromPop){ if(!fromPop){ const inner=history.state&&history.state.inner; if(id!=='home' && !inner) history.pushState({inner:1},''); else if(id==='home' && inner){ ignorePop++; history.back(); } } screen=id; document.body.classList.toggle('inner',id!=='home'); if(id!=='poem'){ stopPlay(); if(modelMode){ modelMode=false; $('#autoOn').checked=true; } clearTimeout(qTimer); decCache.clear(); } $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); $('#back').style.display = id==='home'?'none':''; $('#bar').style.display = id==='poem'?'':'none'; window.scrollTo(0,0); if(id!=='poem'){ stopAuto(); stopRec(); } if(id!=='archive') $$('#rlist audio').forEach(a=>a.pause()); if(id==='home') setTimeout(showNews,400); }
 $('#back').onclick = ()=>{ if(recBusy()) return; show('home'); renderHome(); };
 // back: close a sheet → stop a recording → go home; returns false when there is nothing to go back from
 function handleBack(){
@@ -414,6 +434,10 @@ function renderHome(){
   const w=weekly();
   $('#weekly').innerHTML = w ? `<div class="banner" id="wk"><span class="big">🏆</span><div style="flex:1"><span class="small">نشيد الأسبوع</span><b>${esc(w.title)}</b><span class="small">${esc(w.poet)}</span></div>${badgeHTML(badges(w))}</div>` : '';
   if(w) $('#wk').onclick=()=>openPoem(w.id);
+  // 🔁 segments whose review day has come (and those the parent asked to practise again)
+  const due=allPoems().map(p=>({p,g:reviewsDue(p.id)})).filter(x=>x.g.length);
+  $('#reviewBox').innerHTML = due.length? `<div class="banner" style="display:block;cursor:default"><b style="font-size:19px">🔁 حان وقت المراجعة</b><div class="row">${due.map(x=>`<button class="btn" data-rv="${esc(x.p.id)}" data-g="${x.g[0]}">${esc(x.p.title)}</button>`).join('')}</div></div>` : '';
+  $$('#reviewBox [data-rv]').forEach(b=>b.onclick=()=>{ openPoem(b.dataset.rv); goSeg(Math.min(+b.dataset.g, segs.length>1?segs.length:0)); mode='sing'; level=4; setModeUI(); renderVerses(); toast('أنشد المقطع غيباً، ثم احفظ التسجيل',3500); });
   const ps=[...new Set(allPoems().map(p=>p.poet))];
   $('#poets').innerHTML = `<span class="chip ${poetF==='all'?'on':''}" data-p="all">كل الشعراء</span>`+ps.map(p=>`<span class="chip ${poetF===p?'on':''}" data-p="${esc(p)}">${esc(p)}</span>`).join('');
   $$('#poets .chip').forEach(c=>c.onclick=()=>{poetF=c.dataset.p;renderHome()});
@@ -429,20 +453,24 @@ $$('#ages .chip').forEach(c=>c.onclick=()=>{ $('#ages .on').classList.remove('on
 
 // ---------- poem ----------
 let cur=null, segs=[[0,0]], seg=0, curLine=0, mode='read', level=1, auto=null, peek=-1;
-const rng = () => segs[seg];
+// a poem with several segments also has «الكل»: the whole poem at once (index segs.length)
+const rng = () => seg>=segs.length ? [0,cur.verses.length] : segs[seg];
 function openPoem(id){
   cur=poemById(id); if(!cur) return;
-  segs=segments(cur); const s=st(cur.id); seg=Math.max(0,Math.min(Math.floor(num(s.seg)),segs.length-1)); curLine=rng()[0]; mode='read'; level=1;
+  segs=segments(cur); const s=st(cur.id); seg=Math.max(0,Math.min(Math.floor(num(s.seg)),segs.length>1?segs.length:0)); curLine=rng()[0]; mode='read'; level=1;
   $('#pTitle').textContent=cur.title; $('#pPoet').textContent=cur.poet;
-  $('#pNote').innerHTML = cur.note?`<div class="note">${esc(cur.note)}</div>`:'';
+  $('#pNote').innerHTML = (cur.note?`<div class="note">${esc(cur.note)}</div>`:'') + (cur.excerpt?`<div class="note">📌 مقتطف للحفظ: ${abyat(cur.excerpt[0])} من ${abyat(cur.excerpt[1])}</div>`:'');
+  $('#pFoot').textContent = cur.foot ? '* '+cur.foot : '';
   $('#modeStory').style.display = STORY[cur.id]?'':'none';
   $('#secureWarn').innerHTML = (window.isSecureContext && navigator.mediaDevices) ? '' : '<div class="warn">التسجيل لا يعمل حين يُفتح الملف بهذه الطريقة. ثبّت تطبيق «أنشودتي» أو افتحه من رابطه.</div>';
   qEasy=null; clearTimeout(qTimer); visited=new Set(); renderSegs(); setModeUI(); renderVerses(); show('poem'); loadLast(); loadModel(); renderBanner();
 }
 function renderSegs(){
   if(segs.length<2){ $('#segBox').innerHTML=''; return; }
-  const ms=new Set(st(cur.id).mem||[]);
-  $('#segBox').innerHTML = '<span>المقطع:</span>'+segs.map((r,i)=>`<span class="chip ${i===seg?'on':''}" data-s="${i}">${AR(r[0]+1)}–${AR(r[1])}${ms.has(i)?' 🧠':''}</span>`).join('');
+  const s=st(cur.id), ms=new Set(s.mem||[]), pend=new Set(s.pend||[]), due=new Set(reviewsDue(cur.id));
+  const mark=i=> due.has(i)&&ms.has(i)?' 🔁':ms.has(i)?' 🧠':pend.has(i)?' ⏳':'';
+  $('#segBox').innerHTML = '<span>المقطع:</span>'+segs.map((r,i)=>`<span class="chip ${i===seg?'on':''}" data-s="${i}">${AR(r[0]+1)}–${AR(r[1])}${mark(i)}</span>`).join('')
+    + `<span class="chip ${seg===segs.length?'on':''}" data-s="${segs.length}" title="النشيد كله متصلاً">الكل${mark(segs.length)}</span>`;
   $$('#segBox .chip').forEach(c=>c.onclick=()=>goSeg(+c.dataset.s));
 }
 function goSeg(i){ stopPlay(); seg=i; if(!modelMode) st(cur.id).seg=seg; saveS(); curLine=rng()[0]; stopAuto(); renderSegs(); if(mode==='quiz') quizMenu(); else { renderVerses(); scrollCur(); } loadModel();
@@ -483,7 +511,7 @@ function setModeUI(){
   $('#hint').style.display = mode==='read' && !(kidAge()&&kidAge()<=7)?'':'none';
   $('#quizBox').style.display = mode==='quiz'?'':'none';
   $('#storyBox').style.display = mode==='story'?'':'none';
-  $('#verses').style.display = (mode==='quiz'||mode==='story')?'none':'';
+  $('#verses').style.display = $('#pFoot').style.display = (mode==='quiz'||mode==='story')?'none':'';
   $('#prevV').style.visibility = $('#nextV').style.visibility = (mode==='quiz'||mode==='story')?'hidden':'';
 }
 $('#modeRead').onclick=()=>{if(rec&&rec.state==='recording') return toast('أوقف التسجيل أولاً'); mode='read';stopAuto();stopPlay();setModeUI();renderVerses()};
@@ -496,7 +524,8 @@ $$('#lvlBox .chip[data-l]').forEach(c=>c.onclick=()=>{ if(rec&&rec.state==='reco
 function markHeard(){ const b0=badges(cur); const s=st(cur.id); if(s.heard) return; s.heard=1; s.last=Date.now(); saveS(); const e=earned(b0,badges(cur)); if(e.length) toast('شارة جديدة '+e.map(x=>x[1]+' '+x[2]).join(' · '),3500); }
 let visited=new Set();
 function markSeen(){ const [a,b]=rng(); let n=0; for(let i=a;i<b;i++) if(visited.has(i)) n++; if(n<Math.ceil((b-a)*0.6)) return;
-  const s=st(cur.id); const seen=new Set(s.seen||[]); if(seen.has(seg)) return; seen.add(seg); s.seen=[...seen]; saveS(); if(seen.size>=segs.length) markHeard(); }
+  const s=st(cur.id); const seen=new Set((s.seen||[]).filter(x=>x<segs.length)); if(seg>=segs.length) segs.forEach((_,i)=>seen.add(i)); else seen.add(seg);
+  s.seen=[...seen]; saveS(); if(seen.size>=segs.length) markHeard(); }
 // a whole picture book: every verse sits under its picture, so the story is told in full, not in four snapshots
 async function renderStory(){
   const sc=(STORY[cur.id]||[]).slice().sort((x,y)=>x.v-y.v), n=cur.verses.length, p0=cur;
@@ -594,7 +623,10 @@ $('#recBtn').onclick = async ()=>{
         if(!who && model) who='النموذج';
         if(!who){ toast('اكتب اسم المنشد'); return $('#who').focus(); }
         busy=true; $('#keep').disabled=true;
-        const saved=await recPut({poem:rp.id,title:rp.title,who,when:Date.now(),dur,blob,type:blob.type,lvl:recLvl,seg:recSeg,model,marks,loud});
+        // a real recitation from memory: the whole segment, long enough, and loud enough to be heard
+        const memOk = !model && recLvl===4 && dur>=Math.max(3,(rB-rA)*1.5) && loud>=0.08;
+        const sw=(KS(who)[rp.id])||{}, isReview = memOk && (sw.mem||[]).includes(recSeg);
+        const saved=await recPut({poem:rp.id,title:rp.title,who,when:Date.now(),dur,blob,type:blob.type,lvl:recLvl,seg:recSeg,model,marks,loud,memCand:memOk&&!isReview,review:isReview});
         if(saved==null){ busy=false; $('#keep').disabled=false;
           $('#saveErr').innerHTML='<div class="warn">تعذّر حفظ التسجيل في ذاكرة الجهاز. أرسله لنفسك الآن حتى لا يضيع، ثم أعد تشغيل التطبيق.<div class="row"><button class="btn s g" id="saveShare">📤 أرسله لنفسك</button></div></div>';
           $('#saveShare').onclick=()=>shareBlob(blob,blob.type,`أنشودتي-${rp.title}-${who}`,`${who} ينشد «${rp.title}»`,rp.title); return; }
@@ -603,10 +635,11 @@ $('#recBtn').onclick = async ()=>{
         closeSheet(); if(cur===rp && screen==='poem'){ loadLast(); loadModel(); }
         if(model){ if(recModelMode) return modelNext(); toast('حُفظ النموذج ✓ سيظهر زر «اسمع النموذج»'); return; }
         const b0=badges(rp); const s=st(rp.id); s.rec=(s.rec||0)+1; s.lvl=Math.max(s.lvl||0,recLvl); s.last=Date.now();
-        // 🧠 only for a real recitation from memory: the whole segment, long enough, and loud enough to be heard
-        const memOk = recLvl===4 && dur>=Math.max(3,(rB-rA)*1.5) && loud>=0.08;
-        if(memOk){ s.mem=[...new Set([...(s.mem||[]),recSeg])]; } saveS(); if(cur===rp) renderSegs();
-        celebrate(earned(b0,badges(rp)), recLvl, rp, recLvl===4&&!memOk);
+        // 🧠 is given by the parent after listening (parent page); the app only says the take is waiting
+        if(memOk && !isReview){ s.pend=[...new Set([...(s.pend||[]),recSeg])]; if(s.rev) delete s.rev[recSeg]; }
+        if(isReview) scheduleReview(s,recSeg,((s.rev||{})[recSeg]||{step:0}).step+1);
+        saveS(); if(cur===rp) renderSegs();
+        celebrate(earned(b0,badges(rp)), recLvl, rp, recLvl===4&&!memOk, memOk&&!isReview, isReview);
       };
       $('#redo').onclick=()=>closeSheet();
     };
@@ -622,7 +655,7 @@ $('#recBtn').onclick = async ()=>{
 async function playRecSheet(meta,title,onEnd){ const r=await recGet(meta.id); if(!r||!r.blob) return toast('تعذّر فتح التسجيل');
   const url=URL.createObjectURL(r.blob), au=new Audio(url); au.controls=true; au.style.width='100%'; au.style.marginTop='10px'; fixDur(au);
   openSheet(title,()=>{ au.pause(); URL.revokeObjectURL(url); }); $('#sheet').appendChild(au); au.play().catch(()=>{}); if(onEnd) au.onended=onEnd; }
-async function loadLast(){ const p=cur; const mine=(await recMeta()).filter(r=>String(r.poem)===String(p.id)&&!r.model&&(!kid||r.who===kid)).sort((a,b)=>b.when-a.when); if(cur!==p) return;
+async function loadLast(){ const p=cur; const mine=(await recMeta()).filter(r=>String(r.poem)===String(p.id)&&!r.model&&!r.echo&&(!kid||r.who===kid)).sort((a,b)=>b.when-a.when); if(cur!==p) return;
   $('#playLast').style.display = mine.length?'':'none';
   $('#playLast').onclick=()=>{ const r=mine[0]; playRecSheet(r,`<h3>آخر تسجيل — ${esc(r.who)}</h3><div class="small">${new Date(r.when).toLocaleString('ar-EG')}</div>`); }; }
 async function loadModel(){ if(!cur) return; const p=cur, sg=seg;
@@ -648,9 +681,9 @@ function talkHTML(bare){ const q=LESSONS[cur&&cur.id]; if(!q) return ''; const o
 function chime(){ try{ const ac=actx(); if(ac.resume) ac.resume(); const t=ac.currentTime+0.05;
   [523.25,659.25,783.99,1046.5].forEach((f,i)=>{ const o=ac.createOscillator(), g=ac.createGain(); o.type='triangle'; o.frequency.value=f; o.connect(g); g.connect(ac.destination);
     const s=t+i*0.11; g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(0.25,s+0.02); g.gain.exponentialRampToValueAtTime(0.0001,s+0.35); o.start(s); o.stop(s+0.4); }); }catch(e){} }
-function celebrate(newB, lvl, p=cur, memShort=false){
+function celebrate(newB, lvl, p=cur, memShort=false, waiting=false, reviewed=false){
   chime();
-  const lvlMsg = lvl===4?(memShort?'':'غيباً! 🧠'):lvl===3?'بأوائل الكلمات فقط 👏':lvl===2?'بنصف النص فقط 👏':'';
+  const lvlMsg = reviewed?'مراجعة غيباً 🔁 والمراجعة القادمة بعد أيام':waiting?'غيباً! 🧠 بانتظار أن يسمعك والدك ويختم حفظك ⏳':lvl===4?(memShort?'':'غيباً!'):lvl===3?'بأوائل الكلمات فقط 👏':lvl===2?'بنصف النص فقط 👏':'';
   openSheet(`<div class="stars">🌟🎉🌟</div><h3 style="text-align:center">أحسنت يا ${esc(kid||'بطل')}!</h3>
     ${lvlMsg?`<p style="text-align:center">${lvlMsg}</p>`:''}
     ${memShort?'<p class="warn" style="text-align:center">لتنال 🧠 أنشد المقطع كله غيباً، بصوت واضح، من أوله إلى آخره.</p>':''}
@@ -704,7 +737,45 @@ function pb(text,turn){ $('#playBar').style.display=''; $('#pbText').textContent
 function pbProg(ms){ const i=$('#pbProg'); i.style.transition='none'; i.style.width='0'; void i.offsetWidth; i.style.transition=`width ${ms}ms linear`; i.style.width='100%'; }
 $('#pbStop').onclick=()=>stopPlay();
 // listen to the model verse by verse (echo=false), or verse then the child's turn to repeat it (echo=true)
+// the pause between the two hemistichs: the quietest moment in the middle of the verse
+function halves(buf,s0,s1){ const rr=frameRms(buf); const a=Math.max(1,Math.floor((s0+(s1-s0)*0.3)/0.02)), b=Math.min(rr.length-2,Math.ceil((s0+(s1-s0)*0.7)/0.02));
+  let best=Math.round((s0+s1)/0.04), bv=Infinity; for(let f=a;f<=b;f++){ const v=rr[f-1]+rr[f]+rr[f+1]; if(v<bv){ bv=v; best=f; } } const m=Math.min(s1-0.2,Math.max(s0+0.2,best*0.02)); return [[s0,m],[m,s1]]; }
+// records the whole echo session (the child's turns) so the parent can listen later
+async function sessionRecorder(){ try{ if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined') return null;
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}); const mime=['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(m=>MediaRecorder.isTypeSupported(m))||'';
+  const r=new MediaRecorder(stream,mime?{mimeType:mime}:{}), ch=[], t0=Date.now(); r.ondataavailable=e=>{ if(e.data&&e.data.size) ch.push(e.data); }; r.start(500);
+  return {stop:()=>new Promise(res=>{ r.onstop=()=>{ stream.getTracks().forEach(x=>x.stop()); res({blob:new Blob(ch,{type:r.mimeType||mime||'audio/webm'}),dur:(Date.now()-t0)/1000}); }; try{ r.stop(); }catch(e){ res(null); } })};
+  }catch(e){ return null; } }
+async function echoYoung(r){
+  const ac0=actx(); if(ac0.resume) ac0.resume();
+  const sess=newSess(), p0=cur, sg0=seg; mode='sing'; setModeUI(); pb('⏳ …');
+  let buf; try{ buf=await decodeRec(r); }catch(e){ stopPlay(); return toast('تعذّر تشغيل النموذج'); }
+  if(!sess.alive) return;
+  const sp=spans(r,buf); const [a,b]=rng(); const order=[...Array(b-a)].map((_,k)=>a+k).filter(i=>sp[i]);
+  const mic=await sessionRecorder(); if(!sess.alive){ if(mic) mic.stop(); return; }
+  $('#pbRepeat').style.display='none';
+  const say=async(s0,s1,txt)=>{ pb(txt||'👂 استمع'); pbProg((s1-s0)*1000); await playBuf(buf,s0,s1,sess); };
+  const turn=async(ms,txt)=>{ pb(txt||'🗣️ دورك!',true); pbProg(ms); await pause(ms,sess); };
+  const rounds=[[1,'١ · استمع وردّد'],[2,'٢ · أكمل الشطر الثاني'],[3,'٣ · البيت كله وحدك']];
+  for(const [kind,title] of rounds){ if(!sess.alive) break; toast(title,2200); await pause(1500,sess);
+    for(const i of order){ if(!sess.alive) break; const [s0,s1]=sp[i], [h1,h2]=halves(buf,s0,s1); curLine=i; level=kind===1?1:kind===2?2:4; renderVerses(); scrollCur();
+      if(kind===1){ for(const h of [h1,h2]){ await say(h[0],h[1]); if(!sess.alive) break; await turn(Math.round((h[1]-h[0])*1300+900)); } }
+      if(kind===2){ await say(h1[0],h1[1]); if(!sess.alive) break; await turn(Math.round((h2[1]-h2[0])*1400+1000),'🗣️ أكمل!'); if(!sess.alive) break; await say(h2[0],h2[1],'👂 هكذا'); }
+      if(kind===3){ await turn(Math.round((s1-s0)*1400+1200),'🗣️ البيت كله!'); if(!sess.alive) break; await say(s0,s1,'👂 هكذا'); } } }
+  level=1; const done=sess.alive; stopPlay(); if(cur===p0) renderVerses();
+  const took=mic?await mic.stop():null;
+  if(took && took.dur>3 && cur===p0) await recPut({poem:p0.id,title:p0.title,who:kid||'—',when:Date.now(),dur:took.dur,blob:took.blob,type:took.blob.type,lvl:0,seg:sg0,model:false,echo:true,marks:[],loud:1});
+  if(!done || cur!==p0) return;
+  markHeard(); chime();
+  // the next step is shown as pictures, not words
+  const next=sg0<segs.length-1;
+  openSheet(`<div class="stars">🦜🎉</div><h3 style="text-align:center">انتهى الترديد</h3><div class="row" style="justify-content:center;gap:16px"><button class="btn p" id="ecRec" style="font-size:30px;padding:14px 22px" title="سجّل">🎤</button><button class="btn g" id="ecAgain" style="font-size:30px;padding:14px 22px" title="مرة أخرى">🔁</button>${next?'<button class="btn" id="ecNext" style="font-size:30px;padding:14px 22px" title="المقطع التالي">⬅️</button>':''}</div>`);
+  $('#ecRec').onclick=()=>{ closeSheet(); $('#recBtn').click(); };
+  $('#ecAgain').onclick=()=>{ closeSheet(); echoYoung(r); };
+  if(next) $('#ecNext').onclick=()=>{ closeSheet(); goSeg(sg0+1); setTimeout(()=>{ if(!$('#echoBtn').style.display) $('#echoBtn').click(); },700); };
+}
 async function karaoke(r, echo){
+  if(echo && kidAge() && kidAge()<=7) return echoYoung(r);
   if(rec&&rec.state==='recording') return toast('أوقف التسجيل أولاً');
   const ac0=actx(); if(ac0.resume) ac0.resume(); // iOS: unlock audio inside the tap
   const sess=newSess(); mode='sing'; setModeUI(); pb('⏳ …');
@@ -719,7 +790,10 @@ async function karaoke(r, echo){
     await playBuf(buf,s0,s1,sess); if(!sess.alive) break; if(sess.repeat) continue;
     if(echo){ const ms=Math.round((s1-s0)*1250+1200); pb('🗣️ دورك! ردّد البيت',true); pbProg(ms); await pause(ms,sess); if(!sess.alive) break; if(sess.repeat) continue; }
     k++; }
-  if(sess.alive){ stopPlay(); markHeard(); if(echo) toast('انتهى الترديد 🎉 والآن الزر الأحمر لتسجيل المقطع كله 🎤',4000); }
+  if(sess.alive){ stopPlay(); markHeard(); if(echo){ chime(); const next=seg<segs.length-1;
+    openSheet(`<div class="stars">🦜🎉</div><h3 style="text-align:center">انتهى الترديد</h3><div class="row" style="justify-content:center;gap:16px"><button class="btn p" id="ecRec" style="font-size:30px;padding:14px 22px" title="سجّل">🎤</button>${next?'<button class="btn" id="ecNext" style="font-size:30px;padding:14px 22px" title="المقطع التالي">⬅️</button>':''}</div>`);
+    $('#ecRec').onclick=()=>{ closeSheet(); $('#recBtn').click(); };
+    if(next) $('#ecNext').onclick=()=>{ closeSheet(); goSeg(seg+1); }; } }
 }
 // family theater: each verse sung by a different family voice, stitched into one performance
 async function theater(){
@@ -860,13 +934,13 @@ async function renderArchive(){
   $$('#recFilter .chip').forEach(c=>c.onclick=()=>{recF=c.dataset.v;renderArchive()});
   const list = all.filter(r=> recF==='all' || (recF==='__m'? r.model : (!r.model && r.who===recF)));
   // before / after
-  const groups={}; all.filter(r=>!r.model && (recF==='all'||r.who===recF)).forEach(r=>{(groups[r.who+'|'+r.poem] ||= []).push(r)});
+  const groups={}; all.filter(r=>!r.model && !r.echo && (recF==='all'||r.who===recF)).forEach(r=>{(groups[r.who+'|'+r.poem] ||= []).push(r)});
   const ba=Object.values(groups).filter(g=>g.length>=2).map(g=>g.sort((a,b)=>a.when-b.when));
   $('#ba').innerHTML = ba.length? `<div class="banner" style="cursor:default;display:block"><b style="font-size:19px">🔁 اسمع كم تحسّنت</b>${ba.map((g,i)=>`<div class="row" style="align-items:center;margin-top:8px"><span style="flex:1">${esc(g[0].who)} — ${esc(g[0].title)} <span class="small">(${AR(g.length)} تسجيلات)</span></span><button class="btn s p" data-ba="${i}">قبل ← بعد</button></div>`).join('')}</div>` : '';
   $$('#ba [data-ba]').forEach(b=>b.onclick=()=>beforeAfter(ba[+b.dataset.ba]));
   if(!list.length){ $('#rlist').innerHTML='<div class="empty">لا تسجيلات بعد. افتح نشيداً واضغط الزر الأحمر.</div>'; return; }
   const LV=['','كامل','نصف','أوائل','غيباً'];
-  $('#rlist').innerHTML = list.map(r=>`<div class="r" data-id="${esc(r.id)}"><div class="t"><b style="font-family:Amiri,serif;font-size:20px">${r.model?'🔊 ':''}${esc(r.title)}</b>${r.model&&(r.marks||[]).length>1?' <span class="tag">🦜 أبيات</span>':''}<div class="small">${esc(r.who)} · ${new Date(r.when).toLocaleDateString('ar-EG',{month:'long',day:'numeric',year:'numeric'})} · ${fmt(r.dur)}${r.lvl>1?' · '+LV[r.lvl]:''}</div></div>
+  $('#rlist').innerHTML = list.map(r=>`<div class="r" data-id="${esc(r.id)}"><div class="t"><b style="font-family:Amiri,serif;font-size:20px">${r.model?'🔊 ':''}${esc(r.title)}</b>${r.model&&(r.marks||[]).length>1?' <span class="tag">🦜 أبيات</span>':''}${r.echo?' <span class="tag">🦜 ترديد</span>':''}${r.stamp==='ok'?' <span class="tag">✓ خُتم</span>':r.stamp==='again'?' <span class="tag">🔁 نراجعه</span>':r.stamp==='heard'?' <span class="tag">👂 سُمع</span>':r.memCand?' <span class="tag">⏳</span>':''}<div class="small">${esc(r.who)} · ${new Date(r.when).toLocaleDateString('ar-EG',{month:'long',day:'numeric',year:'numeric'})} · ${fmt(r.dur)}${r.lvl>1?' · '+LV[r.lvl]:''}</div></div>
     <button class="btn s g" data-sh title="مشاركة">📤</button><button class="btn s" data-md title="نموذج">${r.model?'★':'☆'}</button><button class="btn s d" data-del title="حذف">🗑</button><button class="btn p pl" data-pl>▶ استمع · ${fmt(r.dur)}</button></div>`).join('');
   $$('#rlist .r').forEach(el=>{ const r=list.find(x=>String(x.id)===el.dataset.id);
     // the audio is loaded only when asked for: a long archive never loads every recording at once
@@ -979,8 +1053,36 @@ async function renderParent(){
   $('#pKpis').innerHTML = pKid? [[cnt('sang'),'أنشد'],[cnt('mem'),'حفظ غيباً'],[cnt('quiz'),'نجح في اختبار'],[AR(recs.length),'تسجيل'],[AR(mins),'دقيقة إنشاد'],[AR(wk),'تسجيل هذا الأسبوع']].map(([n,t])=>`<div class="kpi"><b>${typeof n==='number'?AR(n):n}</b>${t}</div>`).join('') + (lastT?`<div class="kpi"><b style="font-size:16px">${new Date(lastT).toLocaleDateString('ar-EG',{day:'numeric',month:'short'})}</b>آخر نشاط</div>`:'') : '';
   const rows=B.filter(x=>x.s.rec||x.s.quiz||x.s.heard).sort((a,b)=>(b.s.last||0)-(a.s.last||0));
   $('#pTable').innerHTML = pKid ? (rows.length? `<table class="t"><tr><th>النشيد</th><th>الشارات</th><th>أفضل اختبار</th><th>التسجيلات</th></tr>${rows.map(x=>`<tr><td>${esc(x.p.title)}</td><td>${badgeHTML(x.b)}</td><td>${x.s.quiz?AR(x.s.quiz)+'٪':'—'}</td><td>${AR(x.s.rec||0)}</td></tr>`).join('')}</table>` : '<div class="empty">لم يبدأ بعد.</div>') : '';
-  renderAdded(); renderBackupInfo();
+  renderAdded(); renderBackupInfo(); renderQueue(); renderTonight();
 }
+const tasjeel = n => n===1?'تسجيلاً واحداً':n===2?'تسجيلين':n<=10?AR(n)+' تسجيلات':AR(n)+' تسجيلاً';
+function segName(r){ const p=poemById(r.poem); if(!p) return ''; const sg=segments(p); if(sg.length<2) return 'النشيد كله'; if(r.seg>=sg.length) return 'النشيد كله متصلاً'; const [a,b]=sg[r.seg]; return 'الأبيات '+AR(a+1)+'–'+AR(b); }
+// the parent listens, and decides: 🧠 is the parent's stamp, not the app's guess
+async function renderQueue(){
+  const all=(await recMeta()).filter(r=>!r.model && !r.stamp && kids.includes(r.who)).sort((a,b)=>(b.memCand?1:0)-(a.memCand?1:0) || b.when-a.when);
+  if(!all.length){ $('#pQueue').innerHTML=''; return; }
+  const list=all.slice(0,8);
+  $('#pQueue').innerHTML=`<h2 class="sec">📥 تنتظر أذنك (${AR(all.length)})</h2><div class="rlist">${list.map(r=>`<div class="r" data-q="${esc(r.id)}"><div class="t"><b style="font-family:Amiri,serif;font-size:19px">${esc(r.title)}</b> <span class="tag">${r.memCand?'🧠 غيباً · '+segName(r):r.echo?'🦜 ترديد':'🎤 إنشاد'}</span><div class="small">${esc(r.who)} · ${new Date(r.when).toLocaleDateString('ar-EG',{day:'numeric',month:'long'})} · ${fmt(r.dur)}</div></div>
+    <button class="btn p" data-pl>▶</button>${r.memCand?'<button class="btn g" data-st="ok">✓ حفظه</button><button class="btn" data-st="again">🔁 نراجعه غداً</button>':'<button class="btn g" data-st="heard">👍 سمعته</button>'}</div>`).join('')}</div>${all.length>list.length?`<p class="small">وبعدها ${tasjeel(all.length-list.length)}</p>`:''}`;
+  $$('#pQueue .r').forEach(el=>{ const r=list.find(x=>String(x.id)===el.dataset.q);
+    el.querySelector('[data-pl]').onclick=async e=>{ const b=e.currentTarget; if(b.disabled) return; b.disabled=true; const full=await recGet(r.id); if(!full||!full.blob) return toast('تعذّر فتح التسجيل');
+      const u=URL.createObjectURL(full.blob); archURLs.push(u); const a=document.createElement('audio'); a.controls=true; a.src=u; a.style.width='100%'; fixDur(a); b.replaceWith(a); a.play().catch(()=>{}); };
+    el.querySelectorAll('[data-st]').forEach(b=>b.onclick=async()=>{ const stamp=b.dataset.st; if(!await recPatch(r.id,{stamp,stampAt:Date.now()})) return toast('تعذّر الحفظ'); stampEffects(r,stamp); toast(stamp==='ok'?'خُتم الحفظ ✓ وسيرى الطفل رسالتك':stamp==='again'?'سيظهر في مراجعة الغد':'وصلته رسالتك 👂'); renderParent(); }); });
+}
+function stampEffects(r,stamp){ const p=poemById(r.poem); const s=st(r.poem,r.who); s.pend=(s.pend||[]).filter(x=>x!==r.seg);
+  if(stamp==='ok'){ const before=p?badges(p,r.who).mem:false; s.mem=[...new Set([...(s.mem||[]),r.seg])]; scheduleReview(s,r.seg,0); saveS();
+    pushNews(r.who,{t:'mem',poem:r.poem,whole:!!p&&segments(p).length>1&&r.seg>=segments(p).length,cert:!!p&&!before&&badges(p,r.who).mem}); }
+  else if(stamp==='again'){ (s.rev ||= {})[r.seg]={step:0,due:Date.now()+864e5}; saveS(); pushNews(r.who,{t:'again',poem:r.poem}); }
+  else { saveS(); pushNews(r.who,{t:'heard',poem:r.poem}); } }
+// ten minutes tonight: listen, record one model, ask one question
+async function renderTonight(){ const items=[];
+  const q=(await recMeta()).filter(r=>!r.model&&!r.stamp&&kids.includes(r.who)).length; if(q) items.push(`📥 اسمع ${tasjeel(q)} (في الأعلى)`);
+  const t=await nextModelTarget(); if(t){ const p=poemById(t[0]), sg=segments(p), [a,b]=sg[t[1]];
+    items.push(`🎙 سجّل نموذج «${esc(p.title)}»${sg.length>1?' (الأبيات '+AR(a+1)+'–'+AR(b)+')':''} — نحو ${AR(Math.max(1,Math.round((b-a)*8/60)))} دقيقة <button class="btn s g" id="tnModel">ابدأ</button>`); }
+  if(pKid){ const last=Object.entries(S[pKid]||{}).filter(([id,s])=>LESSONS[id]&&poemById(id)&&s&&s.last).sort((x,y)=>y[1].last-x[1].last)[0];
+    if(last){ const qs=LESSONS[last[0]]; items.push(`💬 سؤال الليلة مع ${esc(pKid)} عن «${esc(poemById(last[0]).title)}»: ${esc(qs[Math.floor(Date.now()/864e5)%qs.length])}`); } }
+  $('#pTonight').innerHTML = items.length? `<div class="talk"><b>🌙 مهمة الليلة (نحو عشر دقائق)</b><ol>${items.map(x=>`<li>${x}</li>`).join('')}</ol></div>` : '';
+  if($('#tnModel')) $('#tnModel').onclick=()=>startModel(...t); }
 // remind the parent when recordings exist that no backup holds yet
 async function renderBackupInfo(){ const last=LS.get('lastBackup',0), ms=await recMeta(), fresh=ms.filter(r=>r.when>last).length;
   const persisted = navigator.storage&&navigator.storage.persisted ? await navigator.storage.persisted().catch(()=>null) : null;
@@ -1056,7 +1158,7 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
 // ---------- start ----------
 if(iosTab()) $('#iosWarn').innerHTML=`<div class="warn" style="margin-bottom:10px">📱 ${IOS_MSG}</div>`;
 applyKidPrefs(); renderKidChip(); renderHome();
-if(!kid) setTimeout(()=>kidSheet(true),400);
+if(!kid) setTimeout(()=>kidSheet(true),400); else setTimeout(showNews,700);
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !isNative() && !/localhost|127\.0\.0\.1/.test(location.hostname)) navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
 </script>
