@@ -136,6 +136,8 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 .verse .bm{grid-column:1/-1;font-family:"Cairo",sans-serif;font-size:16px;line-height:1.75;color:#5c4a28;background:#fff7e0;border-radius:10px;padding:6px 10px;margin-top:2px}
 .bmIdea{font-family:"Cairo",sans-serif;font-size:17px;background:#e9f4ee;border-radius:12px;padding:8px 12px;margin:0 0 10px;line-height:1.8}
 #bmBtn.on{background:var(--accent);color:#fff}
+.tale p{font-family:Cairo;font-size:18px;line-height:1.9;margin:.55em 0}
+.acts li{margin:.45em 0;line-height:1.7}
 .albumBar{display:flex;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap}
 .albumBar img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 </style>
@@ -177,6 +179,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
         <button class="btn s" id="modeQuiz">❓ اختبر نفسك</button>
         <button class="btn s" id="modeStory" style="display:none">🖼 حكاية مصوّرة</button>
         <button class="btn s" id="bmBtn" style="display:none">💡 معنى البيت</button>
+        <button class="btn s" id="taleBtn" style="display:none">📚 حكاية النشيد</button>
         <button class="btn s g" id="modelBtn" style="display:none">🔊 اسمع النموذج</button>
         <button class="btn s g" id="echoBtn" style="display:none">🦜 ردّد بعدي</button>
         <button class="btn s" id="theaterBtn" style="display:none">🎭 مسرح العائلة</button>
@@ -243,6 +246,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
     <label>الأبيات</label><textarea id="aText" placeholder="الشطر الأول / الشطر الثاني&#10;الشطر الأول / الشطر الثاني"></textarea>
     <div class="row"><button class="btn p" id="aSave">حفظ النشيد</button></div>
     <div id="addedList" class="small" style="margin-top:10px"></div>
+    <div id="packList" class="small note" style="margin-top:10px"></div>
     <h2 class="sec">💾 نسخة احتياطية</h2>
     <p class="small">تحفظ الأطفال والتقدّم والأناشيد المضافة والمعاني المعدّلة، ومعها التسجيلات إن اخترت ذلك. كل ما في التطبيق محفوظ في هذا الجهاز وحده.</p>
     <div id="backupInfo"></div>
@@ -275,6 +279,8 @@ const LESSONS = /*__LESSONS__*/;
 const ALBUM = /*__ALBUM__*/;
 const PATHS = /*__PATHS__*/;
 const BAYT = /*__BAYT__*/;
+const PACKS = /*__PACKS__*/;
+const TALES = {}, ACTS = {};
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -319,6 +325,21 @@ let added = LS.get('added',[]); if(!Array.isArray(added)) added=[]; added = adde
 let meanings = Object.assign({}, PRESET, LS.get('meanings',{}));
 const allPoems = () => POEMS.concat(added);
 const poemById = id => allPoems().find(p=>String(p.id)===String(id));
+// ---------- ready packs: a protected poem the parent types in gets its meanings, pictures and activities ----------
+// the app keeps no word of such a poem: each verse is recognised by a few key words, in order, so a verse left out or a typo costs only that verse
+const pnorm = s => strip(String(s)).replace(/[أإآ]/g,'ا').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[^؀-ۿ ]/g,'');
+function packMap(p){
+  for(const [name,k] of Object.entries(PACKS)){ let j=0;
+    const map=p.verses.map(v=>{ const t=pnorm(v.join(' ')); for(let x=j;x<k.keys.length;x++) if(k.keys[x].some(w=>t.includes(w))){ j=x+1; return x; } return null; });
+    if(map.filter(x=>x!==null).length >= Math.max(4,Math.ceil(p.verses.length*0.75))) return {name,k,map}; }
+  return null; }
+function applyPacks(){ for(const p of added){ const m=packMap(p); if(!m) continue; const {name,k,map}=m; p.pack=name; if(k.age) p.age=k.age.slice();
+  BAYT[p.id]={idea:k.idea, v:map.map(j=>j===null?'':k.bayt[j])};
+  if(k.lessons) LESSONS[p.id]=k.lessons; if(k.acts) ACTS[p.id]=k.acts; if(k.tale) TALES[p.id]=k.tale;
+  const sc=(k.story||[]).map(s=>({img:s.img, v:map.indexOf(s.v)})).filter(s=>s.v>=0); if(sc.length) STORY[p.id]=sc;
+  for(const [w,mn] of Object.entries(k.words||{})) meanings[`${p.id}|${w}`]=mn; } }
+applyPacks();
+const packFirst = band => added.filter(p=>p.pack && (!band ? PACKS[p.pack].first : (PACKS[p.pack].path||[]).includes(band))).map(p=>p.id);
 // a word can mean different things in different poems: "poem:verse|word" > "poem|word" > "word"
 const okeys = (k,i) => cur ? [`${cur.id}:${i+1}|${k}`, `${cur.id}|${k}`] : [];
 const M = (k,i) => { for(const x of okeys(k,i)) if(meanings[x]!==undefined) return meanings[x]; return meanings[k]; };
@@ -468,7 +489,7 @@ function weekly(){ const a=kidAge()&&Math.max(6,kidAge()); const fits=p=> a ? (p
 const thumbOf = p => { if(STORY[p.id]?.[0]?.img) return STORY[p.id][0].img; const th=IMAGES['@thumb:'+p.id]; if(th) return th[0]==='@' ? IMAGES[th.slice(1)] : th;
   for(const w of String(p.title).split(/\s+/)){ const k=wkey(w); if(!k) continue; const o=`${p.id}|${k}`; const u=(o in IMAGES)?IMAGES[o]:IMAGES[k]; if(u) return u; } return null; };
 // ---------- «ابدأ من هنا»: an ordered path for each age, from the shortest and closest to the longest ----------
-const pathOf = (k=kid) => { const a=kidAge(k); return a ? (a<=8?PATHS.young:PATHS.old).filter(id=>poemById(id)) : []; };
+const pathOf = (k=kid) => { const a=kidAge(k); if(!a) return []; const band=a<=8?'young':'old'; return [...packFirst(band), ...PATHS[band]].filter(id=>poemById(id)); };
 const stepDone = (id,k=kid) => { const b=badges(poemById(id),k); return b.quiz||b.mem; };
 function renderPath(){ const path=pathOf(); if(!path.length){ $('#pathBox').innerHTML=''; return; }
   const done=path.map(id=>stepDone(id)), i=done.indexOf(false);
@@ -489,7 +510,8 @@ function renderHome(){
   const ps=[...new Set(allPoems().map(p=>p.poet))];
   $('#poets').innerHTML = `<span class="chip ${poetF==='all'?'on':''}" data-p="all">كل الشعراء</span>`+ps.map(p=>`<span class="chip ${poetF===p?'on':''}" data-p="${esc(p)}">${esc(p)}</span>`).join('');
   $$('#poets .chip').forEach(c=>c.onclick=()=>{poetF=c.dataset.p;renderHome()});
-  const list = allPoems().filter(p=>(poetF==='all'||p.poet===poetF) && ageOk(p));
+  const top=new Set(packFirst()); // a ready-pack poem the parent placed first
+  const list = allPoems().filter(p=>(poetF==='all'||p.poet===poetF) && ageOk(p)).sort((x,y)=>top.has(y.id)-top.has(x.id));
   $('#grid').innerHTML = list.map(p=>{ const im=thumbOf(p); return `<div class="card" data-id="${esc(p.id)}">${im?`<img class="thumb" src="${im}" alt="" loading="lazy">`:`<div class="thumb ph">${esc((p.title||'؟').trim()[0])}</div>`}<h3>${esc(p.title)}</h3><div class="poet">${esc(p.poet)}</div>
     <div class="meta"><span class="tag">${abyat(p.verses.length)}</span><span class="tag">${AR(p.age[0])}–${AR(p.age[1])}</span>${STORY[p.id]?'<span class="tag">🖼 حكاية</span>':''}<span class="mtag"></span>${badgeHTML(badges(p))}</div></div>`; }).join('') || '<div class="empty">لا شيء هنا</div>';
   $$('#grid .card').forEach(c=>c.onclick=()=>openPoem(c.dataset.id));
@@ -525,6 +547,7 @@ function openPoem(id){
   $('#pNote').innerHTML = (cur.note?`<div class="note">${esc(cur.note)}</div>`:'') + (cur.excerpt?`<div class="note">📌 مقتطف للحفظ: ${abyat(cur.excerpt[0])} من ${abyat(cur.excerpt[1])}</div>`:'');
   $('#pFoot').textContent = cur.foot ? '* '+cur.foot : '';
   $('#modeStory').style.display = STORY[cur.id]?'':'none'; $('#bmBtn').style.display = BAYT[cur.id]?'':'none'; $('#bmBtn').classList.toggle('on',bmOn());
+  $('#taleBtn').style.display = TALES[cur.id]?'':'none';
   $('#secureWarn').innerHTML = (window.isSecureContext && navigator.mediaDevices) ? '' : '<div class="warn">التسجيل لا يعمل حين يُفتح الملف بهذه الطريقة. ثبّت تطبيق «أنشودتي» أو افتحه من رابطه.</div>';
   qEasy=null; clearTimeout(qTimer); visited=new Set(); renderSegs(); setModeUI(); renderVerses(); show('poem'); loadLast(); loadModel(); renderBanner();
 }
@@ -737,13 +760,17 @@ async function loadModel(){ if(!cur) return; const p=cur, sg=seg;
   $('#echoBtn').onclick=()=>karaoke(marked,true);
   const voices=new Set(all.filter(covers).map(r=>r.who));
   $('#theaterBtn').style.display = voices.size>=2?'':'none';
-  $('#talkBtn').style.display = LESSONS[p.id]?'':'none';
+  $('#talkBtn').style.display = LESSONS[p.id]||ACTS[p.id]?'':'none';
   $('#certBtn').style.display = badges(p).mem?'':'none';
 }
 $('#theaterBtn').onclick=()=>theater();
 $('#talkBtn').onclick=()=>openSheet(`<h3>💬 حديث مع والدك</h3>${talkHTML(true)}<div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`);
 $('#certBtn').onclick=()=>certificate(cur);
-function talkHTML(bare){ const q=LESSONS[cur&&cur.id]; if(!q) return ''; const ol=`<ol>${q.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`; return bare?ol:`<div class="talk"><b>💬 حديث مع والدك</b>${ol}</div>`; }
+function talkHTML(bare){ const id=cur&&cur.id, q=LESSONS[id], a=ACTS[id]; if(!q&&!a) return '';
+  const ol=(q?`<ol>${q.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:'')+(a?`<b>🎨 نشاطات</b><ul class="acts">${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'');
+  return bare?ol:`<div class="talk"><b>💬 حديث مع والدك</b>${ol}</div>`; }
+// «حكاية النشيد»: a short tale told around the poem, to read with the child
+$('#taleBtn').onclick=()=>{ const t=TALES[cur&&cur.id]; if(!t) return; openSheet(`<h3>📚 ${esc(t.title)}</h3><div class="tale">${t.text.map(x=>`<p>${esc(x)}</p>`).join('')}</div><div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`); };
 // a short happy tune: praise a child who cannot read yet can hear
 // after an achievement: the tune, then one of the parent's recorded praises (never the same one twice in a row)
 async function cheer(){ chime(); try{ const ps=await praiseAll(); if(!ps.length) return; let i=Math.floor(Math.random()*ps.length); if(ps.length>1 && i===cheer.last) i=(i+1)%ps.length; cheer.last=i;
@@ -1243,10 +1270,15 @@ $('#aSave').onclick=()=>{
   if(!lines.length) return toast('اكتب الأبيات');
   const bad=lines.findIndex(l=>l.split('/').length!==2||l.split('/').some(x=>!x.trim()));
   if(bad>-1) return toast('السطر '+AR(bad+1)+' ليس على صورة «الشطر الأول / الشطر الثاني»',4000);
-  added.push({id:'u'+Date.now(), title, poet, age:$('#aAge').value.split(',').map(Number), verses:lines.map(l=>l.split('/').map(x=>x.trim())), user:true});
-  LS.set('added',added); $('#aTitle').value=$('#aPoet').value=$('#aText').value=''; renderAdded(); renderHome(); toast('حُفظ النشيد ✓');
+  const np={id:'u'+Date.now(), title, poet, age:$('#aAge').value.split(',').map(Number), verses:lines.map(l=>l.split('/').map(x=>x.trim())), user:true};
+  added.push(np); applyPacks();
+  LS.set('added',added); $('#aTitle').value=$('#aPoet').value=$('#aText').value=''; renderAdded(); renderHome();
+  toast(np.pack?`حُفظ النشيد ✓ ومعه شرحه وحكايته ونشاطاته`:'حُفظ النشيد ✓',3500);
 };
-function renderAdded(){ $('#addedList').innerHTML = added.map(p=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0"><span style="flex:1">${esc(p.title)} — ${esc(p.poet)} (${abyat(p.verses.length)})</span><button class="btn s d" data-id="${esc(p.id)}">حذف</button></div>`).join('')||'لا أناشيد مضافة بعد.';
+function renderAdded(){ $('#addedList').innerHTML = added.map(p=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0"><span style="flex:1">${esc(p.title)} — ${esc(p.poet)} (${abyat(p.verses.length)})${p.pack?' 📦':''}</span><button class="btn s d" data-id="${esc(p.id)}">حذف</button></div>`).join('')||'لا أناشيد مضافة بعد.';
+  const ready=Object.values(PACKS).filter(k=>!added.some(p=>p.pack&&PACKS[p.pack]===k));
+  $('#packList').style.display = ready.length?'':'none';
+  $('#packList').innerHTML = ready.length ? `<b>📦 أناشيد شرحها جاهز</b><br>اكتب أحدها هنا كما في كتاب المدرسة، فيظهر معه تلقائياً معنى كل بيت ومعاني الكلمات وحكايته ونشاطاته وصوره:`+ready.map(k=>`<div>• «${esc(k.title)}» — ${esc(k.poet)}: ${esc(k.how||'')}</div>`).join('') : '';
   $$('#addedList button').forEach(b=>b.onclick=async()=>{ if(await ask('حذف هذا النشيد؟','احذف')){added=added.filter(p=>p.id!==b.dataset.id);LS.set('added',added);renderAdded();renderHome()} }); }
 $('#aExport').onclick=()=>{ openSheet(`<h3>💾 نسخة احتياطية</h3><p class="small">«مع التسجيلات» ينقل أصوات الأطفال إلى جهاز آخر أو بعد إعادة تثبيت التطبيق. إن كثرت التسجيلات تُقسَم النسخة ملفات، فاحفظها كلها معاً.</p><div class="row"><button class="btn p" id="exAll">مع التسجيلات</button><button class="btn" id="exLite">بلا تسجيلات</button></div>`);
   $('#exAll').onclick=()=>doExport(true); $('#exLite').onclick=()=>doExport(false); };
@@ -1294,7 +1326,7 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
         rest.marks=Array.isArray(rest.marks)?rest.marks.filter(m=>Array.isArray(m)).map(m=>[num(m[0]),num(m[1]),num(m[2])]):[];
         if(await recPut(Object.assign(rest,{blob:new Blob([u],{type:typeof x.type==='string'?x.type:'audio/webm'})}))!=null){ nOk++; have.add(key); } else nFail++; }catch(err){ nFail++; } } }
   if(!any) return toast(bad?'هذا ليس ملف نسخة احتياطية من «أنشودتي»':'لم يُستورد شيء',4500);
-  LS.set('added',added); LS.set('kids',kids); LS.set('kidInfo',kidInfo); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome();
+  applyPacks(); LS.set('added',added); LS.set('kids',kids); LS.set('kidInfo',kidInfo); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome();
   const missing=[]; for(const g of Object.values(groups)){ const max=g.last||Math.max(...g.parts); for(let i=1;i<=max;i++) if(!g.parts.has(i)) missing.push(i); if(!g.last) missing.push(max+1); }
   const parts=['تم الاستيراد']; if(nOk) parts.push(AR(nOk)+' تسجيل'); if(nSkip) parts.push(AR(nSkip)+' موجود مسبقاً'); if(nFail) parts.push('⚠️ تعذّر '+AR(nFail)); if(bad) parts.push('⚠️ '+AR(bad)+' ملف غير صالح');
   if(missing.length) parts.push('⚠️ ينقص من النسخة: الجزء '+missing.map(AR).join('، '));

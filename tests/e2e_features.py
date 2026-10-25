@@ -78,6 +78,30 @@ async def main():
         check(await pg.evaluate('score') == 1 and await pg.locator('#quizBox .opt.no').count() == 0, 'ordering: either copy of a refrain is right')
         await pg.wait_for_timeout(1300); await pg.click('#back'); await pg.wait_for_timeout(200)
 
+        # ---- a ready pack: a protected poem typed in by the parent gets its meanings, tale and activities, and goes first ----
+        # (stand-in lines with the pack's key words; the real poem is never in the code)
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(300)
+        check('فلسطين داري' in await pg.text_content('#packList'), 'the parent page lists the ready packs')
+        dummy = '\n'.join(['فلسطين كلمة / في الدفتر', 'فؤاد صغير / في الصدر', 'لحن جميل / في الصباح', 'غريب الدار / بعيد',
+                           'ثمار الشجر / حلوة', 'شعب كبير / طيب', 'مهدي صغير / دافئ', 'فلسطين كلمة / في الدفتر'])
+        await pg.fill('#aTitle', 'فلسطين'); await pg.fill('#aPoet', 'سليمان العيسى'); await pg.fill('#aText', dummy)
+        await pg.click('#aSave'); await pg.wait_for_timeout(300)
+        pid = await pg.evaluate('added[added.length-1].id')
+        check(await pg.evaluate('added[added.length-1].pack') == 'فلسطين' and not await pg.is_visible('#packList'), 'typed in, the poem is recognised by its key words')
+        await pg.click('#back'); await pg.click('#ages .chip[data-age="all"]'); await pg.wait_for_timeout(200)
+        check(await pg.get_attribute('#grid .card >> nth=0', 'data-id') == pid and await pg.evaluate('pathOf()[0]') == pid, 'it comes first on the home screen and on the path')
+        await pg.click(f'#grid .card[data-id="{pid}"]'); await pg.wait_for_timeout(300)
+        check(await pg.is_visible('#bmBtn') and await pg.is_visible('#taleBtn') and await pg.is_visible('#talkBtn'), 'verse meanings, tale and talk are offered')
+        check('سرير' in (await pg.evaluate("M('مهدي',6)") or ''), 'its word meanings')
+        await pg.click('#taleBtn'); await pg.wait_for_timeout(150)
+        check('مفتاح جدّي' in await pg.text_content('#sheet') and await pg.locator('#sheet .tale p').count() >= 8, 'the tale opens')
+        await pg.click('#sheet button:has-text("تمام")')
+        await pg.click('#talkBtn'); await pg.wait_for_timeout(150)
+        check(await pg.locator('#sheet .acts li').count() >= 5, 'activities under the talk questions')
+        await pg.click('#sheet button:has-text("تمام")'); await pg.click('#back')
+        await pg.evaluate(f"added=added.filter(p=>p.id!=='{pid}'); LS.set('added',added); renderHome()")
+        await pg.click('#ages .chip[data-age="me"]'); await pg.wait_for_timeout(200)
+
         # ---- pictures are separate files in the app build ----
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
         await pg.click('#verses .w.img >> nth=0'); await pg.wait_for_timeout(400)

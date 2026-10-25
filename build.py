@@ -158,6 +158,15 @@ for pid, sc in story_d.items():
     assert p and sc and all(0 <= s['v'] < len(p['verses']) for s in sc), f'story {pid} is empty or points to a missing verse'
 lessons = {k: v for k, v in json.load(open(P('content', 'lessons.json'), encoding='utf-8')).items() if not k.startswith('_')}
 assert all(any(p['id'] == k for p in poems) for k in lessons), 'lessons.json: unknown poem id'
+# ready packs for protected poems the parent types in by hand: everything around the poem, never its words
+packs = {k: v for k, v in json.load(open(P('content', 'packs.json'), encoding='utf-8')).items() if not k.startswith('_')}
+for name, k in packs.items():
+    n = len(k['keys'])
+    assert k.get('title') and k.get('idea') and n >= 4 and all(isinstance(x, list) and x for x in k['keys']), f'packs.json: {name} needs title, idea and keys'
+    assert len(k['bayt']) == n and all(isinstance(x, str) and x.strip() for x in k['bayt']), f'packs.json: {name}: one meaning per verse'
+    assert all(0 <= s['v'] < n and os.path.exists(P(s['img'])) for s in k.get('story', [])), f'packs.json: {name}: a scene points to a missing verse or picture'
+    assert not set(k.get('path', [])) - {'young', 'old'}, f'packs.json: {name}: path is young/old'
+    k['story'] = [dict(s, img='data:image/jpeg;base64,' + base64.b64encode(open(P(s['img']), 'rb').read()).decode()) for s in k.get('story', [])]
 
 # ---------- fonts ----------
 FS = P('fonts', 'node_modules', '@fontsource')
@@ -188,8 +197,9 @@ def font_css():
 version = os.environ.get('APP_VERSION') or datetime.date.today().isoformat()
 tpl = open(P('src', 'template.html'), encoding='utf-8').read()
 fonts = font_css()
-def render(images, story):
+def render(images, story, packs):
     page = (tpl.replace('/*__VERSION__*/', version)
+               .replace('/*__PACKS__*/', json.dumps(packs, ensure_ascii=False))
                .replace('/*__POEMS__*/', json.dumps(poems, ensure_ascii=False))
                .replace('/*__MEANINGS__*/', json.dumps(G, ensure_ascii=False))
                .replace('/*__IMAGES__*/', json.dumps(images, ensure_ascii=False))
@@ -218,12 +228,13 @@ def ext_img(u):
     return name
 images_www = {k: ext_img(v) for k, v in images_d.items()}
 story_www = {pid: [dict(s, img=ext_img(s['img'])) for s in sc] for pid, sc in story_d.items()}
+packs_www = {name: dict(k, story=[dict(s, img=ext_img(s['img'])) for s in k['story']]) for name, k in packs.items()}
 for f in ('icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'):
     shutil.copy(P('icons', f), os.path.join(www, 'icons', f))
 pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">'
        '<link rel="icon" href="icons/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">'
        '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="أنشودتي">')
-open(os.path.join(www, 'index.html'), 'w', encoding='utf-8').write(render(images_www, story_www).replace('<!--__PWA__-->', pwa))
+open(os.path.join(www, 'index.html'), 'w', encoding='utf-8').write(render(images_www, story_www, packs_www).replace('<!--__PWA__-->', pwa))
 json.dump({
     'name': 'أنشودتي', 'short_name': 'أنشودتي', 'description': 'مكتبة أناشيد للأطفال بصوتهم',
     'lang': 'ar', 'dir': 'rtl', 'start_url': './', 'scope': './', 'display': 'standalone',
@@ -247,6 +258,6 @@ self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return;
 
 # ---------- dist: one self-contained file (also used by the Windows app) ----------
 os.makedirs(P('dist'), exist_ok=True)
-open(P('dist', 'أنشودتي.html'), 'w', encoding='utf-8').write(render(images_d, story_d).replace('<!--__PWA__-->', ''))
+open(P('dist', 'أنشودتي.html'), 'w', encoding='utf-8').write(render(images_d, story_d, packs).replace('<!--__PWA__-->', ''))
 print(f'built version {version}: www/index.html {os.path.getsize(os.path.join(www, "index.html"))//1024} KB + {len(img_files)} pictures · '
       f'dist {os.path.getsize(P("dist", "أنشودتي.html"))//1024} KB', file=sys.stderr)
