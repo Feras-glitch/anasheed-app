@@ -90,8 +90,16 @@ async def main():
         check(await pg.evaluate('added[added.length-1].pack') == 'فلسطين' and not await pg.is_visible('#packList'), 'typed in, the poem is recognised by its key words')
         await pg.click('#back'); await pg.click('#ages .chip[data-age="all"]'); await pg.wait_for_timeout(200)
         check(await pg.get_attribute('#grid .card >> nth=0', 'data-id') == pid and await pg.evaluate('pathOf()[0]') == pid, 'it comes first on the home screen and on the path')
+        n_sc = await pg.evaluate("PACKS['فلسطين'].story.length")
+        check(n_sc > 0 and await pg.evaluate(f"STORY['{pid}'].length") == n_sc
+              and await pg.get_attribute(f'#grid .card[data-id="{pid}"] img.thumb', 'src') == await pg.evaluate("PACKS['فلسطين'].story[0].img"),
+              f'its picture story ({n_sc} scenes) and its card picture')
         await pg.click(f'#grid .card[data-id="{pid}"]'); await pg.wait_for_timeout(300)
         check(await pg.is_visible('#bmBtn') and await pg.is_visible('#taleBtn') and await pg.is_visible('#talkBtn'), 'verse meanings, tale and talk are offered')
+        await pg.click('#modeStory'); await pg.wait_for_timeout(300)
+        nimg = await pg.evaluate("[...document.querySelectorAll('#storyBox .scene img')].filter(i=>i.complete&&i.naturalWidth>100).length")
+        check(await pg.locator('#storyBox .scene').count() == n_sc and nimg == n_sc and await pg.locator('#storyBox .sv').count() == 8, 'the picture book shows every scene and all eight verses')
+        await pg.click('#modeRead'); await pg.wait_for_timeout(150)
         check('سرير' in (await pg.evaluate("M('مهدي',6)") or ''), 'its word meanings')
         await pg.click('#taleBtn'); await pg.wait_for_timeout(150)
         check('مفتاح جدّي' in await pg.text_content('#sheet') and await pg.locator('#sheet .tale p').count() >= 8, 'the tale opens')
