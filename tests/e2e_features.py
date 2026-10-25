@@ -38,11 +38,12 @@ async def main():
 
         # ---- «ابدأ من هنا»: the path for the child's age ----
         txt = await pg.text_content('#pathBox')
-        check('الخطوة ١ من ١٢' in txt and 'طلع البدر علينا' in txt, f'age 7: the path starts with the shortest poem')
+        n_young = await pg.evaluate('AR(PATHS.young.length)')
+        check(f'الخطوة ١ من {n_young}' in txt and 'طلع البدر علينا' in txt, f'age 7: the path starts with the shortest poem')
         await pg.evaluate("st('١٦').star=1; saveS(); renderHome()")
-        check('الخطوة ٢ من ١٢' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .dots i.on').count() == 1, 'a ⭐ moves the path to the next step')
+        check(f'الخطوة ٢ من {n_young}' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .dots i.on').count() == 1, 'a ⭐ moves the path to the next step')
         await pg.click('#pathGo'); await pg.wait_for_timeout(300)
-        check(await pg.evaluate('cur.id') == '١٩', 'the path opens its next poem')
+        check(await pg.evaluate('cur.id') == await pg.evaluate('PATHS.young[1]'), 'the path opens its next poem')
         await pg.click('#back'); await pg.evaluate("delete st('١٦').star; saveS(); renderHome()")
 
         # ---- «معنى البيت»: a plain line under each verse, and a quiz on whole verses ----
@@ -62,6 +63,20 @@ async def main():
         await pg.click('#qBack'); await pg.click('#bmBtn'); await pg.wait_for_timeout(100)
         check(await pg.locator('#verses .bm').count() == 0, 'the meanings can be hidden again')
         await pg.click('#back'); await pg.click('#ages .chip[data-age="me"]'); await pg.wait_for_timeout(200)
+
+        # ---- a refrain repeats a verse («طفل يحادث أمه»): each quiz asks it once, and ordering accepts either copy ----
+        await pg.click('#grid .card[data-id="٤٣"]'); await pg.wait_for_timeout(300)
+        await pg.click('#modeQuiz'); await pg.click('#quizBox [data-e="0"]'); await pg.click('#quizBox [data-q="complete"]'); await pg.wait_for_timeout(100)
+        u1 = await pg.evaluate("new Set(qs.map(i=>cur.verses[i].join('|'))).size === qs.length")
+        await pg.click('#modeQuiz'); await pg.click('#quizBox [data-q="sense"]'); await pg.wait_for_timeout(100)
+        u2 = await pg.evaluate("new Set(qs.map(i=>BAYT[cur.id].v[i])).size === qs.length")
+        check(u1 and u2, 'a refrain is asked once in «أكمل البيت» and «ما معنى البيت؟»')
+        await pg.click('#modeQuiz'); await pg.click('#quizBox [data-q="order"]'); await pg.wait_for_timeout(100)
+        await pg.evaluate("qs=[[1,2,3]]; qi=0; score=0; nextQ()")
+        for i in (3, 2, 1):
+            await pg.click(f'#quizBox .opt[data-i="{i}"]')
+        check(await pg.evaluate('score') == 1 and await pg.locator('#quizBox .opt.no').count() == 0, 'ordering: either copy of a refrain is right')
+        await pg.wait_for_timeout(1300); await pg.click('#back'); await pg.wait_for_timeout(200)
 
         # ---- pictures are separate files in the app build ----
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
@@ -108,7 +123,7 @@ async def main():
         # ---- parent model session ----
         await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(400)
         await pg.fill('#parentName', 'بابا'); await pg.dispatch_event('#parentName', 'change')
-        check(await pg.locator('#modelList .r').count() == 30, 'model list covers every poem')
+        check(await pg.locator('#modelList .r').count() == await pg.evaluate('POEMS.length'), 'model list covers every poem')
         await pg.click('#modelList [data-m="١"]'); await pg.wait_for_timeout(400)
         check(await pg.locator('#modeBanner .modeBanner').count() == 1 and not await pg.is_checked('#autoOn'), 'model mode: banner, manual verse stepping')
         await record_marked(pg, verses=4)

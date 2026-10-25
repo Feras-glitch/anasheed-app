@@ -94,10 +94,10 @@ async def main():
         await pg.set_input_files('#aImport', evil); await pg.wait_for_timeout(800)
         await pg.click('#back'); await pg.wait_for_timeout(300)
         n = await pg.locator('#grid .card').count()
-        check(n == 31, f'broken poems in a backup are skipped, the valid one added, home not blank ({n} cards)')
+        check(n == await pg.evaluate('POEMS.length') + 1, f'broken poems in a backup are skipped, the valid one added, home not blank ({n} cards)')
         await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(500)
         await pg.reload(); await pg.wait_for_timeout(700)
-        check(await pg.locator('#grid .card').count() == 31, 'home still full after a reload')
+        check(await pg.locator('#grid .card').count() == await pg.evaluate('POEMS.length') + 1, 'home still full after a reload')
         await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(500)
         check(not await pg.evaluate('window.__pw'), 'numbers in a backup cannot inject script')
 

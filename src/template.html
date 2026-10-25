@@ -1092,8 +1092,10 @@ function senseIdx(){ const B=BAYT[cur&&cur.id]; if(!B) return []; const [a,b]=rn
 function startQuiz(t){ clearTimeout(qTimer);
   qType=t; qi=0; score=0; const [a,b]=rng(); const idx=[...Array(b-a)].map((_,i)=>a+i);
   if(t==='listen') return startListen();
-  if(t==='sense') qs=shuffle(senseIdx()).slice(0,5);
-  if(t==='complete'){ const whole=idx.filter(i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1])); qs=shuffle(whole.length>=3?whole:idx).slice(0,5); }
+  // a refrain repeats the same verse: ask it once
+  const once=(is,f)=>{ const seen=new Set(); return is.filter(i=>{ const k=f(i); if(seen.has(k)) return false; seen.add(k); return true; }); };
+  if(t==='sense') qs=shuffle(once(senseIdx(),i=>BAYT[cur.id].v[i])).slice(0,5);
+  if(t==='complete'){ const all=once(idx,i=>cur.verses[i].join('|')); const whole=all.filter(i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1])); qs=shuffle(whole.length>=3?whole:all).slice(0,5); }
   if(t==='meaning'){ const ws=segWords(); const withImg=shuffle(ws.filter(x=>IMG(x.k,x.i)));
     // easy: pictures only when there are enough of them — a child who cannot read cannot pick a written meaning
     if(qEasy && withImg.length>=3) qs=withImg.slice(0,5);
@@ -1174,7 +1176,7 @@ function nextQ(){
     const order=qs[qi]; let next=0, miss=0; const sh=shuffle(order); if(sh.join()===order.join()) sh.reverse();
     $('#quizBox').innerHTML=head+`<div class="q" style="font-family:Cairo;font-size:19px">المس الأبيات بترتيبها الصحيح</div>`+sh.map(i=>`<button class="opt ord" data-i="${i}">${esc(cur.verses[i][0])}<br>${esc(cur.verses[i][1])}</button>`).join('');
     $$('#quizBox .opt').forEach(b=>b.onclick=()=>{ if(b.disabled) return;
-      if(+b.dataset.i===order[next]){ b.classList.add('ok'); b.disabled=true; b.insertAdjacentHTML('beforeend',`<span class="num">${AR(next+1)}</span>`); next++;
+      if(cur.verses[+b.dataset.i].join('|')===cur.verses[order[next]].join('|')){ b.classList.add('ok'); b.disabled=true; b.insertAdjacentHTML('beforeend',`<span class="num">${AR(next+1)}</span>`); next++;
         if(next===order.length){ const ok=miss<=1; if(ok) score++; toast(ok?'أحسنت!':'رتّبتها، لكن بأخطاء كثيرة'); qLater(()=>{qi++;nextQ()},1100); } }
       else { miss++; b.classList.add('no'); setTimeout(()=>b.classList.remove('no'),500); } });
   }
