@@ -131,6 +131,8 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 .stk.lock img{filter:grayscale(1) blur(5px) opacity(.45)}
 .stk.lock::after{content:'🔒';position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:30px}
 .stk .new{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;border-radius:10px;padding:0 8px;font-size:12px}
+.banner.path img{width:88px;height:60px;object-fit:cover;border-radius:10px;flex:none}
+.dots{display:flex;gap:4px;margin:6px 0 2px;flex-wrap:wrap} .dots i{width:10px;height:10px;border-radius:50%;background:#e6d3ae} .dots i.on{background:var(--accent2)} .dots i.cur{background:var(--accent);box-shadow:0 0 0 2px #fff}
 .albumBar{display:flex;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap}
 .albumBar img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 </style>
@@ -146,6 +148,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 <main>
   <section id="home" class="screen on">
     <div id="iosWarn"></div>
+    <div id="pathBox"></div>
     <div id="weekly"></div>
     <div id="reviewBox"></div>
     <div id="albumBar"></div>
@@ -266,6 +269,7 @@ const IMAGES = /*__IMAGES__*/;
 const STORY = /*__STORY__*/;
 const LESSONS = /*__LESSONS__*/;
 const ALBUM = /*__ALBUM__*/;
+const PATHS = /*__PATHS__*/;
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -458,7 +462,17 @@ function weekly(){ const a=kidAge()&&Math.max(6,kidAge()); const fits=p=> a ? (p
 // a picture on every card: children who cannot read yet choose by the picture
 const thumbOf = p => { if(STORY[p.id]?.[0]?.img) return STORY[p.id][0].img; const th=IMAGES['@thumb:'+p.id]; if(th) return th[0]==='@' ? IMAGES[th.slice(1)] : th;
   for(const w of String(p.title).split(/\s+/)){ const k=wkey(w); if(!k) continue; const o=`${p.id}|${k}`; const u=(o in IMAGES)?IMAGES[o]:IMAGES[k]; if(u) return u; } return null; };
+// ---------- «ابدأ من هنا»: an ordered path for each age, from the shortest and closest to the longest ----------
+const pathOf = (k=kid) => { const a=kidAge(k); return a ? (a<=8?PATHS.young:PATHS.old).filter(id=>poemById(id)) : []; };
+const stepDone = (id,k=kid) => { const b=badges(poemById(id),k); return b.quiz||b.mem; };
+function renderPath(){ const path=pathOf(); if(!path.length){ $('#pathBox').innerHTML=''; return; }
+  const done=path.map(id=>stepDone(id)), i=done.indexOf(false);
+  if(i<0){ $('#pathBox').innerHTML='<div class="banner" style="cursor:default">🧭 <div><b>أتممتَ مسار «ابدأ من هنا» 🎉</b><span class="small">اختر من القائمة أي نشيد تحبّه</span></div></div>'; return; }
+  const p=poemById(path[i]), im=thumbOf(p);
+  $('#pathBox').innerHTML=`<div class="banner path" id="pathGo">${im?`<img src="${im}" alt="">`:''}<div style="flex:1;min-width:0"><span class="small">🧭 ابدأ من هنا · الخطوة ${AR(i+1)} من ${AR(path.length)}</span><b>${esc(p.title)}</b><div class="dots">${done.map((d,j)=>`<i class="${d?'on':j===i?'cur':''}"></i>`).join('')}</div><span class="small">أنشِده، ثم انجح في اختبارين ⭐ لتنتقل إلى التالي</span></div></div>`;
+  $('#pathGo').onclick=()=>openPoem(p.id); }
 function renderHome(){
+  renderPath();
   const w=weekly();
   $('#weekly').innerHTML = w ? `<div class="banner" id="wk"><span class="big">🏆</span><div style="flex:1"><span class="small">نشيد الأسبوع</span><b>${esc(w.title)}</b><span class="small">${esc(w.poet)}</span></div>${badgeHTML(badges(w))}</div>` : '';
   if(w) $('#wk').onclick=()=>openPoem(w.id);

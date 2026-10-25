@@ -142,6 +142,8 @@ for pid, a in album.items():
     assert any(p['id'] == pid for p in poems) and a.get('name'), f'album.json: bad entry {pid}'
     images_d['@album:' + pid] = 'data:image/jpeg;base64,' + base64.b64encode(open(P(a['img']), 'rb').read()).decode()
 album_names = {pid: a['name'] for pid, a in album.items()}
+paths = {k: v for k, v in json.load(open(P('content', 'paths.json'), encoding='utf-8')).items() if not k.startswith('_')}
+assert set(paths) == {'young', 'old'} and all(any(p['id'] == i for p in poems) for v in paths.values() for i in v), 'paths.json: unknown poem id'
 G.update(OVR)
 for k, v in G_PARENT.items():
     G.setdefault(k, v)
@@ -189,6 +191,7 @@ def render(images, story):
                .replace('/*__STORY__*/', json.dumps(story, ensure_ascii=False))
                .replace('/*__LESSONS__*/', json.dumps(lessons, ensure_ascii=False))
                .replace('/*__ALBUM__*/', json.dumps(album_names, ensure_ascii=False))
+               .replace('/*__PATHS__*/', json.dumps(paths, ensure_ascii=False))
                .replace('<!--__FONTS__-->', fonts))
     assert '/*__' not in page, 'unfilled placeholder'
     return page

@@ -36,6 +36,15 @@ async def main():
         check(await pg.input_value('#speed') == '1', 'age 7 → slowest reading pace')
         await pg.evaluate('gateUntil=Date.now()+600000')  # the parent gate itself is tested in e2e.py
 
+        # ---- «ابدأ من هنا»: the path for the child's age ----
+        txt = await pg.text_content('#pathBox')
+        check('الخطوة ١ من ١٢' in txt and 'طلع البدر علينا' in txt, f'age 7: the path starts with the shortest poem')
+        await pg.evaluate("st('١٦').star=1; saveS(); renderHome()")
+        check('الخطوة ٢ من ١٢' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .dots i.on').count() == 1, 'a ⭐ moves the path to the next step')
+        await pg.click('#pathGo'); await pg.wait_for_timeout(300)
+        check(await pg.evaluate('cur.id') == '١٩', 'the path opens its next poem')
+        await pg.click('#back'); await pg.evaluate("delete st('١٦').star; saveS(); renderHome()")
+
         # ---- pictures are separate files in the app build ----
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
         await pg.click('#verses .w.img >> nth=0'); await pg.wait_for_timeout(400)
