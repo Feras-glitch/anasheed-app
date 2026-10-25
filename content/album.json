@@ -1,0 +1,113 @@
+{
+ "_note": "ألبوم الشخصيات: لكل حكاية مصوّرة ملصق شخصيتها، قُصّ من مشاهدها (scripts: /tmp ألبوم). يُفتح الملصق حين يحفظ الطفل النشيد كله غيباً (🧠).",
+ "١": {
+  "name": "الثعلب الواعظ",
+  "img": "content/album/١.jpg",
+  "from": "المشهد 1"
+ },
+ "٢": {
+  "name": "القط والفأر",
+  "img": "content/album/٢.jpg",
+  "from": "المشهد 4"
+ },
+ "٣": {
+  "name": "الأسد",
+  "img": "content/album/٣.jpg",
+  "from": "المشهد 1"
+ },
+ "٤": {
+  "name": "الكلب والحمامة",
+  "img": "content/album/٤.jpg",
+  "from": "المشهد 2"
+ },
+ "٥": {
+  "name": "الغزال",
+  "img": "content/album/٥.jpg",
+  "from": "المشهد 4"
+ },
+ "٦": {
+  "name": "النملة",
+  "img": "content/album/٦.jpg",
+  "from": "المشهد 2"
+ },
+ "٦ب": {
+  "name": "النملة الزاهدة",
+  "img": "content/album/٦ب.jpg",
+  "from": "المشهد 4"
+ },
+ "٧": {
+  "name": "الثعلب المغرور",
+  "img": "content/album/٧.jpg",
+  "from": "المشهد 2"
+ },
+ "٢٧": {
+  "name": "دودة القز",
+  "img": "content/album/٢٧.jpg",
+  "from": "المشهد 2"
+ },
+ "٢٨": {
+  "name": "الكلب والقرد والحمار",
+  "img": "content/album/٢٨.jpg",
+  "from": "المشهد 3"
+ },
+ "٢٩": {
+  "name": "أمينة وكلبها",
+  "img": "content/album/٢٩.jpg",
+  "from": "المشهد 1"
+ },
+ "٣٠": {
+  "name": "الثعلب التائب",
+  "img": "content/album/٣٠.jpg",
+  "from": "المشهد 1"
+ },
+ "٣١": {
+  "name": "الأرنب",
+  "img": "content/album/٣١.jpg",
+  "from": "المشهد 2"
+ },
+ "٣٢": {
+  "name": "الذئب",
+  "img": "content/album/٣٢.jpg",
+  "from": "المشهد 3"
+ },
+ "٣٣": {
+  "name": "الفأرة",
+  "img": "content/album/٣٣.jpg",
+  "from": "المشهد 2"
+ },
+ "٣٤": {
+  "name": "الحمار",
+  "img": "content/album/٣٤.jpg",
+  "from": "المشهد 3"
+ },
+ "٣٥": {
+  "name": "حيوانات السفينة",
+  "img": "content/album/٣٥.jpg",
+  "from": "المشهد 2"
+ },
+ "٣٦": {
+  "name": "اليمامة",
+  "img": "content/album/٣٦.jpg",
+  "from": "المشهد 1"
+ },
+ "٣٧": {
+  "name": "الأرنب الحكيم",
+  "img": "content/album/٣٧.jpg",
+  "from": "المشهد 2"
+ },
+ "٣٨": {
+  "name": "الديك الهندي",
+  "img": "content/album/٣٨.jpg",
+  "from": "المشهد 1"
+ },
+ "٣٩": {
+  "name": "البلابل",
+  "img": "content/album/٣٩.jpg",
+  "from": "المشهد 4"
+ },
+ "٤٠": {
+  "name": "الطاووس",
+  "img": "content/album/٤٠.jpg",
+  "from": "المشهد 2"
+ }
+}

@@ -206,6 +206,22 @@ async def main():
         check(r_ok, 'a review from memory schedules the next one further away')
         await pg.click('#sheet button:has-text("تمام")')
 
+        # ---- character album: a memorised picture story opens its sticker ----
+        await pg.click('#back'); await pg.wait_for_timeout(300)
+        check('٠ من ٢٢' in await pg.text_content('#albumBar'), 'home shows the album: nothing collected yet')
+        await pg.evaluate("st('٧').mem=[0]; saveS(); pushNews(kid,{t:'mem',poem:'٧',cert:true}); renderHome(); showNews()"); await pg.wait_for_timeout(400)
+        check(await pg.locator('#sheet img').count() == 1 and 'ملصق جديد' in await pg.text_content('#sheet'), 'the parent\'s stamp on a picture story brings a new sticker')
+        await pg.click('#newsAlbum'); await pg.wait_for_timeout(400)
+        check(await pg.locator('#albumGrid .stk').count() == 22 and await pg.locator('#albumGrid .stk.lock').count() == 21, 'album: 22 stickers, one open')
+        check(await pg.locator('#albumGrid .stk .new').count() == 1 and 'الثعلب المغرور' in await pg.text_content('#albumGrid'), 'the new sticker is marked and named')
+        nw = await pg.evaluate("document.querySelector('#albumGrid .stk:not(.lock) img').naturalWidth")
+        check(nw == 320, f'sticker picture loads ({nw}px)')
+        await pg.click('#albumGrid .stk.lock >> nth=0'); await pg.wait_for_timeout(400)
+        check(await pg.evaluate('screen') == 'poem', 'a locked sticker leads to its poem')
+        await pg.click('#back'); await pg.wait_for_timeout(300)
+        check('١ من ٢٢' in await pg.text_content('#albumBar') and 'جديد' not in await pg.text_content('#albumBar'), 'once seen, the sticker is no longer «new»')
+        await pg.click('#goAlbum'); await pg.wait_for_timeout(200)
+
         # ---- archive player shows a real length ----
         await pg.click('#back'); await pg.click('#goArchive'); await pg.wait_for_timeout(1500)
         await pg.click('#rlist .r >> nth=0 >> [data-pl]'); await pg.wait_for_timeout(1500)

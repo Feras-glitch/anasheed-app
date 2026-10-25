@@ -136,6 +136,12 @@ for pid, src in thumbs.items():
         images_d['@thumb:' + pid] = '@' + src  # an alias: the picture is not stored twice
     else:  # a small JPEG kept in content/thumbs/
         images_d['@thumb:' + pid] = 'data:image/jpeg;base64,' + base64.b64encode(open(P(src), 'rb').read()).decode()
+# character stickers: one per picture story, opened when the child memorises the whole poem
+album = {k: v for k, v in json.load(open(P('content', 'album.json'), encoding='utf-8')).items() if not k.startswith('_')}
+for pid, a in album.items():
+    assert any(p['id'] == pid for p in poems) and a.get('name'), f'album.json: bad entry {pid}'
+    images_d['@album:' + pid] = 'data:image/jpeg;base64,' + base64.b64encode(open(P(a['img']), 'rb').read()).decode()
+album_names = {pid: a['name'] for pid, a in album.items()}
 G.update(OVR)
 for k, v in G_PARENT.items():
     G.setdefault(k, v)
@@ -182,6 +188,7 @@ def render(images, story):
                .replace('/*__IMAGES__*/', json.dumps(images, ensure_ascii=False))
                .replace('/*__STORY__*/', json.dumps(story, ensure_ascii=False))
                .replace('/*__LESSONS__*/', json.dumps(lessons, ensure_ascii=False))
+               .replace('/*__ALBUM__*/', json.dumps(album_names, ensure_ascii=False))
                .replace('<!--__FONTS__-->', fonts))
     assert '/*__' not in page, 'unfilled placeholder'
     return page

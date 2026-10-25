@@ -124,6 +124,15 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 @media (max-width:360px){header{gap:6px;padding-left:10px;padding-right:10px}header h1{font-size:15px}header h1 span,.chip.kid .ki{display:none}.chip.kid{max-width:31vw;padding:4px 10px}header .btn.s{padding:6px 9px}}
 @media (max-width:420px){body.inner header h1 span{display:none}body.inner .chip.kid{max-width:38vw}}
 @media (max-width:480px){.verse{grid-template-columns:1fr;gap:0;font-size:22px;line-height:1.9}.verse>div:nth-child(3){padding-right:28px}header h1{font-size:18px}}
+.album{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}
+.stk{background:var(--card);border-radius:18px;padding:10px 8px;box-shadow:var(--shadow);text-align:center;cursor:pointer;position:relative}
+.stk img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:50%;border:4px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);display:block}
+.stk b{display:block;font-size:14px;margin-top:6px;line-height:1.4}
+.stk.lock img{filter:grayscale(1) blur(5px) opacity(.45)}
+.stk.lock::after{content:'🔒';position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:30px}
+.stk .new{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;border-radius:10px;padding:0 8px;font-size:12px}
+.albumBar{display:flex;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap}
+.albumBar img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 </style>
 </head>
 <body>
@@ -139,6 +148,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
     <div id="iosWarn"></div>
     <div id="weekly"></div>
     <div id="reviewBox"></div>
+    <div id="albumBar"></div>
     <div class="chips" id="ages">
       <span class="chip" data-age="me" id="ageMe" style="display:none">لعمري</span>
       <span class="chip on" data-age="all">الكل</span>
@@ -184,6 +194,12 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
     <div class="small" id="pFoot" style="text-align:center;margin:10px 4px"></div>
     <div class="quiz" id="quizBox" style="display:none"></div>
     <div id="storyBox" style="display:none"></div>
+  </section>
+
+  <section id="album" class="screen">
+    <h2 class="sec" id="albumTitle">📒 ألبوم الشخصيات</h2>
+    <p class="small" id="albumInfo"></p>
+    <div class="album" id="albumGrid"></div>
   </section>
 
   <section id="archive" class="screen">
@@ -249,6 +265,7 @@ const PRESET = /*__MEANINGS__*/;
 const IMAGES = /*__IMAGES__*/;
 const STORY = /*__STORY__*/;
 const LESSONS = /*__LESSONS__*/;
+const ALBUM = /*__ALBUM__*/;
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -322,9 +339,11 @@ function setKid(k){ kid=k; LS.set('kid',k); applyKidPrefs(); renderKidChip(); re
 // what the parent decided while the child was away, shown once with a happy tune
 function showNews(){ if(!kid || screen!=='home' || $('#pop').classList.contains('on')) return; const n=takeNews(kid); if(!n.length) return; cheer();
   const line=x=>{ const p=poemById(x.poem), t=p?esc(p.title):''; return x.t==='mem'?`🧠 خُتم حفظ «${t}»${x.whole?' كله':''} ✓`:x.t==='again'?`🔁 «${t}»: نراجعه غداً`:`👂 سُمع إنشاد «${t}»`; };
-  const c=n.find(x=>x.t==='mem'&&x.cert);
-  openSheet(`<div class="stars">🌟💌🌟</div><h3 style="text-align:center">من ${esc(LS.get('parentName','')||'والدك')}</h3>${n.map(x=>`<p style="font-size:20px;text-align:center">${line(x)}</p>`).join('')}${c?'<div style="text-align:center"><button class="btn p" id="newsCert">🏅 الشهادة</button></div>':''}<div style="text-align:center"><button class="btn" onclick="closeSheet()">تمام</button></div>`);
-  if(c) $('#newsCert').onclick=()=>{ const p=poemById(c.poem); if(p) certificate(p); }; }
+  const c=n.find(x=>x.t==='mem'&&x.cert), stk=n.filter(x=>x.t==='mem'&&x.cert&&ALBUM[x.poem]&&poemById(x.poem)&&badges(poemById(x.poem)).mem);
+  const stkHTML=stk.length?`<div style="text-align:center;margin:8px 0">${stk.map(x=>`<img src="${albumImg(x.poem)}" alt="" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:4px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.2);margin:4px">`).join('')}<p style="font-size:19px">📒 ملصق جديد في ألبومك: ${stk.map(x=>esc(ALBUM[x.poem])).join('، ')}</p></div>`:'';
+  openSheet(`<div class="stars">🌟💌🌟</div><h3 style="text-align:center">من ${esc(LS.get('parentName','')||'والدك')}</h3>${n.map(x=>`<p style="font-size:20px;text-align:center">${line(x)}</p>`).join('')}${stkHTML}<div class="row" style="justify-content:center">${c?'<button class="btn p" id="newsCert">🏅 الشهادة</button>':''}${stk.length?'<button class="btn g" id="newsAlbum">📒 الألبوم</button>':''}</div><div style="text-align:center"><button class="btn" onclick="closeSheet()">تمام</button></div>`);
+  if(c) $('#newsCert').onclick=()=>{ const p=poemById(c.poem); if(p) certificate(p); };
+  if(stk.length) $('#newsAlbum').onclick=()=>{ closeSheet(); renderAlbum(); show('album'); }; }
 function renderKidChip(){ $('#kidChip').innerHTML = '<span class="ki">👤 </span>'+esc(kid||'من أنت؟'); }
 async function kidSheet(first){
   const list = kids.map(k=>`<button class="btn ${k===kid?'p':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
@@ -447,6 +466,7 @@ function renderHome(){
   const due=allPoems().map(p=>({p,g:reviewsDue(p.id)})).filter(x=>x.g.length);
   $('#reviewBox').innerHTML = due.length? `<div class="banner" style="display:block;cursor:default"><b style="font-size:19px">🔁 حان وقت المراجعة</b><div class="row">${due.map(x=>`<button class="btn" data-rv="${esc(x.p.id)}" data-g="${x.g[0]}">${esc(x.p.title)}</button>`).join('')}</div></div>` : '';
   $$('#reviewBox [data-rv]').forEach(b=>b.onclick=()=>{ openPoem(b.dataset.rv); goSeg(Math.min(+b.dataset.g, segs.length>1?segs.length:0)); mode='sing'; level=4; setModeUI(); renderVerses(); toast('أنشد المقطع غيباً، ثم احفظ التسجيل',3500); });
+  renderAlbumBar();
   const ps=[...new Set(allPoems().map(p=>p.poet))];
   $('#poets').innerHTML = `<span class="chip ${poetF==='all'?'on':''}" data-p="all">كل الشعراء</span>`+ps.map(p=>`<span class="chip ${poetF===p?'on':''}" data-p="${esc(p)}">${esc(p)}</span>`).join('');
   $$('#poets .chip').forEach(c=>c.onclick=()=>{poetF=c.dataset.p;renderHome()});
@@ -459,6 +479,21 @@ function renderHome(){
     $$('#grid .card').forEach(c=>{ if(has.has(c.dataset.id)) c.querySelector('.mtag').innerHTML='<span class="tag" title="فيه صوت للتعلّم">🦜 بصوت '+esc(LS.get('parentName','')||'الوالد')+'</span>'; }); });
 }
 $$('#ages .chip').forEach(c=>c.onclick=()=>{ $('#ages .on').classList.remove('on'); c.classList.add('on'); ageF=c.dataset.age; renderHome(); });
+
+// ---------- album: each picture story memorised by heart opens its character's sticker ----------
+const albumIds = () => Object.keys(ALBUM).filter(id=>poemById(id));
+const albumHave = (k=kid) => albumIds().filter(id=>badges(poemById(id),k).mem);
+const albumImg = id => IMAGES['@album:'+id];
+function renderAlbumBar(){ const ids=albumIds(); if(!ids.length || !kid){ $('#albumBar').innerHTML=''; return; }
+  const have=albumHave(), seen=new Set(LS.get('albumSeen',{})[kid]||[]), fresh=have.some(id=>!seen.has(id));
+  $('#albumBar').innerHTML=`<div class="banner albumBar" id="goAlbum">📒 <b>ألبوم الشخصيات</b><span class="small">${AR(have.length)} من ${AR(ids.length)}</span>${have.slice(-4).map(id=>`<img src="${albumImg(id)}" alt="">`).join('')}${fresh?'<span class="tag">✨ جديد</span>':''}</div>`;
+  $('#goAlbum').onclick=()=>{ renderAlbum(); show('album'); }; }
+function renderAlbum(){ const ids=albumIds(), have=new Set(albumHave()), all=LS.get('albumSeen',{}), seen=new Set(all[kid]||[]);
+  $('#albumTitle').textContent='📒 ألبوم '+(kid||'الشخصيات');
+  $('#albumInfo').textContent = (have.size?`جمعتَ ${AR(have.size)} من ${AR(ids.length)}. `:'')+'احفظ حكاية مصوّرة كلها غيباً، فيُفتح ملصق شخصيتها.';
+  $('#albumGrid').innerHTML=ids.map(id=>{ const on=have.has(id); return `<div class="stk ${on?'':'lock'}" data-id="${esc(id)}"><img src="${albumImg(id)}" alt="">${on&&!seen.has(id)?'<span class="new">جديد</span>':''}<b>${on?esc(ALBUM[id]):'؟'}</b><div class="small">${esc(poemById(id).title)}</div></div>`; }).join('');
+  $$('#albumGrid .stk').forEach(el=>el.onclick=()=>{ const id=el.dataset.id; if(!have.has(id)) toast(`احفظ «${poemById(id).title}» غيباً ليُفتح هذا الملصق`,3000); openPoem(id); });
+  if(kid){ all[kid]=[...have]; LS.set('albumSeen',all); } }
 
 // ---------- poem ----------
 let cur=null, segs=[[0,0]], seg=0, curLine=0, mode='read', level=1, auto=null, peek=-1;
