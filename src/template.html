@@ -147,7 +147,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
     </div>
     <div class="chips" id="poets"></div>
     <div class="grid" id="grid"></div>
-    <p class="small" style="text-align:center;margin-top:18px">👂 سمعتُه أو تابعتُه للآخر · 🎤 أنشدتُه · ⭐ نجحتُ في الاختبار · 🧠 حفظتُه غيباً</p>
+    <p class="small" style="text-align:center;margin-top:18px">👂 سمعتُه أو تابعتُه للآخر · 🎤 أنشدتُه · ⭐ نجحتُ في اختبارين مختلفين · 🧠 حفظتُه غيباً</p>
   </section>
 
   <section id="poem" class="screen">
@@ -299,6 +299,8 @@ let kids = LS.get('kids',null);
 let S = LS.get('stats2',null);
 if(!kids){ const who=LS.get('who',''); kids = (who && who!=='—') ? [who] : []; LS.set('kids',kids); }
 if(!S){ S={}; const old=LS.get('stats',null); if(old && kids[0]){ S[kids[0]]={}; for(const [k,v] of Object.entries(old)) S[kids[0]][k]={heard:0,rec:v.rec||0,lvl:v.rec?1:0,quiz:v.quiz?Math.round(v.quiz/5*100):0,mem:[],seg:0,last:0}; } LS.set('stats2',S); }
+// a star earned before ⭐ needed two kinds of quiz is kept
+if(!LS.get('starV2',false)){ for(const o of Object.values(S)) for(const x of Object.values(o||{})) if(x && num(x.quiz)>=80 && !x.qz) x.star=1; LS.set('stats2',S); LS.set('starV2',true); }
 let kid = LS.get('kid', kids[0]||null); if(kid && !kids.includes(kid)) kid = kids[0]||null;
 const KS = (k=kid) => (S[k||'—'] ||= {});
 const st = (id,k=kid) => { const o=KS(k); return o[id] ||= {heard:0,rec:0,lvl:0,quiz:0,mem:[],seg:0,last:0}; };
@@ -332,10 +334,13 @@ $('#kidChip').onclick=()=>kidSheet(false);
 function segments(p){ const n=p.verses.length; if(n<=12) return [[0,n]]; const out=[]; for(let i=0;i<n;i+=6) out.push([i,Math.min(n,i+6)]); const l=out[out.length-1]; if(out.length>1 && l[1]-l[0]<3){ out.pop(); out[out.length-1][1]=n; } return out; }
 
 // badges
-const BADGES=[['heard','👂','سمعتُه أو تابعتُه للآخر'],['sang','🎤','أنشدتُه'],['quiz','⭐','نجحتُ في الاختبار'],['mem','🧠','حفظتُه غيباً']];
+const BADGES=[['heard','👂','سمعتُه أو تابعتُه للآخر'],['sang','🎤','أنشدتُه'],['quiz','⭐','نجحتُ في اختبارين مختلفين'],['mem','🧠','حفظتُه غيباً']];
+// ⭐ needs 80% in two different kinds of quiz: one success can be luck, or a single skill
+const QT={complete:'✍️ أكمل البيت',meaning:'💡 ما معنى الكلمة؟',order:'🔢 رتّب الأبيات',listen:'🔊 اسمع واختر'};
+const passedTypes = s => Object.entries((s&&s.qz)||{}).filter(([t,v])=>QT[t]&&num(v)>=80).map(([t])=>t);
 function badges(p,k=kid){ const s=(KS(k)[p.id])||{}; const sg=segments(p), m=new Set(s.mem||[]);
   const mem = sg.every((_,i)=>m.has(i)) && (sg.length<2 || m.has(sg.length));
-  return {heard:!!s.heard, sang:(s.rec||0)>0, quiz:(s.quiz||0)>=80, mem, due: mem && reviewsDue(p.id,k).some(g=>m.has(g))}; }
+  return {heard:!!s.heard, sang:(s.rec||0)>0, quiz:!!s.star, mem, due: mem && reviewsDue(p.id,k).some(g=>m.has(g))}; }
 const badgeHTML = b => `<span class="badges">${BADGES.map(([k,i,t])=>`<span class="${b[k]?'on':''}${k==='mem'&&b.due?' due':''}" title="${k==='mem'&&b.due?'حان وقت مراجعته':t}">${i}</span>`).join('')}</span>`;
 // ---------- spaced review: a memorised segment comes back after 1, 3, 7, 21 and 60 days ----------
 const REVIEW_DAYS=[1,3,7,21,60];
@@ -968,16 +973,37 @@ const qLater=(f,ms)=>{ clearTimeout(qTimer); const p=cur; qTimer=setTimeout(()=>
 const optNorm = m => String(m).replace(/^[وفب](?=ال)/,'').trim();
 const optHead = m => strip(optNorm(m)).replace(/^ال/,'').split(/[\s(:،]/)[0];
 const rhymeOf = x => strip(x).replace(/[\sاوىيه]+$/,'').slice(-1);
-function quizMenu(){ clearTimeout(qTimer);
+function quizMenu(){ clearTimeout(qTimer); stopPlay();
   const [a,b]=rng(); const canOrder=b-a>=3; const hasWords=segWords().length>0;
   if(qEasy===null) qEasy = kidAge()? kidAge()<=8 : cur.age[0]<=7;
-  $('#quizBox').innerHTML=`<div class="chips" style="justify-content:center"><span class="chip ${qEasy?'on':''}" data-e="1">🐣 سهل</span><span class="chip ${qEasy?'':'on'}" data-e="0">🦅 عادي</span></div><div class="menu"><button class="btn v" data-q="complete">✍️ أكمل البيت</button>${hasWords?'<button class="btn g" data-q="meaning">💡 ما معنى الكلمة؟</button>':''}${canOrder?'<button class="btn p" data-q="order">🔢 رتّب الأبيات</button>':''}</div>`+(segs.length>1?'<p class="small" style="text-align:center">الأسئلة من المقطع المختار فقط</p>':'');
+  const s=st(cur.id), done=new Set(passedTypes(s)), tick=t=>done.has(t)?' ✓':'';
+  const starLine = s.star ? '⭐ نلتَ النجمة في هذا النشيد' : `⭐ النجمة لمن ينجح في نوعين مختلفين من الاختبار${done.size?` — نجحتَ في ${AR(done.size)} من ٢`:''}`;
+  $('#quizBox').innerHTML=`<div class="chips" style="justify-content:center"><span class="chip ${qEasy?'on':''}" data-e="1">🐣 سهل</span><span class="chip ${qEasy?'':'on'}" data-e="0">🦅 عادي</span></div><div class="menu"><button class="btn v" data-q="complete">${QT.complete}${tick('complete')}</button>${hasWords?`<button class="btn g" data-q="meaning">${QT.meaning}${tick('meaning')}</button>`:''}${canOrder?`<button class="btn p" data-q="order">${QT.order}${tick('order')}</button>`:''}</div><p class="small" id="starLine" style="text-align:center">${starLine}</p>`+(segs.length>1?'<p class="small" style="text-align:center">الأسئلة من المقطع المختار فقط</p>':'');
   $$('#quizBox [data-q]').forEach(b=>b.onclick=()=>startQuiz(b.dataset.q));
   $$('#quizBox [data-e]').forEach(c=>c.onclick=()=>{ qEasy=c.dataset.e==='1'; quizMenu(); });
+  // for the young: hear a verse in the parent's voice and pick its picture (needs a verse-marked model)
+  if(qEasy){ const p0=cur, s0=seg; listenCands().then(c=>{ if(c.length<3 || cur!==p0 || seg!==s0 || mode!=='quiz' || $('#quizBox [data-q="listen"]') || !$('#quizBox .menu')) return;
+    $('#quizBox .menu').insertAdjacentHTML('afterbegin',`<button class="btn g" data-q="listen">${QT.listen}${tick('listen')}</button>`); $('#quizBox [data-q="listen"]').onclick=()=>startQuiz('listen'); }); }
 }
+// what can be asked by ear: each story picture under its verse, then the pictured words of the chosen segment (by half-verse)
+async function listenCands(){ const p=cur, [a,b]=rng();
+  const ms=(await recMeta()).filter(r=>String(r.poem)===String(p.id)&&r.model&&(r.marks||[]).length>1).sort((x,y)=>y.when-x.when);
+  const byVerse=i=>ms.find(r=>r.marks.some(m=>m[0]===i)); const out=[], seen=new Set();
+  const sc=STORY[p.id]||[]; if(sc.length>=3) for(const e of sc) if(byVerse(e.v) && !seen.has(e.img)){ seen.add(e.img); out.push({i:e.v,img:e.img,scene:true,r:byVerse(e.v)}); }
+  for(let i=a;i<b;i++){ const r=byVerse(i); if(r) p.verses[i].forEach((h,hi)=>h.split(' ').forEach(w=>{ const k=wkey(w), u=k&&IMG(k,i); if(u&&!seen.has(u)){ seen.add(u); out.push({i,hi,img:u,w,r}); } })); }
+  return out; }
+async function startListen(){ const ac=actx(); if(ac.resume) ac.resume(); // inside the tap: iOS unlocks audio here
+  const p0=cur; $('#quizBox').innerHTML='<p style="text-align:center">⏳</p>';
+  const ok=[]; for(const c of await listenCands()){ try{ const buf=await decodeRec(c.r), sp=spans(c.r,buf)[c.i]; if(!sp) continue; ok.push(Object.assign(c,{buf,span:c.scene?sp:halves(buf,sp[0],sp[1])[c.hi]})); }catch(e){} }
+  if(cur!==p0 || mode!=='quiz') return;
+  const sc=shuffle(ok.filter(c=>c.scene)), ws=shuffle(ok.filter(c=>!c.scene));
+  qs=shuffle(sc.concat(ws).slice(0,5));
+  if(qs.length<3){ toast('تعذّر تشغيل صوت النموذج'); return quizMenu(); }
+  nextQ(); }
 function segWords(){ const [a,b]=rng(); const seen=new Set(), out=[]; for(let i=a;i<b;i++) cur.verses[i].forEach((h,hi)=>h.split(' ').forEach(w=>{const k=wkey(w); if(k&&M(k,i)&&!seen.has(k)){seen.add(k);out.push({k,w,i,hi})}})); return out; }
 function startQuiz(t){ clearTimeout(qTimer);
   qType=t; qi=0; score=0; const [a,b]=rng(); const idx=[...Array(b-a)].map((_,i)=>a+i);
+  if(t==='listen') return startListen();
   if(t==='complete'){ const whole=idx.filter(i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1])); qs=shuffle(whole.length>=3?whole:idx).slice(0,5); }
   if(t==='meaning'){ const ws=segWords(); const withImg=shuffle(ws.filter(x=>IMG(x.k,x.i)));
     // easy: pictures only when there are enough of them — a child who cannot read cannot pick a written meaning
@@ -986,15 +1012,31 @@ function startQuiz(t){ clearTimeout(qTimer);
   if(t==='order'){ const n=Math.min(qEasy?3:4,b-a); const starts=shuffle([...Array(b-a-n+1)].map((_,i)=>a+i)); qs=[0,1,2].map(r=>starts[r%starts.length]).map(s=>[...Array(n)].map((_,i)=>s+i)); }
   nextQ();
 }
-function finishQuiz(){
-  const pct=Math.round(score/qs.length*100); const b0=badges(cur); const s=st(cur.id); s.quiz=Math.max(s.quiz||0,pct); s.last=Date.now(); saveS(); const e=earned(b0,badges(cur));
-  $('#quizBox').innerHTML=`<div class="stars">${'⭐'.repeat(score)}${'☆'.repeat(qs.length-score)}</div><h3 style="text-align:center">${AR(score)} من ${AR(qs.length)}</h3>${e.length?`<p style="text-align:center;font-size:20px">شارة جديدة: ${e.map(([k,i,t])=>i+' '+t).join(' · ')}</p>`:''}${LESSONS[cur.id]?talkHTML():''}<div class="row" style="justify-content:center"><button class="btn p" id="qAgain">مرة أخرى</button><button class="btn" id="qMenu">اختبار آخر</button><button class="btn" id="qBack">عودة للنص</button></div>`;
+function finishQuiz(){ stopPlay();
+  const pct=Math.round(score/qs.length*100); const b0=badges(cur); const s=st(cur.id); s.quiz=Math.max(s.quiz||0,pct); (s.qz ||= {})[qType]=Math.max(num(s.qz[qType]),pct);
+  if(passedTypes(s).length>=2) s.star=1; s.last=Date.now(); saveS(); const e=earned(b0,badges(cur));
+  const need=Math.ceil(qs.length*0.8);
+  const toward = s.star||e.length ? '' : pct>=80 ? `<p style="text-align:center">✓ نجحتَ في «${QT[qType]}». نجاحٌ في نوع آخر يمنحك ⭐</p>` : `<p class="small" style="text-align:center">يُحسب النجاح من ${AR(need)} إجابات صحيحة</p>`;
+  $('#quizBox').innerHTML=`<div class="stars">${'⭐'.repeat(score)}${'☆'.repeat(qs.length-score)}</div><h3 style="text-align:center">${AR(score)} من ${AR(qs.length)}</h3>${e.length?`<p style="text-align:center;font-size:20px">شارة جديدة: ${e.map(([k,i,t])=>i+' '+t).join(' · ')}</p>`:''}${toward}${LESSONS[cur.id]?talkHTML():''}<div class="row" style="justify-content:center"><button class="btn p" id="qAgain">مرة أخرى</button><button class="btn" id="qMenu">اختبار آخر</button><button class="btn" id="qBack">عودة للنص</button></div>`;
   $('#qAgain').onclick=()=>startQuiz(qType); $('#qMenu').onclick=quizMenu; $('#qBack').onclick=()=>$('#modeRead').click();
 }
 function answer(btns,ok,rightEl){ btns.forEach(x=>x.disabled=true); if(ok) score++; else if(rightEl) rightEl.classList.add('ok'); qLater(()=>{qi++;nextQ()}, ok?900:1700); }
 function nextQ(){
   if(qi>=qs.length) return finishQuiz();
   const head=`<div class="small" style="text-align:center">سؤال ${AR(qi+1)} من ${AR(qs.length)}</div>`;
+  if(qType==='listen'){
+    const x=qs[qi], right=x.img; let others;
+    if(x.scene) others=(STORY[cur.id]||[]).map(e=>e.img).filter(u=>u!==right);
+    else { // wrong pictures never belong to a word of the same verse: the child may have heard that word too
+      const inVerse=new Set(cur.verses[x.i].flatMap(t=>t.split(' ')).map(w=>wkey(w)).filter(Boolean).map(k=>IMG(k,x.i)).filter(Boolean));
+      others=[...new Set(Object.entries(IMAGES).filter(([k,u])=>u&&k[0]!=='@'&&u[0]!=='@'&&!inVerse.has(u)).map(([k,u])=>u))]; }
+    const opts=shuffle([right,...shuffle(others).slice(0,2)]);
+    $('#quizBox').innerHTML=head+`<div class="q"><button class="btn p" id="lsPlay" style="font-size:34px;padding:10px 26px" title="اسمع">🔊</button><br><span class="small">${x.scene?'اسمع البيت، ثم المس صورته':'اسمع، ثم المس صورة ما سمعت'}</span></div><div class="imgs">`+opts.map(u=>`<button class="opt" data-ok="${u===right?1:0}"><img src="${u}" alt=""></button>`).join('')+'</div>';
+    const play=()=>{ const sess=newSess(); playBuf(x.buf,x.span[0],x.span[1],sess).then(()=>{ if(playSess===sess) playSess=null; }); };
+    $('#lsPlay').onclick=play; play();
+    const btns=$$('#quizBox .opt'); btns.forEach(b=>b.onclick=()=>{ stopPlay(); const ok=b.dataset.ok==='1'; b.classList.add(ok?'ok':'no'); answer(btns,ok,btns.find(y=>y.dataset.ok==='1')); if(x.w) toast(x.w); });
+    return;
+  }
   if(qType==='complete'){
     const i=qs[qi], right=cur.verses[i][1];
     // never offer an ending whose verse begins like the question's (a poem may repeat a first hemistich)
@@ -1130,6 +1172,7 @@ async function doExport(withRecs){
 }
 function mergeStat(a,b){ a=a&&typeof a==='object'?a:{}; b=b&&typeof b==='object'?b:{}; const ints=x=>(Array.isArray(x)?x:[]).map(Number).filter(Number.isFinite); const newer=num(b.last)>num(a.last)?b:a;
   return {heard:(a.heard||b.heard)?1:0, rec:Math.max(num(a.rec),num(b.rec)), lvl:Math.max(num(a.lvl),num(b.lvl)), quiz:Math.min(100,Math.max(num(a.quiz),num(b.quiz))),
+    star:(a.star||b.star||(num(a.quiz)>=80&&!a.qz)||(num(b.quiz)>=80&&!b.qz))?1:0, qz:Object.fromEntries(Object.keys(QT).map(t=>[t,Math.min(100,Math.max(num((a.qz||{})[t]),num((b.qz||{})[t])))]).filter(([t,v])=>v>0)),
     mem:[...new Set([...ints(a.mem),...ints(b.mem)])], seen:[...new Set([...ints(a.seen),...ints(b.seen)])], seg:Math.max(0,Math.floor(num(newer.seg))), last:Math.max(num(a.last),num(b.last))}; }
 $('#aImportBtn').onclick=async()=>{ if(!await parentGate()) return; $('#aImport').click(); };
 $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value=''; if(!fs.length) return;

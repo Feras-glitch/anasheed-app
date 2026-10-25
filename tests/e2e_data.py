@@ -66,7 +66,7 @@ async def main():
 
         ctx, pg, errs = await fresh(b)
         await pg.goto(URL); await pg.wait_for_timeout(500)
-        await pg.evaluate("kids.push('ليلى'); LS.set('kids',kids); closeSheet(); setKid('ليلى'); st('٨').mem=[2]; st('٨').rec=9; st('٨').quiz=100; st('٨').last=Date.now()+1e6; saveS(); gateUntil=Date.now()+6e5")
+        await pg.evaluate("kids.push('ليلى'); LS.set('kids',kids); closeSheet(); setKid('ليلى'); st('٨').mem=[2]; st('٨').rec=9; st('٨').quiz=100; st('٨').qz={order:100,meaning:90}; st('٨').star=1; st('٨').last=Date.now()+1e6; saveS(); gateUntil=Date.now()+6e5")
         await pg.click('#goParent')
         part1 = [x for x in paths if 'جزء1' in x]
         await pg.set_input_files('#aImport', part1); await pg.wait_for_timeout(1500)
@@ -76,6 +76,7 @@ async def main():
         check(await pg.evaluate('recMeta().then(a=>a.length)') == 3, 'all recordings restored from the parts (the first part only once)')
         s8 = await pg.evaluate("st('٨')")
         check(sorted(s8['mem']) == [0, 1, 2] and s8['rec'] == 9 and s8['quiz'] == 100, f'an older backup never wipes newer progress {s8}')
+        check(s8.get('star') == 1 and s8.get('qz', {}).get('order') == 100, f'a restore keeps ⭐ and the kinds of quiz passed {s8}')
         await pg.set_input_files('#aImport', paths); await pg.wait_for_timeout(2000)
         check(await pg.evaluate('recMeta().then(a=>a.length)') == 3, 'importing the same backup twice adds nothing')
 

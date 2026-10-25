@@ -124,6 +124,30 @@ async def main():
         check(await pg.evaluate('recMeta().then(a=>a.filter(r=>r.echo).length)') == n0 + 1, 'the child\'s echo turns are saved for the parent to hear')
         check(not await pg.is_visible('#playBar'), 'stop hides the play bar')
 
+        # ---- ⭐ needs two kinds of quiz; the young hear a verse in the parent's voice and pick its picture ----
+        await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(400)
+        await pg.click('#modelList [data-m="٣٢"]'); await pg.wait_for_timeout(400)
+        await record_marked(pg, verses=3)
+        await pg.click('#keep'); await pg.wait_for_timeout(700); await pg.click('#mnStop'); await pg.wait_for_timeout(300)
+        await pg.click('#modeQuiz'); await pg.wait_for_timeout(800)
+        check(await pg.locator('#quizBox [data-q="listen"]').count() == 1, 'a young child with a verse-marked model is offered «اسمع واختر»')
+        await pg.click('#quizBox [data-q="listen"]'); await pg.wait_for_timeout(1500)
+        check(await pg.locator('#quizBox .imgs .opt').count() == 3 and await pg.is_visible('#lsPlay'), 'listening quiz: a 🔊 button and three pictures')
+        nq = await pg.evaluate('qs.length')
+        for _ in range(nq):
+            await pg.click('#quizBox .opt[data-ok="1"]'); await pg.wait_for_timeout(1100)
+        txt = await pg.text_content('#quizBox')
+        check('نوع آخر' in txt and not await pg.evaluate('badges(cur).quiz'), 'one kind of quiz passed: the star waits for a second kind')
+        await pg.click('#qMenu'); await pg.wait_for_timeout(300)
+        check('✓' in await pg.text_content('#quizBox [data-q="listen"]'), 'the passed kind is ticked in the quiz menu')
+        await pg.click('#quizBox [data-q="complete"]')
+        nq = await pg.evaluate('qs.length')
+        for _ in range(nq):
+            right = await pg.evaluate("(()=>{const q=document.querySelector('#quizBox .q').textContent; const first=q.split('…')[0].trim(); const v=cur.verses.find(v=>first.startsWith(v[0].trim())); return v[1]})()")
+            await pg.locator('#quizBox .opt', has_text=right).first.click(); await pg.wait_for_timeout(1000)
+        check(await pg.evaluate('badges(cur).quiz') and 'شارة جديدة' in await pg.text_content('#quizBox'), 'a second kind passed: ⭐ awarded')
+        await pg.click('#qBack')
+
         # ---- family theater (Leila + Baba) ----
         await pg.click('#back'); await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(500)
         check(await pg.is_visible('#theaterBtn'), 'theater offered when two voices recorded the segment')
