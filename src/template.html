@@ -207,6 +207,10 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
     <div class="row"><button class="btn g" id="modelSession">🎙 ابدأ جلسة تسجيل النماذج</button></div>
     <label>اسمك كما يظهر على النماذج</label><input id="parentName" placeholder="بابا">
     <div class="mlist" id="modelList"></div>
+    <h2 class="sec">🎉 مديح بصوتك</h2>
+    <p class="small">سجّل من ثلاث إلى خمس عبارات قصيرة، مثل «أحسنت يا بطل!» و«أنا فخور بك!». تُسمع بعد كل إنجاز مع نغمة الاحتفال، عبارة مختلفة كل مرة.</p>
+    <div class="mlist" id="praiseList"></div>
+    <div class="row"><button class="btn g" id="praiseRec">🎙 سجّل عبارة</button></div>
     <h2 class="sec">➕ أناشيد إضافية</h2>
     <p class="small">اكتب كل بيت في سطر، وافصل بين الشطرين بعلامة <b>/</b>. يُحفظ في هذا الجهاز.</p>
     <label>العنوان</label><input id="aTitle" placeholder="مثال: موطني">
@@ -316,7 +320,7 @@ function applyKidPrefs(){ const a=kidAge(); $('#ageMe').style.display = a?'':'no
   $$('#ages .chip').forEach(c=>c.classList.toggle('on',c.dataset.age===ageF)); }
 function setKid(k){ kid=k; LS.set('kid',k); applyKidPrefs(); renderKidChip(); renderHome(); setTimeout(showNews,300); }
 // what the parent decided while the child was away, shown once with a happy tune
-function showNews(){ if(!kid || screen!=='home' || $('#pop').classList.contains('on')) return; const n=takeNews(kid); if(!n.length) return; chime();
+function showNews(){ if(!kid || screen!=='home' || $('#pop').classList.contains('on')) return; const n=takeNews(kid); if(!n.length) return; cheer();
   const line=x=>{ const p=poemById(x.poem), t=p?esc(p.title):''; return x.t==='mem'?`🧠 خُتم حفظ «${t}»${x.whole?' كله':''} ✓`:x.t==='again'?`🔁 «${t}»: نراجعه غداً`:`👂 سُمع إنشاد «${t}»`; };
   const c=n.find(x=>x.t==='mem'&&x.cert);
   openSheet(`<div class="stars">🌟💌🌟</div><h3 style="text-align:center">من ${esc(LS.get('parentName','')||'والدك')}</h3>${n.map(x=>`<p style="font-size:20px;text-align:center">${line(x)}</p>`).join('')}${c?'<div style="text-align:center"><button class="btn p" id="newsCert">🏅 الشهادة</button></div>':''}<div style="text-align:center"><button class="btn" onclick="closeSheet()">تمام</button></div>`);
@@ -644,7 +648,7 @@ $('#recBtn').onclick = async ()=>{
         if(memOk && !isReview){ s.pend=[...new Set([...(s.pend||[]),recSeg])]; if(s.rev) delete s.rev[recSeg]; }
         if(isReview) scheduleReview(s,recSeg,((s.rev||{})[recSeg]||{step:0}).step+1);
         saveS(); if(cur===rp) renderSegs();
-        celebrate(earned(b0,badges(rp)), recLvl, rp, recLvl===4&&!memOk, memOk&&!isReview, isReview);
+        celebrate(earned(b0,badges(rp)), recLvl, rp, recLvl===4&&!memOk, memOk&&!isReview, isReview, rB-rA, s.rec===1);
       };
       $('#redo').onclick=()=>closeSheet();
     };
@@ -683,13 +687,20 @@ $('#talkBtn').onclick=()=>openSheet(`<h3>💬 حديث مع والدك</h3>${tal
 $('#certBtn').onclick=()=>certificate(cur);
 function talkHTML(bare){ const q=LESSONS[cur&&cur.id]; if(!q) return ''; const ol=`<ol>${q.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`; return bare?ol:`<div class="talk"><b>💬 حديث مع والدك</b>${ol}</div>`; }
 // a short happy tune: praise a child who cannot read yet can hear
+// after an achievement: the tune, then one of the parent's recorded praises (never the same one twice in a row)
+async function cheer(){ chime(); try{ const ps=await praiseAll(); if(!ps.length) return; let i=Math.floor(Math.random()*ps.length); if(ps.length>1 && i===cheer.last) i=(i+1)%ps.length; cheer.last=i;
+  const buf=await decodeRec(ps[i]), ac=actx(), src=ac.createBufferSource(); src.buffer=buf; src.connect(ac.destination); src.start(ac.currentTime+0.6); }catch(e){} }
 function chime(){ try{ const ac=actx(); if(ac.resume) ac.resume(); const t=ac.currentTime+0.05;
   [523.25,659.25,783.99,1046.5].forEach((f,i)=>{ const o=ac.createOscillator(), g=ac.createGain(); o.type='triangle'; o.frequency.value=f; o.connect(g); g.connect(ac.destination);
     const s=t+i*0.11; g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(0.25,s+0.02); g.gain.exponentialRampToValueAtTime(0.0001,s+0.35); o.start(s); o.stop(s+0.4); }); }catch(e){} }
-function celebrate(newB, lvl, p=cur, memShort=false, waiting=false, reviewed=false){
-  chime();
-  const lvlMsg = reviewed?'مراجعة غيباً 🔁 والمراجعة القادمة بعد أيام':waiting?'غيباً! 🧠 بانتظار أن يسمعك والدك ويختم حفظك ⏳':lvl===4?(memShort?'':'غيباً!'):lvl===3?'بأوائل الكلمات فقط 👏':lvl===2?'بنصف النص فقط 👏':'';
-  openSheet(`<div class="stars">🌟🎉🌟</div><h3 style="text-align:center">أحسنت يا ${esc(kid||'بطل')}!</h3>
+// the same words every time lose their effect: the opening changes, and the line says what was done
+const HEADS=['أحسنت يا ٪!','رائع يا ٪!','أبدعت يا ٪!','ما شاء الله يا ٪!','بارك الله فيك يا ٪!'];
+function praiseHead(){ let i=Math.floor(Math.random()*HEADS.length); if(i===LS.get('praiseHead',-1)) i=(i+1)%HEADS.length; LS.set('praiseHead',i); return HEADS[i].replace('٪',esc(kid||'بطل')); }
+function celebrate(newB, lvl, p=cur, memShort=false, waiting=false, reviewed=false, n=0, first=false){
+  cheer();
+  const nv=n?abyat(n)+' ':'';
+  const lvlMsg = reviewed?`راجعتَ ${nv}غيباً 🔁 والمراجعة القادمة بعد أيام`:waiting?`${nv}غيباً! 🧠 بانتظار أن يسمعك والدك ويختم حفظك ⏳`:lvl===4?(memShort?'':`${nv}غيباً!`):lvl===3?`${nv}بأوائل الكلمات فقط 👏`:lvl===2?`${nv}بنصف النص فقط 👏`:first?`أول إنشاد لـ«${esc(p.title)}» 🎤`:n?`أنشدتَ ${abyat(n)} 🎤`:'';
+  openSheet(`<div class="stars">🌟🎉🌟</div><h3 style="text-align:center">${praiseHead()}</h3>
     ${lvlMsg?`<p style="text-align:center">${lvlMsg}</p>`:''}
     ${memShort?'<p class="warn" style="text-align:center">لتنال 🧠 أنشد المقطع كله غيباً، بصوت واضح، من أوله إلى آخره.</p>':''}
     ${newB.length?`<p style="text-align:center;font-size:20px">شارة جديدة: ${newB.map(([k,i,t])=>i+' '+t).join(' · ')}</p>`:''}
@@ -774,7 +785,7 @@ async function echoYoung(r){
   const took=mic?await mic.stop():null;
   if(took && took.dur>3 && cur===p0) await recPut({poem:p0.id,title:p0.title,who:kid||'—',when:Date.now(),dur:took.dur,blob:took.blob,type:took.blob.type,lvl:0,seg:sg0,model:false,echo:true,marks:[],loud:1});
   if(!done || cur!==p0) return;
-  markHeard(); chime();
+  markHeard(); cheer();
   // the next step is shown as pictures, not words
   const next=sg0<segs.length-1;
   openSheet(`<div class="stars">🦜🎉</div><h3 style="text-align:center">انتهى الترديد</h3><div class="row" style="justify-content:center;gap:16px"><button class="btn p" id="ecRec" style="font-size:30px;padding:14px 22px" title="سجّل">🎤</button><button class="btn g" id="ecAgain" style="font-size:30px;padding:14px 22px" title="مرة أخرى">🔁</button>${next?'<button class="btn" id="ecNext" style="font-size:30px;padding:14px 22px" title="المقطع التالي">⬅️</button>':''}</div>`);
@@ -798,7 +809,7 @@ async function karaoke(r, echo){
     await playBuf(buf,s0,s1,sess); if(!sess.alive) break; if(sess.repeat) continue;
     if(echo){ const ms=Math.round((s1-s0)*1250+1200); pb('🗣️ دورك! ردّد البيت',true); pbProg(ms); await pause(ms,sess); if(!sess.alive) break; if(sess.repeat) continue; }
     k++; }
-  if(sess.alive){ stopPlay(); markHeard(); if(echo){ chime(); const next=seg<segs.length-1;
+  if(sess.alive){ stopPlay(); markHeard(); if(echo){ cheer(); const next=seg<segs.length-1;
     openSheet(`<div class="stars">🦜🎉</div><h3 style="text-align:center">انتهى الترديد</h3><div class="row" style="justify-content:center;gap:16px"><button class="btn p" id="ecRec" style="font-size:30px;padding:14px 22px" title="سجّل">🎤</button>${next?'<button class="btn" id="ecNext" style="font-size:30px;padding:14px 22px" title="المقطع التالي">⬅️</button>':''}</div>`);
     $('#ecRec').onclick=()=>{ closeSheet(); $('#recBtn').click(); };
     if(next) $('#ecNext').onclick=()=>{ closeSheet(); goSeg(seg+1); }; } }
@@ -864,6 +875,22 @@ async function certificate(p){
 }
 
 // ---------- parent: model-recording session ----------
+// ---------- praise in the parent's voice ----------
+const PRAISE_MAX=5;
+const praiseAll = () => recMeta().then(a=>a.filter(r=>r.praise).sort((x,y)=>x.when-y.when));
+async function renderPraise(){ const ps=await praiseAll();
+  $('#praiseList').innerHTML = ps.length ? ps.map((r,i)=>`<div class="r"><span class="t">🎉 عبارة ${AR(i+1)} · ${fmt(r.dur)}</span><button class="btn s p" data-pp="${i}" title="استمع">▶</button><button class="btn s d" data-pd="${i}" title="حذف">🗑</button></div>`).join('') : '<p class="small">لا عبارات بعد. بلا عبارات يُسمع الطفل نغمة الاحتفال وحدها.</p>';
+  const full=ps.length>=PRAISE_MAX; $('#praiseRec').disabled=full; $('#praiseRec').textContent = full ? 'خمس عبارات تكفي' : '🎙 سجّل عبارة';
+  $$('#praiseList [data-pp]').forEach(b=>b.onclick=()=>playRecSheet(ps[+b.dataset.pp],'<h3>🎉 عبارة مديح</h3>'));
+  $$('#praiseList [data-pd]').forEach(b=>b.onclick=async()=>{ if(!await ask('حذف هذه العبارة؟','احذف')) return; await recDel(ps[+b.dataset.pd].id); renderPraise(); }); }
+$('#praiseRec').onclick=async()=>{ if((await praiseAll()).length>=PRAISE_MAX) return;
+  const mic=await sessionRecorder(); if(!mic) return toast('تعذّر الوصول إلى الميكروفون');
+  let done=false; const fin=async()=>{ if(done) return; done=true; clearTimeout(t); const took=await mic.stop(); closeSheet();
+    if(!took || took.dur<0.6) return toast('العبارة قصيرة جداً');
+    await recPut({poem:'@praise',title:'مديح',who:LS.get('parentName','')||'الوالد',when:Date.now(),dur:took.dur,blob:took.blob,type:took.blob.type,lvl:0,seg:0,model:false,praise:true,marks:[],loud:1});
+    renderPraise(); toast('حُفظت العبارة ✓ ستُسمع بعد الإنجاز القادم'); };
+  openSheet(`<div class="stars">🔴</div><h3 style="text-align:center">قل العبارة الآن</h3><p class="small" style="text-align:center">مثل: «أحسنت يا بطل!» · «ما شاء الله، حفظتَ!» · «أنا فخور بك!»</p><div style="text-align:center"><button class="btn p" id="praiseStop">⏹ انتهيت</button></div>`,()=>fin(),true);
+  $('#praiseStop').onclick=fin; const t=setTimeout(fin,6000); };
 $('#parentName').value=LS.get('parentName','');
 $('#parentName').onchange=()=>LS.set('parentName',$('#parentName').value.trim());
 async function modelCoverage(){ const ms=(await recMeta()).filter(r=>r.model&&(r.marks||[]).length>1); const cov={};
@@ -936,7 +963,7 @@ let recF='all';
 let archURLs=[];
 async function renderArchive(){
   archURLs.forEach(u=>URL.revokeObjectURL(u)); archURLs=[];
-  const all=(await recMeta()).sort((a,b)=>b.when-a.when);
+  const all=(await recMeta()).filter(r=>!r.praise).sort((a,b)=>b.when-a.when);
   const whos=[...new Set(all.filter(r=>!r.model).map(r=>r.who))];
   $('#recFilter').innerHTML = [['all','الكل'],...whos.map(w=>[w,w]),['__m','🔊 النماذج']].map(([v,t])=>`<span class="chip ${recF===v?'on':''}" data-v="${esc(v)}">${esc(t)}</span>`).join('');
   $$('#recFilter .chip').forEach(c=>c.onclick=()=>{recF=c.dataset.v;renderArchive()});
@@ -1014,7 +1041,7 @@ function startQuiz(t){ clearTimeout(qTimer);
 }
 function finishQuiz(){ stopPlay();
   const pct=Math.round(score/qs.length*100); const b0=badges(cur); const s=st(cur.id); s.quiz=Math.max(s.quiz||0,pct); (s.qz ||= {})[qType]=Math.max(num(s.qz[qType]),pct);
-  if(passedTypes(s).length>=2) s.star=1; s.last=Date.now(); saveS(); const e=earned(b0,badges(cur));
+  if(passedTypes(s).length>=2) s.star=1; s.last=Date.now(); saveS(); const e=earned(b0,badges(cur)); if(pct>=80) cheer();
   const need=Math.ceil(qs.length*0.8);
   const toward = s.star||e.length ? '' : pct>=80 ? `<p style="text-align:center">✓ نجحتَ في «${QT[qType]}». نجاحٌ في نوع آخر يمنحك ⭐</p>` : `<p class="small" style="text-align:center">يُحسب النجاح من ${AR(need)} إجابات صحيحة</p>`;
   $('#quizBox').innerHTML=`<div class="stars">${'⭐'.repeat(score)}${'☆'.repeat(qs.length-score)}</div><h3 style="text-align:center">${AR(score)} من ${AR(qs.length)}</h3>${e.length?`<p style="text-align:center;font-size:20px">شارة جديدة: ${e.map(([k,i,t])=>i+' '+t).join(' · ')}</p>`:''}${toward}${LESSONS[cur.id]?talkHTML():''}<div class="row" style="justify-content:center"><button class="btn p" id="qAgain">مرة أخرى</button><button class="btn" id="qMenu">اختبار آخر</button><button class="btn" id="qBack">عودة للنص</button></div>`;
@@ -1090,8 +1117,8 @@ async function renderParent(){
   $$('#pKids .chip').forEach(c=>c.onclick=()=>{pKid=c.dataset.k;renderParent()});
   if(pKid) $('#pKids').insertAdjacentHTML('beforeend',`<span class="small" style="align-self:center">العمر: ${kidAge(pKid)?AR(kidAge(pKid)):'—'}</span><button class="btn s" id="kidAge">تغيير العمر</button>`);
   if($('#kidAge')) $('#kidAge').onclick=async()=>{ await ageSheet(pKid); if(pKid===kid) applyKidPrefs(); renderParent(); };
-  renderModelList();
-  const recs=(await recMeta()).filter(r=>!r.model&&r.who===pKid);
+  renderModelList(); renderPraise();
+  const recs=(await recMeta()).filter(r=>!r.model&&!r.praise&&r.who===pKid);
   const ps=allPoems(); const B=ps.map(p=>({p,b:badges(p,pKid),s:(KS(pKid)[p.id])||{}}));
   const cnt=k=>B.filter(x=>x.b[k]).length; const mins=Math.round(recs.reduce((a,r)=>a+(r.dur||0),0)/60);
   const wk=recs.filter(r=>Date.now()-r.when<7*864e5).length; const lastT=Math.max(0,...recs.map(r=>r.when),...B.map(x=>x.s.last||0));
@@ -1104,7 +1131,7 @@ const tasjeel = n => n===1?'تسجيلاً واحداً':n===2?'تسجيلين':
 function segName(r){ const p=poemById(r.poem); if(!p) return ''; const sg=segments(p); if(sg.length<2) return 'النشيد كله'; if(r.seg>=sg.length) return 'النشيد كله متصلاً'; const [a,b]=sg[r.seg]; return 'الأبيات '+AR(a+1)+'–'+AR(b); }
 // the parent listens, and decides: 🧠 is the parent's stamp, not the app's guess
 async function renderQueue(){
-  const all=(await recMeta()).filter(r=>!r.model && !r.stamp && kids.includes(r.who)).sort((a,b)=>(b.memCand?1:0)-(a.memCand?1:0) || b.when-a.when);
+  const all=(await recMeta()).filter(r=>!r.model && !r.praise && !r.stamp && kids.includes(r.who)).sort((a,b)=>(b.memCand?1:0)-(a.memCand?1:0) || b.when-a.when);
   if(!all.length){ $('#pQueue').innerHTML=''; return; }
   const list=all.slice(0,8);
   $('#pQueue').innerHTML=`<h2 class="sec">📥 تنتظر أذنك (${AR(all.length)})</h2><div class="rlist">${list.map(r=>`<div class="r" data-q="${esc(r.id)}"><div class="t"><b style="font-family:Amiri,serif;font-size:19px">${esc(r.title)}</b> <span class="tag">${r.memCand?'🧠 غيباً · '+segName(r):r.echo?'🦜 ترديد':'🎤 إنشاد'}</span><div class="small">${esc(r.who)} · ${new Date(r.when).toLocaleDateString('ar-EG',{day:'numeric',month:'long'})} · ${fmt(r.dur)}</div></div>
@@ -1121,7 +1148,7 @@ function stampEffects(r,stamp){ const p=poemById(r.poem); const s=st(r.poem,r.wh
   else { saveS(); pushNews(r.who,{t:'heard',poem:r.poem}); } }
 // ten minutes tonight: listen, record one model, ask one question
 async function renderTonight(){ const items=[];
-  const q=(await recMeta()).filter(r=>!r.model&&!r.stamp&&kids.includes(r.who)).length; if(q) items.push(`📥 اسمع ${tasjeel(q)} (في الأعلى)`);
+  const q=(await recMeta()).filter(r=>!r.model&&!r.praise&&!r.stamp&&kids.includes(r.who)).length; if(q) items.push(`📥 اسمع ${tasjeel(q)} (في الأعلى)`);
   const t=await nextModelTarget(); if(t){ const p=poemById(t[0]), sg=segments(p), [a,b]=sg[t[1]];
     items.push(`🎙 سجّل نموذج «${esc(p.title)}»${sg.length>1?' (الأبيات '+AR(a+1)+'–'+AR(b)+')':''} — نحو ${AR(Math.max(1,Math.round((b-a)*8/60)))} دقيقة <button class="btn s g" id="tnModel">ابدأ</button>`); }
   if(pKid){ const last=Object.entries(S[pKid]||{}).filter(([id,s])=>LESSONS[id]&&poemById(id)&&s&&s.last).sort((x,y)=>y[1].last-x[1].last)[0];
@@ -1190,7 +1217,7 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
     if(typeof o.parentName==='string' && o.parentName && !LS.get('parentName','')){ LS.set('parentName',o.parentName); $('#parentName').value=o.parentName; }
     if(Array.isArray(o.recs)) for(const x of o.recs){ if(!x||typeof x.b64!=='string'){ nFail++; continue; } const key=x.who+'|'+x.poem+'|'+x.when; if(have.has(key)){ nSkip++; continue; }
       try{ const bin=atob(x.b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
-        const {b64,id,size,...rest}=x; ['dur','lvl','seg','when','loud'].forEach(k=>rest[k]=num(rest[k])); rest.who=String(rest.who||'—'); rest.title=String(rest.title||''); rest.poem=String(rest.poem||''); rest.model=!!rest.model;
+        const {b64,id,size,...rest}=x; ['dur','lvl','seg','when','loud'].forEach(k=>rest[k]=num(rest[k])); rest.who=String(rest.who||'—'); rest.title=String(rest.title||''); rest.poem=String(rest.poem||''); rest.model=!!rest.model; rest.praise=!!rest.praise;
         rest.marks=Array.isArray(rest.marks)?rest.marks.filter(m=>Array.isArray(m)).map(m=>[num(m[0]),num(m[1]),num(m[2])]):[];
         if(await recPut(Object.assign(rest,{blob:new Blob([u],{type:typeof x.type==='string'?x.type:'audio/webm'})}))!=null){ nOk++; have.add(key); } else nFail++; }catch(err){ nFail++; } } }
   if(!any) return toast(bad?'هذا ليس ملف نسخة احتياطية من «أنشودتي»':'لم يُستورد شيء',4500);

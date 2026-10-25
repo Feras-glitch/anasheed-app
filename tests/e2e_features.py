@@ -126,6 +126,9 @@ async def main():
 
         # ---- ⭐ needs two kinds of quiz; the young hear a verse in the parent's voice and pick its picture ----
         await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(400)
+        # ---- praise in the parent's voice ----
+        await pg.click('#praiseRec'); await pg.wait_for_timeout(1800); await pg.click('#praiseStop'); await pg.wait_for_timeout(1200)
+        check(await pg.locator('#praiseList [data-pp]').count() == 1, 'the parent records a praise phrase')
         await pg.click('#modelList [data-m="٣٢"]'); await pg.wait_for_timeout(400)
         await record_marked(pg, verses=3)
         await pg.click('#keep'); await pg.wait_for_timeout(700); await pg.click('#mnStop'); await pg.wait_for_timeout(300)
@@ -146,6 +149,7 @@ async def main():
             right = await pg.evaluate("(()=>{const q=document.querySelector('#quizBox .q').textContent; const first=q.split('…')[0].trim(); const v=cur.verses.find(v=>first.startsWith(v[0].trim())); return v[1]})()")
             await pg.locator('#quizBox .opt', has_text=right).first.click(); await pg.wait_for_timeout(1000)
         check(await pg.evaluate('badges(cur).quiz') and 'شارة جديدة' in await pg.text_content('#quizBox'), 'a second kind passed: ⭐ awarded')
+        check(await pg.evaluate('cheer.last') == 0, 'a success plays the parent\'s recorded praise')
         await pg.click('#qBack')
 
         # ---- family theater (Leila + Baba) ----
@@ -209,6 +213,7 @@ async def main():
         check(d and all(x and x != float('inf') for x in d), f'archive audio durations known {d[:3]}')
         check('٠:' in await pg.text_content('#rlist .r >> nth=1 >> [data-pl]'), 'each recording shows its length before loading')
         check(await pg.locator('#rlist .tag:has-text("🦜")').count() >= 1, 'marked models labelled in the archive')
+        check(await pg.locator('#rlist .r:has-text("مديح")').count() == 0, 'praise phrases are not listed among the recordings')
 
         # ---- backup with recordings → restore into a fresh install ----
         await pg.click('#back'); await pg.click('#goParent'); await pg.click('#aExport'); await pg.wait_for_timeout(200)
