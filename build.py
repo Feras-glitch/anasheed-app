@@ -143,6 +143,11 @@ for pid, a in album.items():
     images_d['@album:' + pid] = 'data:image/jpeg;base64,' + base64.b64encode(open(P(a['img']), 'rb').read()).decode()
 album_names = {pid: a['name'] for pid, a in album.items()}
 paths = {k: v for k, v in json.load(open(P('content', 'paths.json'), encoding='utf-8')).items() if not k.startswith('_')}
+# «معنى البيت»: one plain line per verse shown in the app (excerpts included), and the poem's idea
+bayt = {k: v for k, v in json.load(open(P('content', 'bayt.json'), encoding='utf-8')).items() if not k.startswith('_')}
+for pid, b in bayt.items():
+    p = next((x for x in poems if x['id'] == pid), None)
+    assert p and b.get('idea') and len(b['v']) == len(p['verses']) and all(isinstance(x, str) and x.strip() for x in b['v']), f'bayt.json: {pid} does not match its verses'
 assert set(paths) == {'young', 'old'} and all(any(p['id'] == i for p in poems) for v in paths.values() for i in v), 'paths.json: unknown poem id'
 G.update(OVR)
 for k, v in G_PARENT.items():
@@ -192,6 +197,7 @@ def render(images, story):
                .replace('/*__LESSONS__*/', json.dumps(lessons, ensure_ascii=False))
                .replace('/*__ALBUM__*/', json.dumps(album_names, ensure_ascii=False))
                .replace('/*__PATHS__*/', json.dumps(paths, ensure_ascii=False))
+               .replace('/*__BAYT__*/', json.dumps(bayt, ensure_ascii=False))
                .replace('<!--__FONTS__-->', fonts))
     assert '/*__' not in page, 'unfilled placeholder'
     return page

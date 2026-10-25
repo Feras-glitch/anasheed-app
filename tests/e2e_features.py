@@ -45,6 +45,24 @@ async def main():
         check(await pg.evaluate('cur.id') == '١٩', 'the path opens its next poem')
         await pg.click('#back'); await pg.evaluate("delete st('١٦').star; saveS(); renderHome()")
 
+        # ---- «معنى البيت»: a plain line under each verse, and a quiz on whole verses ----
+        await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
+        check(not await pg.is_visible('#bmBtn'), 'a poem for the young has no «معنى البيت»')
+        await pg.click('#back'); await pg.click('#ages .chip[data-age="all"]'); await pg.click('#grid .card[data-id="٣٠"]'); await pg.wait_for_timeout(300)
+        check(await pg.is_visible('#bmBtn') and await pg.locator('#verses .bm').count() == 0, 'age 7: «معنى البيت» offered, off by default')
+        await pg.click('#bmBtn'); await pg.wait_for_timeout(200)
+        n_v = await pg.locator('#verses .verse').count(); n_bm = await pg.locator('#verses .bm').count()
+        check(n_bm == n_v == 10 and await pg.locator('#verses .bmIdea').count() == 1, f'one meaning under each verse, and the poem\'s idea ({n_bm}/{n_v})')
+        await pg.click('#modeQuiz'); await pg.wait_for_timeout(200)
+        await pg.click('#quizBox [data-q="sense"]'); await pg.wait_for_timeout(100)
+        nq = await pg.evaluate('qs.length')
+        for _ in range(nq):
+            await pg.evaluate("(()=>{ const r=BAYT[cur.id].v[qs[qi]]; [...document.querySelectorAll('#quizBox .opt')].find(b=>b.textContent===r).click(); })()"); await pg.wait_for_timeout(1000)
+        check(await pg.evaluate("st('٣٠').qz.sense") == 100, f'«ما معنى البيت؟» counts as a kind of quiz ({nq} questions)')
+        await pg.click('#qBack'); await pg.click('#bmBtn'); await pg.wait_for_timeout(100)
+        check(await pg.locator('#verses .bm').count() == 0, 'the meanings can be hidden again')
+        await pg.click('#back'); await pg.click('#ages .chip[data-age="me"]'); await pg.wait_for_timeout(200)
+
         # ---- pictures are separate files in the app build ----
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
         await pg.click('#verses .w.img >> nth=0'); await pg.wait_for_timeout(400)

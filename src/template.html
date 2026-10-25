@@ -133,6 +133,9 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 .stk .new{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;border-radius:10px;padding:0 8px;font-size:12px}
 .banner.path img{width:88px;height:60px;object-fit:cover;border-radius:10px;flex:none}
 .dots{display:flex;gap:4px;margin:6px 0 2px;flex-wrap:wrap} .dots i{width:10px;height:10px;border-radius:50%;background:#e6d3ae} .dots i.on{background:var(--accent2)} .dots i.cur{background:var(--accent);box-shadow:0 0 0 2px #fff}
+.verse .bm{grid-column:1/-1;font-family:"Cairo",sans-serif;font-size:16px;line-height:1.75;color:#5c4a28;background:#fff7e0;border-radius:10px;padding:6px 10px;margin-top:2px}
+.bmIdea{font-family:"Cairo",sans-serif;font-size:17px;background:#e9f4ee;border-radius:12px;padding:8px 12px;margin:0 0 10px;line-height:1.8}
+#bmBtn.on{background:var(--accent);color:#fff}
 .albumBar{display:flex;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap}
 .albumBar img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 </style>
@@ -173,6 +176,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
         <button class="btn s" id="modeSing">🎵 إنشاد</button>
         <button class="btn s" id="modeQuiz">❓ اختبر نفسك</button>
         <button class="btn s" id="modeStory" style="display:none">🖼 حكاية مصوّرة</button>
+        <button class="btn s" id="bmBtn" style="display:none">💡 معنى البيت</button>
         <button class="btn s g" id="modelBtn" style="display:none">🔊 اسمع النموذج</button>
         <button class="btn s g" id="echoBtn" style="display:none">🦜 ردّد بعدي</button>
         <button class="btn s" id="theaterBtn" style="display:none">🎭 مسرح العائلة</button>
@@ -270,6 +274,7 @@ const STORY = /*__STORY__*/;
 const LESSONS = /*__LESSONS__*/;
 const ALBUM = /*__ALBUM__*/;
 const PATHS = /*__PATHS__*/;
+const BAYT = /*__BAYT__*/;
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -363,7 +368,7 @@ function segments(p){ const n=p.verses.length; if(n<=12) return [[0,n]]; const o
 // badges
 const BADGES=[['heard','👂','سمعتُه أو تابعتُه للآخر'],['sang','🎤','أنشدتُه'],['quiz','⭐','نجحتُ في اختبارين مختلفين'],['mem','🧠','حفظتُه غيباً']];
 // ⭐ needs 80% in two different kinds of quiz: one success can be luck, or a single skill
-const QT={complete:'✍️ أكمل البيت',meaning:'💡 ما معنى الكلمة؟',order:'🔢 رتّب الأبيات',listen:'🔊 اسمع واختر'};
+const QT={complete:'✍️ أكمل البيت',meaning:'💡 ما معنى الكلمة؟',order:'🔢 رتّب الأبيات',listen:'🔊 اسمع واختر',sense:'🧩 ما معنى البيت؟'};
 const passedTypes = s => Object.entries((s&&s.qz)||{}).filter(([t,v])=>QT[t]&&num(v)>=80).map(([t])=>t);
 function badges(p,k=kid){ const s=(KS(k)[p.id])||{}; const sg=segments(p), m=new Set(s.mem||[]);
   const mem = sg.every((_,i)=>m.has(i)) && (sg.length<2 || m.has(sg.length));
@@ -519,7 +524,7 @@ function openPoem(id){
   $('#pTitle').textContent=cur.title; $('#pPoet').textContent=cur.poet;
   $('#pNote').innerHTML = (cur.note?`<div class="note">${esc(cur.note)}</div>`:'') + (cur.excerpt?`<div class="note">📌 مقتطف للحفظ: ${abyat(cur.excerpt[0])} من ${abyat(cur.excerpt[1])}</div>`:'');
   $('#pFoot').textContent = cur.foot ? '* '+cur.foot : '';
-  $('#modeStory').style.display = STORY[cur.id]?'':'none';
+  $('#modeStory').style.display = STORY[cur.id]?'':'none'; $('#bmBtn').style.display = BAYT[cur.id]?'':'none'; $('#bmBtn').classList.toggle('on',bmOn());
   $('#secureWarn').innerHTML = (window.isSecureContext && navigator.mediaDevices) ? '' : '<div class="warn">التسجيل لا يعمل حين يُفتح الملف بهذه الطريقة. ثبّت تطبيق «أنشودتي» أو افتحه من رابطه.</div>';
   qEasy=null; clearTimeout(qTimer); visited=new Set(); renderSegs(); setModeUI(); renderVerses(); show('poem'); loadLast(); loadModel(); renderBanner();
 }
@@ -549,17 +554,21 @@ function hemi(txt,hide,i){
 function renderVerses(){
   const [a,b]=rng(); const sing=mode==='sing'; if(sing) visited.add(curLine);
   if(rec&&rec.state==='recording'){ const l=recMarks[recMarks.length-1]; if(!l||l[0]!==curLine) recMarks.push([curLine,(Date.now()-t0)/1000,autoStepping?1:0]); }
-  let h='';
+  let h=''; const bm=bmOn() && mode==='read' && BAYT[cur.id];
+  if(bm) h+=`<div class="bmIdea">💡 فكرة النشيد: ${esc(BAYT[cur.id].idea)}</div>`;
   for(let i=a;i<b;i++){ const v=cur.verses[i]; const vis=!sing||level===1||i===peek;
     const h1 = vis?hemi(v[0],0,i) : level===4?hemi(v[0],'blank') : level===3?hemi(v[0],'first') : hemi(v[0],0,i);
     const h2 = vis?hemi(v[1],0,i) : level===4?hemi(v[1],'blank') : hemi(v[1],level===2?'blank':'first');
-    h+=`<div class="verse ${sing?(i===curLine?'cur':(i<curLine?'dim':'')):''}" data-i="${i}"><span class="vn">${AR(i+1)}</span><div>${h1}</div><div>${h2}</div>${stageWho[i]?`<span class="who">🎤 ${esc(stageWho[i])}</span>`:''}</div>`; }
+    h+=`<div class="verse ${sing?(i===curLine?'cur':(i<curLine?'dim':'')):''}" data-i="${i}"><span class="vn">${AR(i+1)}</span><div>${h1}</div><div>${h2}</div>${stageWho[i]?`<span class="who">🎤 ${esc(stageWho[i])}</span>`:''}${bm?`<div class="bm">${esc(BAYT[cur.id].v[i])}</div>`:''}</div>`; }
   if(sing && curLine===b-1){ markSeen(); if(seg<segs.length-1) h+=`<div style="text-align:center;padding:12px"><button class="btn p" id="nextSeg">المقطع التالي ⬅</button></div>`; }
   $('#verses').innerHTML=h;
   if($('#nextSeg')) $('#nextSeg').onclick=e=>{ e.stopPropagation(); goSeg(seg+1); };
   $$('#verses .verse').forEach(el=>el.onclick=e=>{ const w=e.target.closest('.w'); if(w && (w.classList.contains('has')||w.classList.contains('img')||Date.now()<gateUntil) && (!sing||level===1||+el.dataset.i===peek)) return openWord(w.dataset.k,w.textContent,+el.dataset.i);
     curLine=+el.dataset.i; if(mode!=='sing'){mode='sing';setModeUI()} if(level>1 && !(rec&&rec.state==='recording')){ peek=curLine; clearTimeout(renderVerses._p); renderVerses._p=setTimeout(()=>{peek=-1;renderVerses()},2500);} renderVerses(); scrollCur(); });
 }
+// «معنى البيت» is on by default from age 9 (the poems that have it are for 8–12); the child's own choice is kept
+const bmOn = () => { const v=LS.get('bm',null); return v===null ? kidAge()>=9 : !!v; };
+$('#bmBtn').onclick=()=>{ LS.set('bm',!bmOn()); if(mode!=='read') $('#modeRead').click(); else renderVerses(); $('#bmBtn').classList.toggle('on',bmOn()); };
 function scrollCur(){ const el=$('#verses .cur'); if(el) el.scrollIntoView({block:'center',behavior:'smooth'}); }
 function setModeUI(){
   const on=(id,m)=>$(id).classList.toggle('p',mode===m);
@@ -1054,7 +1063,7 @@ function quizMenu(){ clearTimeout(qTimer); stopPlay();
   if(qEasy===null) qEasy = kidAge()? kidAge()<=8 : cur.age[0]<=7;
   const s=st(cur.id), done=new Set(passedTypes(s)), tick=t=>done.has(t)?' ✓':'';
   const starLine = s.star ? '⭐ نلتَ النجمة في هذا النشيد' : `⭐ النجمة لمن ينجح في نوعين مختلفين من الاختبار${done.size?` — نجحتَ في ${AR(done.size)} من ٢`:''}`;
-  $('#quizBox').innerHTML=`<div class="chips" style="justify-content:center"><span class="chip ${qEasy?'on':''}" data-e="1">🐣 سهل</span><span class="chip ${qEasy?'':'on'}" data-e="0">🦅 عادي</span></div><div class="menu"><button class="btn v" data-q="complete">${QT.complete}${tick('complete')}</button>${hasWords?`<button class="btn g" data-q="meaning">${QT.meaning}${tick('meaning')}</button>`:''}${canOrder?`<button class="btn p" data-q="order">${QT.order}${tick('order')}</button>`:''}</div><p class="small" id="starLine" style="text-align:center">${starLine}</p>`+(segs.length>1?'<p class="small" style="text-align:center">الأسئلة من المقطع المختار فقط</p>':'');
+  $('#quizBox').innerHTML=`<div class="chips" style="justify-content:center"><span class="chip ${qEasy?'on':''}" data-e="1">🐣 سهل</span><span class="chip ${qEasy?'':'on'}" data-e="0">🦅 عادي</span></div><div class="menu"><button class="btn v" data-q="complete">${QT.complete}${tick('complete')}</button>${hasWords?`<button class="btn g" data-q="meaning">${QT.meaning}${tick('meaning')}</button>`:''}${canOrder?`<button class="btn p" data-q="order">${QT.order}${tick('order')}</button>`:''}${senseIdx().length>=3?`<button class="btn v" data-q="sense">${QT.sense}${tick('sense')}</button>`:''}</div><p class="small" id="starLine" style="text-align:center">${starLine}</p>`+(segs.length>1?'<p class="small" style="text-align:center">الأسئلة من المقطع المختار فقط</p>':'');
   $$('#quizBox [data-q]').forEach(b=>b.onclick=()=>startQuiz(b.dataset.q));
   $$('#quizBox [data-e]').forEach(c=>c.onclick=()=>{ qEasy=c.dataset.e==='1'; quizMenu(); });
   // for the young: hear a verse in the parent's voice and pick its picture (needs a verse-marked model)
@@ -1077,9 +1086,13 @@ async function startListen(){ const ac=actx(); if(ac.resume) ac.resume(); // ins
   if(qs.length<3){ toast('تعذّر تشغيل صوت النموذج'); return quizMenu(); }
   nextQ(); }
 function segWords(){ const [a,b]=rng(); const seen=new Set(), out=[]; for(let i=a;i<b;i++) cur.verses[i].forEach((h,hi)=>h.split(' ').forEach(w=>{const k=wkey(w); if(k&&M(k,i)&&!seen.has(k)){seen.add(k);out.push({k,w,i,hi})}})); return out; }
+// «ما معنى البيت؟»: a whole verse, three plain meanings; lines that only lead into the next verse are not asked
+const bmFull = x => !/[،:]\s*$/.test(x) && x.split(' ').length>=5;
+function senseIdx(){ const B=BAYT[cur&&cur.id]; if(!B) return []; const [a,b]=rng(); return [...Array(b-a)].map((_,k)=>a+k).filter(i=>bmFull(B.v[i])); }
 function startQuiz(t){ clearTimeout(qTimer);
   qType=t; qi=0; score=0; const [a,b]=rng(); const idx=[...Array(b-a)].map((_,i)=>a+i);
   if(t==='listen') return startListen();
+  if(t==='sense') qs=shuffle(senseIdx()).slice(0,5);
   if(t==='complete'){ const whole=idx.filter(i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1])); qs=shuffle(whole.length>=3?whole:idx).slice(0,5); }
   if(t==='meaning'){ const ws=segWords(); const withImg=shuffle(ws.filter(x=>IMG(x.k,x.i)));
     // easy: pictures only when there are enough of them — a child who cannot read cannot pick a written meaning
@@ -1100,6 +1113,15 @@ function answer(btns,ok,rightEl){ btns.forEach(x=>x.disabled=true); if(ok) score
 function nextQ(){
   if(qi>=qs.length) return finishQuiz();
   const head=`<div class="small" style="text-align:center">سؤال ${AR(qi+1)} من ${AR(qs.length)}</div>`;
+  if(qType==='sense'){
+    const i=qs[qi], B=BAYT[cur.id], right=B.v[i];
+    let pool=shuffle(B.v.filter((x,k)=>k!==i && bmFull(x) && x!==right));
+    if(pool.length<2) pool=pool.concat(shuffle(Object.values(BAYT).flatMap(o=>o.v)).filter(x=>bmFull(x)&&x!==right&&!pool.includes(x)));
+    const opts=shuffle([right,...pool.slice(0,2)]);
+    $('#quizBox').innerHTML=head+`<div class="q">${esc(cur.verses[i][0])}<br>${esc(cur.verses[i][1])}<br><span class="small">ما معنى هذا البيت؟</span></div>`+opts.map(o=>`<button class="opt" style="font-family:Cairo;font-size:18px;line-height:1.7">${esc(o)}</button>`).join('');
+    const btns=$$('#quizBox .opt'); btns.forEach(b=>b.onclick=()=>{ const ok=b.textContent===right; b.classList.add(ok?'ok':'no'); answer(btns,ok,btns.find(y=>y.textContent===right)); });
+    return;
+  }
   if(qType==='listen'){
     const x=qs[qi], right=x.img; let others;
     if(x.scene) others=(STORY[cur.id]||[]).map(e=>e.img).filter(u=>u!==right);
