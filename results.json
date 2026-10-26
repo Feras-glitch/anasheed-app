@@ -1,0 +1,99 @@
+{
+ "install": "Performing Streamed Install\nSuccess",
+ "device": {
+  "sdk": "35",
+  "webview": [
+   "124.0.6367.219"
+  ]
+ },
+ "launch": {
+  "pid": "2438",
+  "socket": "webview_devtools_remote_2438",
+  "url": "https://localhost/"
+ },
+ "facts": {
+  "href": "https://localhost/",
+  "secure": true,
+  "native": true,
+  "plugins": [
+   "Filesystem",
+   "Share"
+  ],
+  "cards": 39,
+  "kidSheet": true,
+  "mediaRecorder": "function",
+  "types": {
+   "audio/mp4": false,
+   "audio/mp4;codecs=mp4a.40.2": false,
+   "audio/webm;codecs=opus": true
+  },
+  "headerTop": 0,
+  "chipTop": 12,
+  "safeTop": "10px",
+  "innerW": 320,
+  "innerH": 592,
+  "dpr": 1,
+  "fonts": true,
+  "fontCairo": true,
+  "loadMs": 1104
+ },
+ "make_kid": "تجربة",
+ "back_button": {
+  "opened_by_tap": "poem",
+  "sheet_open": true,
+  "back1_sheet_closed": true,
+  "back1_screen": "poem",
+  "back2_screen": "home",
+  "back2_app_open": true,
+  "back3_exits_from_home": true,
+  "relaunch": {
+   "pid": "2438",
+   "socket": "webview_devtools_remote_2438",
+   "url": "https://localhost/"
+  }
+ },
+ "record": {
+  "live_while_recording": true,
+  "sheet_text_if_error": "",
+  "save_sheet": true,
+  "recordings": [
+   {
+    "size": 10639,
+    "type": "audio/webm;codecs=opus",
+    "dur": 4
+   }
+  ]
+ },
+ "playback": {
+  "duration": null
+ },
+ "filesystem_plugin": "file:///data/user/0/com.feras.anasheed/cache/t.txt",
+ "share": {
+  "focus_during_share": "com.android.intentresolver/com.android.intentresolver.ChooserActivityLauncher",
+  "focus_after_dismiss": "com.feras.anasheed/com.feras.anasheed.MainActivity"
+ },
+ "level3_render": 39,
+ "landscape": {
+  "w": 640,
+  "h": 272,
+  "overflow": false
+ },
+ "features": {
+  "vu_visible": true,
+  "next_sheet": true,
+  "echo_button": true,
+  "echo_bar": "🗣️ دورك! ردّد البيت",
+  "echo_moves": [
+   0,
+   1,
+   2
+  ],
+  "certificate_px": 1600,
+  "picture_file": "img/6126cada"
+ },
+ "persist_after_restart": {
+  "kid": "تجربة",
+  "recordings": 2,
+  "stats": 100
+ }
+}
