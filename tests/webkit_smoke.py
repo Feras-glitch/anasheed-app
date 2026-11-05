@@ -37,6 +37,7 @@ async def main():
         await pg.click('#sheet [data-a="7"]'); await pg.wait_for_timeout(200)
         check(await pg.locator('#grid .card').count() > 5, 'poem list renders')
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
+        await pg.click('#modeRead'); await pg.wait_for_timeout(200)  # age 7: a picture story opens on its pictures
         await pg.click('#verses .w.img >> nth=0'); await pg.wait_for_timeout(500)
         check(await pg.evaluate("document.querySelector('#sheet img').naturalWidth") > 100, 'word picture loads')
         await pg.click('#mClose')

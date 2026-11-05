@@ -112,6 +112,8 @@ async def main():
 
         # ---- pictures are separate files in the app build ----
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
+        check(await pg.evaluate("mode") == 'story' and await pg.is_visible('#storyBox .scene'), 'age 7: a picture story opens on its pictures')
+        await pg.click('#modeRead'); await pg.wait_for_timeout(200)
         await pg.click('#verses .w.img >> nth=0'); await pg.wait_for_timeout(400)
         src = await pg.get_attribute('#sheet img', 'src'); nw = await pg.evaluate("document.querySelector('#sheet img').naturalWidth")
         check(src.startswith('img/') and nw > 100, f'word pictures load as files ({src})')
@@ -153,8 +155,10 @@ async def main():
         check(len(marks) == 3 and marks[0][0] == 0 and marks[2][0] == 2, f'verse marks saved with the recording {marks}')
 
         # ---- parent model session ----
-        await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(400)
+        await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(400)
         await pg.fill('#parentName', 'بابا'); await pg.dispatch_event('#parentName', 'change')
+        check(await pg.locator('#modelList .r').count() == 5 and await pg.locator('#mlAll').count() == 1, 'model list shows five poems, then «أظهر الكل»')
+        await pg.click('#mlAll'); await pg.wait_for_timeout(300)
         check(await pg.locator('#modelList .r').count() == await pg.evaluate('POEMS.length'), 'model list covers every poem')
         await pg.click('#modelList [data-m="١"]'); await pg.wait_for_timeout(400)
         check(await pg.locator('#modeBanner .modeBanner').count() == 1 and not await pg.is_checked('#autoOn'), 'model mode: banner, manual verse stepping')
@@ -162,7 +166,11 @@ async def main():
         check(await pg.is_checked('#isModel') and await pg.input_value('#who') == 'بابا', 'model save sheet pre-filled')
         await pg.click('#keep'); await pg.wait_for_timeout(700)
         check(await pg.locator('#mnNext').count() == 1, 'after saving: go on to the next poem without a model')
-        await pg.click('#mnStop'); await pg.wait_for_timeout(300)
+        await pg.click('#mnStop'); await pg.wait_for_timeout(500)
+        check(await pg.evaluate('screen') == 'parent', '«انتهيت» takes the parent back to his page')
+        await pg.click('#back'); await pg.wait_for_timeout(300)
+        check(await pg.evaluate('gateUntil') == 0, 'leaving the parent page closes the gate')
+        await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(500)
         check(await pg.is_visible('#echoBtn'), '«ردّد بعدي» appears once a marked model exists')
         await pg.click('#modeStory'); await pg.wait_for_timeout(600)
         check(await pg.locator('#storyBox .splay:visible').count() >= 1, 'story pictures play their verses in the parent\'s voice')
@@ -199,14 +207,16 @@ async def main():
         check(not await pg.is_visible('#playBar'), 'stop hides the play bar')
 
         # ---- ⭐ needs two kinds of quiz; the young hear a verse in the parent's voice and pick its picture ----
-        await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(400)
+        await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(400)
         # ---- praise in the parent's voice ----
         await pg.click('#praiseRec'); await pg.wait_for_timeout(1800); await pg.click('#praiseStop'); await pg.wait_for_timeout(1200)
         check(await pg.locator('#praiseList [data-pp]').count() == 1, 'the parent records a praise phrase')
         await pg.click('#modelList [data-m="٣٢"]'); await pg.wait_for_timeout(400)
         await record_marked(pg, verses=3)
-        await pg.click('#keep'); await pg.wait_for_timeout(700); await pg.click('#mnStop'); await pg.wait_for_timeout(300)
+        await pg.click('#keep'); await pg.wait_for_timeout(700); await pg.click('#mnStop'); await pg.wait_for_timeout(400)
+        await pg.click('#back'); await pg.wait_for_timeout(300); await pg.click('#grid .card[data-id="٣٢"]'); await pg.wait_for_timeout(400)
         await pg.click('#modeQuiz'); await pg.wait_for_timeout(800)
+        check(not await pg.is_visible('#recBtn'), 'no red record button during a quiz')
         check(await pg.locator('#quizBox [data-q="listen"]').count() == 1, 'a young child with a verse-marked model is offered «اسمع واختر»')
         await pg.click('#quizBox [data-q="listen"]'); await pg.wait_for_timeout(1500)
         check(await pg.locator('#quizBox .imgs .opt').count() == 3 and await pg.is_visible('#lsPlay'), 'listening quiz: a 🔊 button and three pictures')
@@ -252,7 +262,7 @@ async def main():
         check('بانتظار' in await pg.text_content('#sheet') and await pg.locator('#celCert').count() == 0, 'a take from memory waits for the parent\'s stamp')
         await pg.click('#sheet button:has-text("تمام")')
         # the parent listens and stamps
-        await pg.click('#back'); await pg.click('#goParent'); await pg.wait_for_timeout(700)
+        await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(700)
         check(await pg.locator('#pQueue [data-st="ok"]').count() >= 1, 'the parent page lists takes waiting to be heard, memorisation first')
         check('مهمة الليلة' in await pg.text_content('#pTonight'), 'the parent page proposes tonight\'s task')
         await pg.click('#pQueue [data-st="ok"] >> nth=0'); await pg.wait_for_timeout(500)
@@ -307,7 +317,7 @@ async def main():
         check(await pg.locator('#rlist .r:has-text("مديح")').count() == 0, 'praise phrases are not listed among the recordings')
 
         # ---- backup with recordings → restore into a fresh install ----
-        await pg.click('#back'); await pg.click('#goParent'); await pg.click('#aExport'); await pg.wait_for_timeout(200)
+        await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.click('#aExport'); await pg.wait_for_timeout(200)
         async with pg.expect_download() as dl:
             await pg.click('#exAll')
         bp = os.path.join(tempfile.mkdtemp(), 'b.json'); await (await dl.value).save_as(bp)

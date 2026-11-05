@@ -40,7 +40,7 @@ for s in re.split(r'\n### ', src)[1:]:
     for l in lines:
         if l.count(' / ') != 1:
             problems.append(f'{num}: a verse needs exactly one " / ": {l[:50]}')
-        if re.match(r'(المصدر|ملاحظة|http)', l) or 'http' in l:
+        if re.match(r'(المصدر|ملاحظة|حاشية|مقتطف|http)', l) or 'http' in l:
             problems.append(f'{num}: a note line contains " / " and would become a verse: {l[:50]}')
     if not lines:
         continue
@@ -156,6 +156,8 @@ story_d = json.load(open(P('content', 'story.json'), encoding='utf-8'))
 for pid, sc in story_d.items():
     p = next((x for x in poems if x['id'] == pid), None)
     assert p and sc and all(0 <= s['v'] < len(p['verses']) for s in sc), f'story {pid} is empty or points to a missing verse'
+    assert all(isinstance(s.get('img'), str) and s['img'].startswith('data:image/') for s in sc), f'story {pid}: a picture is not an image'
+    assert len({s['v'] for s in sc}) == len(sc), f'story {pid}: two pictures on one verse'
 lessons = {k: v for k, v in json.load(open(P('content', 'lessons.json'), encoding='utf-8')).items() if not k.startswith('_')}
 assert all(any(p['id'] == k for p in poems) for k in lessons), 'lessons.json: unknown poem id'
 # ready packs for protected poems the parent types in by hand: everything around the poem, never its words
@@ -166,6 +168,10 @@ for name, k in packs.items():
     assert len(k['bayt']) == n and all(isinstance(x, str) and x.strip() for x in k['bayt']), f'packs.json: {name}: one meaning per verse'
     assert all(0 <= s['v'] < n and os.path.exists(P(s['img'])) for s in k.get('story', [])), f'packs.json: {name}: a scene points to a missing verse or picture'
     assert not set(k.get('path', [])) - {'young', 'old'}, f'packs.json: {name}: path is young/old'
+    # keys are compared after the app's normalisation (no hamza forms, ة→ه, ى→ي): a key written otherwise would never match
+    assert all(re.fullmatch('[ابتثجحخدذرزسشصضطظعغفقكلمنهوي]+', w) for x in k['keys'] for w in x), f'packs.json: {name}: a key is not normalised'
+    assert len({s['v'] for s in k.get('story', [])}) == len(k.get('story', [])), f'packs.json: {name}: two pictures on one verse'
+    assert all(isinstance(w, str) and isinstance(m, str) and m.strip() for w, m in k.get('words', {}).items()), f'packs.json: {name}: a word without meaning'
     k['story'] = [dict(s, img='data:image/jpeg;base64,' + base64.b64encode(open(P(s['img']), 'rb').read()).decode()) for s in k.get('story', [])]
 
 # ---------- fonts ----------
@@ -190,7 +196,10 @@ def font_css():
                     return 'url(data:font/woff2;base64,' + base64.b64encode(open(f, 'rb').read()).decode() + ") format('woff2')"
                 c = re.sub(r"url\((\./files/[^)]+?\.woff2)\)\s*format\('woff2'\)", inline, c)
                 c = re.sub(r",\s*url\(\./files/[^)]+?\.woff\)\s*format\('woff'\)", '', c)
-                out.append(c)
+                # only the @font-face rules of the package reach the page: nothing else from a downloaded file runs in the app
+                faces = re.findall(r'@font-face\s*\{[^{}]*\}', c)
+                assert faces and all(re.search(r'url\(data:font/woff2;base64,[A-Za-z0-9+/=]+\)', f) and 'url(http' not in f and 'expression' not in f for f in faces), f'fonts: unexpected CSS in {css}'
+                out.append('\n'.join(faces))
     print(f'fonts: embedded {len(out)} faces', file=sys.stderr)
     return '<style>' + '\n'.join(out) + '</style>'
 

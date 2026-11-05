@@ -49,7 +49,7 @@ async def main():
         await pg.evaluate("st('٨').mem=[0,1]; st('٨').rec=5; st('٨').last=Date.now(); saveS(); window.__bkPart=60000")
         downloads = []
         pg.on('download', lambda d: downloads.append(d))
-        await pg.click('#goParent'); await pg.click('#aExport'); await pg.click('#exAll'); await pg.wait_for_timeout(2500)
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.click('#aExport'); await pg.click('#exAll'); await pg.wait_for_timeout(2500)
         n_btn = await pg.locator('#sheet [data-part]').count()
         check(n_btn >= 2 and len(downloads) == 0, f'several parts: one button per file, nothing downloaded behind the child\'s back ({n_btn})')
         check(await pg.evaluate("!LS.get('lastBackup',0)"), 'the backup does not count until every part is saved')
@@ -67,7 +67,7 @@ async def main():
         ctx, pg, errs = await fresh(b)
         await pg.goto(URL); await pg.wait_for_timeout(500)
         await pg.evaluate("kids.push('ليلى'); LS.set('kids',kids); closeSheet(); setKid('ليلى'); st('٨').mem=[2]; st('٨').rec=9; st('٨').quiz=100; st('٨').qz={order:100,meaning:90}; st('٨').star=1; st('٨').last=Date.now()+1e6; saveS(); gateUntil=Date.now()+6e5")
-        await pg.click('#goParent')
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent')
         part1 = [x for x in paths if 'جزء1' in x]
         await pg.set_input_files('#aImport', part1); await pg.wait_for_timeout(1500)
         check('ينقص' in (await pg.text_content('#sheet') or ''), 'restoring one part of a split backup warns that parts are missing')
@@ -111,6 +111,7 @@ async def main():
         check(await pg.evaluate('screen') == 'poem' and await pg.evaluate('seg') == 0, 'a broken segment number in a backup still opens the poem')
         check(await pg.evaluate("meanings['١|الثعلب']") == 'جديد', 'an older backup does not overwrite a newer meaning edit')
         await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(600)
+        await pg.evaluate('renderModelList.all=true; renderModelList()'); await pg.wait_for_timeout(400)
         check(await pg.locator('#modelList .r').count() >= 30, 'a broken recording in a backup does not empty the model list')
 
         # ---- a model saved for one segment does not play on another ----

@@ -1,0 +1,9 @@
+{
+  "name": "anasheed-fonts",
+  "private": true,
+  "description": "The two fonts embedded in the app (their CSS and woff2 files go into the page)",
+  "dependencies": {
+    "@fontsource/amiri": "^5.0.0",
+    "@fontsource/cairo": "^5.0.0"
+  }
+}

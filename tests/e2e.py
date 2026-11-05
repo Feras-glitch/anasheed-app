@@ -112,7 +112,7 @@ async def main():
         check('غيباً! 🧠' in txt, 'celebration names the level reached')
         await pg.click('#sheet button:has-text("تمام")'); await pg.wait_for_timeout(100)
         check('⏳' in await pg.text_content('#segBox') and '🧠' not in await pg.text_content('#segBox'), 'a whole, audible take from memory waits for the parent\'s stamp')
-        await pg.click('#goParent'); await pg.wait_for_timeout(700)
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(700)
         await pg.click('#pQueue [data-st="ok"] >> nth=0'); await pg.wait_for_timeout(500)
         await pg.click('#back'); await pg.wait_for_timeout(900)
         check('خُتم' in (await pg.text_content('#sheet') or ''), 'the child sees the parent\'s stamp on the home screen')
@@ -148,8 +148,8 @@ async def main():
         check(await pg.locator('#keep').count() == 1 and await pg.evaluate('screen') == 'poem', '🎧 during a recording stops it and offers to save it')
         await pg.click('#redo')
 
-        # model recording (the parent gate is open from above, so the model box is offered)
-        await record(pg)
+        # model recording (with the parent gate open, the model box is offered)
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await record(pg)
         await pg.check('#isModel'); await pg.fill('#who', 'بابا'); await pg.click('#keep'); await pg.wait_for_timeout(500)
         check(await pg.is_visible('#modelBtn'), 'model button appears after saving a model')
         check('سارة' in await pg.text_content('#kidChip'), 'saving a model does not switch the child')
@@ -230,7 +230,7 @@ async def main():
         check(await pg.locator('#rlist .r').count() == 1, 'models filter')
 
         # parent page
-        await pg.click('#goParent'); await pg.wait_for_timeout(300)
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(300)
         k = await pg.text_content('#pKpis')
         check('أنشد' in k and 'حفظ' in k, 'parent KPIs rendered')
         check(await pg.locator('#pTable tr').count() >= 3, 'parent table lists active poems')
@@ -244,7 +244,7 @@ async def main():
         await pg.click('#grid .card >> nth=-1'); await pg.wait_for_timeout(150)
         await pg.wait_for_timeout(200); check('<img' in await pg.text_content('#verses') and not await pg.evaluate('window.__x'), 'user text is escaped, not injected')
         await pg.click('#back')
-        await pg.click('#goParent'); await pg.click('#aExport')
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.click('#aExport')
         async with pg.expect_download() as dl:
             await pg.click('#exLite')
         check((await dl.value).suggested_filename.endswith('.json'), 'backup export downloads JSON')
@@ -267,8 +267,9 @@ async def main():
         await pg.click('#segBox .chip[data-s="0"]')
         await pg.click('#verses .verse[data-i="0"] .w[data-k="بينا"]'); m1 = await pg.text_content('#sheet'); await pg.click('#mClose')
         check('واضح' in m13 and 'بينما' in m1, 'verse-level meaning: بَيِّنا vs بَينا in the same poem')
-        # parent edits a meaning for one verse only
-        await pg.click('#verses .verse[data-i="0"] .w[data-k="بينا"]'); await pg.click('#sheet summary')
+        # parent edits a meaning for one verse only (the gate closed when the parent left his page)
+        await pg.click('#verses .verse[data-i="0"] .w[data-k="بينا"]'); check(await pg.locator('#mEdit').count()==1 and await pg.locator('#mIn').count()==0, 'after the parent left his page, editing a meaning asks for the gate again'); await pg.click('#mClose')
+        await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#verses .verse[data-i="0"] .w[data-k="بينا"]'); await pg.click('#sheet summary')
         await pg.fill('#mIn', 'معنى تجريبي'); await pg.click('#mSave'); await pg.wait_for_timeout(100)
         await pg.click('#segBox .chip[data-s="2"]')
         await pg.click('#verses .verse[data-i="12"] .w[data-k="بينا"]'); still = await pg.text_content('#sheet'); await pg.click('#mClose')
@@ -280,11 +281,20 @@ async def main():
         # following a poem to its end earns 👂 without any model
         await pg.click('#modeSing')
         check(not await pg.evaluate("!!st('٣٨').heard"), '👂 not given before the end')
+        # tapping ⬇ through the poem in a few seconds is not following it
         for _ in range(3):
             for _ in range(6): await pg.click('#nextV')
             if await pg.locator('#nextSeg').count(): await pg.click('#nextSeg')
-        await pg.wait_for_timeout(200)
-        check(await pg.evaluate("!!st('٣٨').heard"), 'reaching the last verse earns 👂 (no model needed)')
+        await pg.wait_for_timeout(3200)
+        check(not await pg.evaluate("!!st('٣٨').heard"), 'racing through the verses does not earn 👂')
+        # staying on each verse long enough to read it does
+        await pg.click('#segBox .chip[data-s="0"]'); await pg.click('#modeSing')
+        for _ in range(3):
+            for _ in range(6):
+                await pg.wait_for_timeout(3100); await pg.click('#nextV')
+            if await pg.locator('#nextSeg').count(): await pg.click('#nextSeg')
+        await pg.wait_for_timeout(3200)
+        check(await pg.evaluate("!!st('٣٨').heard"), 'following every verse to the last earns 👂 (no model needed)')
 
         # next-segment button at the end of a segment
         await pg.click('#back'); await pg.click('#grid .card[data-id="١٣"]'); await pg.wait_for_timeout(200)
