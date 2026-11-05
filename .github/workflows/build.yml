@@ -240,14 +240,17 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { path: art }
       - run: ls -R art | grep -E "apk|exe|html"
-      - name: Publish the release (GitHub's own CLI, no third-party action)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cat > notes.md <<'EOF'
-          **أندرويد (هاتف/تابلت):** نزّل ملف `.apk` وافتحه، واسمح بالتثبيت من مصادر غير معروفة إن طُلب.
-          **ويندوز:** `Anasheed-Setup` للتثبيت، أو `Anasheed-Portable` للتشغيل دون تثبيت. إن ظهرت رسالة «Windows protected your PC» اضغط More info ← Run anyway.
-          **ملف واحد:** `Anasheed.html` للمعاينة السريعة (التسجيل لا يعمل فيه على الهاتف).
-          EOF
-          gh release create "v${APP_VERSION}" art/android/*.apk art/windows/*.exe art/html/*.html \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "أنشودتي ${APP_VERSION}" --notes-file notes.md --latest
+      # the release action is pinned to one exact version; it only uploads the files built and tested above
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          name: أنشودتي ${{ env.APP_VERSION }}
+          make_latest: true
+          files: |
+            art/android/*.apk
+            art/windows/*.exe
+            art/html/*.html
+          body: |
+            **أندرويد (هاتف/تابلت):** نزّل ملف `.apk` وافتحه، واسمح بالتثبيت من مصادر غير معروفة إن طُلب.
+            **ويندوز:** `Anasheed-Setup` للتثبيت، أو `Anasheed-Portable` للتشغيل دون تثبيت. إن ظهرت رسالة «Windows protected your PC» اضغط More info ← Run anyway.
+            **ملف واحد:** `Anasheed.html` للمعاينة السريعة (التسجيل لا يعمل فيه على الهاتف).
