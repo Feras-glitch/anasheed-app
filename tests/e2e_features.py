@@ -39,12 +39,13 @@ async def main():
         # ---- «ابدأ من هنا»: the path for the child's age ----
         txt = await pg.text_content('#pathBox')
         n_young = await pg.evaluate('AR(PATHS.young.length)')
-        check(f'الخطوة ١ من {n_young}' in txt and 'طلع البدر علينا' in txt, f'age 7: the path starts with the shortest poem')
-        await pg.evaluate("st('١٦').star=1; saveS(); renderHome()")
+        first = await pg.evaluate("poemById(PATHS.young[0]).title")
+        check(await pg.evaluate("PATHS.young[0]") == '٧' and f'الخطوة ١ من {n_young}' in txt and first in txt, f'age 7: the path starts with the shortest, most familiar poem ({first})')
+        await pg.evaluate("st(PATHS.young[0]).star=1; saveS(); renderHome()")
         check(f'الخطوة ٢ من {n_young}' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .dots i.on').count() == 1, 'a ⭐ moves the path to the next step')
         await pg.click('#pathGo'); await pg.wait_for_timeout(300)
         check(await pg.evaluate('cur.id') == await pg.evaluate('PATHS.young[1]'), 'the path opens its next poem')
-        await pg.click('#back'); await pg.evaluate("delete st('١٦').star; saveS(); renderHome()")
+        await pg.click('#back'); await pg.evaluate("delete st(PATHS.young[0]).star; saveS(); renderHome()")
 
         # ---- «معنى البيت»: a plain line under each verse, and a quiz on whole verses ----
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
@@ -53,13 +54,42 @@ async def main():
         check(await pg.is_visible('#bmBtn') and await pg.locator('#verses .bm').count() == 0, 'age 7: «معنى البيت» offered, off by default')
         await pg.click('#bmBtn'); await pg.wait_for_timeout(200)
         n_v = await pg.locator('#verses .verse').count(); n_bm = await pg.locator('#verses .bm').count()
+        check(n_bm == n_v == 3 and await pg.locator('#segBox .chip[data-s]').count() == 4, f'age 7: a ten-verse poem comes in short pieces of three ({n_bm}/{n_v})')
+        await pg.click('#segBox .chip[data-s="3"]'); await pg.wait_for_timeout(200)
+        n_v = await pg.locator('#verses .verse').count(); n_bm = await pg.locator('#verses .bm').count()
         check(n_bm == n_v == 10 and await pg.locator('#verses .bmIdea').count() == 1, f'one meaning under each verse, and the poem\'s idea ({n_bm}/{n_v})')
+        right_all = "(()=>{ const r=BAYT[cur.id].v[qs[qi]]; [...document.querySelectorAll('#quizBox .opt')].find(b=>b.textContent===r).click(); })()"
+        wrong_one = "(()=>{ const r=BAYT[cur.id].v[qs[qi]]; [...document.querySelectorAll('#quizBox .opt')].find(b=>b.textContent!==r).click(); })()"
+        # without wrong meanings written for the verse itself, the quiz is practice
+        await pg.evaluate("window._bw=BW['٣٠']; delete BW['٣٠']")
         await pg.click('#modeQuiz'); await pg.wait_for_timeout(200)
+        check('(تدريب)' in await pg.text_content('#quizBox [data-q="sense"]'), '«ما معنى البيت؟» without its own wrong meanings is marked as practice')
         await pg.click('#quizBox [data-q="sense"]'); await pg.wait_for_timeout(100)
         nq = await pg.evaluate('qs.length')
         for _ in range(nq):
-            await pg.evaluate("(()=>{ const r=BAYT[cur.id].v[qs[qi]]; [...document.querySelectorAll('#quizBox .opt')].find(b=>b.textContent===r).click(); })()"); await pg.wait_for_timeout(1000)
+            await pg.evaluate(right_all); await pg.wait_for_timeout(1000)
+        check(await pg.evaluate("(st('٣٠').qz||{}).sense") is None and 'لا يُحسب' in await pg.text_content('#quizBox'), 'practice keeps no score, and says why')
+        # with them, the three options are about the same verse, and the first try of the day counts
+        await pg.evaluate("BW['٣٠']=window._bw||BAYT['٣٠'].v.map((x,i)=>['معنى خاطئ أول للبيت رقم '+i,'معنى خاطئ ثان للبيت رقم '+i])")
+        await pg.click('#qMenu'); await pg.wait_for_timeout(100)
+        check('(تدريب)' not in await pg.text_content('#quizBox [data-q="sense"]'), 'with its own wrong meanings it counts')
+        await pg.click('#quizBox [data-q="sense"]'); await pg.wait_for_timeout(100)
+        same = await pg.evaluate("(()=>{ const i=qs[qi], o=[...document.querySelectorAll('#quizBox .opt')].map(b=>b.textContent).sort(); return JSON.stringify(o)===JSON.stringify([BAYT[cur.id].v[i],...BW[cur.id][i]].sort()); })()")
+        check(same, 'the wrong options are the wrong meanings of that same verse')
+        nq = await pg.evaluate('qs.length')
+        for _ in range(nq):
+            await pg.evaluate(right_all); await pg.wait_for_timeout(1000)
         check(await pg.evaluate("st('٣٠').qz.sense") == 100, f'«ما معنى البيت؟» counts as a kind of quiz ({nq} questions)')
+        # a second try the same day is practice: a wrong answer is not revealed, the misses come at the end, the score stays
+        await pg.click('#qAgain'); await pg.wait_for_timeout(100)
+        revealed = False
+        for _ in range(nq):
+            await pg.evaluate(wrong_one); await pg.wait_for_timeout(150)
+            revealed = revealed or await pg.locator('#quizBox .opt.ok').count() > 0
+            await pg.wait_for_timeout(1150)
+        check(not revealed, 'a wrong answer does not reveal the right one during the quiz')
+        check(await pg.locator('#quizBox .miss .mi').count() == nq and 'أول محاولة في اليوم' in await pg.text_content('#quizBox'), 'the misses come at the end, and a second try the same day is practice')
+        check(await pg.evaluate("st('٣٠').qz.sense") == 100, 'practice does not lower the score')
         await pg.click('#qBack'); await pg.click('#bmBtn'); await pg.wait_for_timeout(100)
         check(await pg.locator('#verses .bm').count() == 0, 'the meanings can be hidden again')
         await pg.click('#back'); await pg.click('#ages .chip[data-age="me"]'); await pg.wait_for_timeout(200)
@@ -136,11 +166,13 @@ async def main():
             const opts=[...document.querySelectorAll('#quizBox .opt')].map(b=>b.textContent);
             return opts.includes(right) && opts.filter(o=>o!==right).every(o=>rhymeOf(o)!==rhymeOf(right)); })()""")
         check(ok, 'easy distractors never share the poem\'s rhyme')
+        await pg.evaluate("goSeg(segs.length)")  # age 7 reads in pieces of three: the whole poem has room for four
         await pg.click('#modeQuiz'); await pg.click('#quizBox [data-e="0"]'); await pg.click('#quizBox [data-q="order"]'); await pg.wait_for_timeout(100)
         n_reg = await pg.locator('#quizBox .opt').count()
         await pg.click('#modeQuiz'); await pg.click('#quizBox [data-e="1"]'); await pg.click('#quizBox [data-q="order"]'); await pg.wait_for_timeout(100)
         n_easy = await pg.locator('#quizBox .opt').count()
         check(n_reg == 4 and n_easy == 3, f'ordering: 3 verses when easy, 4 normally ({n_easy}/{n_reg})')
+        await pg.evaluate("goSeg(0)")
 
         # ---- level meter + verse marks while recording ----
         await pg.click('#modeSing'); await pg.wait_for_timeout(100)
@@ -182,7 +214,8 @@ async def main():
         check(await pg.is_visible('#playBar'), 'listening plays verse by verse with a play bar')
         await pg.wait_for_timeout(6500)
         seen = set(await pg.evaluate("clearInterval(__iv), [...__seen]"))
-        check(len(seen) >= 4 and 0 in seen, f'highlight follows the model across all verses {sorted(seen)}')
+        exp = set(await pg.evaluate("(([a,b])=>[...Array(b-a)].map((_,i)=>a+i))(rng())"))
+        check(exp <= seen and len(exp) >= 3, f'highlight follows the model across all verses of the piece {sorted(seen)}')
         if await pg.is_visible('#pbStop'): await pg.click('#pbStop')
         # a child of 10 gets the classic echo: the whole verse, then their turn
         await pg.evaluate("kidInfo['ليلى'].age=10")
@@ -227,7 +260,7 @@ async def main():
         check('نوع آخر' in txt and not await pg.evaluate('badges(cur).quiz'), 'one kind of quiz passed: the star waits for a second kind')
         await pg.click('#qMenu'); await pg.wait_for_timeout(300)
         check('✓' in await pg.text_content('#quizBox [data-q="listen"]'), 'the passed kind is ticked in the quiz menu')
-        await pg.click('#quizBox [data-q="complete"]')
+        await pg.click('#quizBox [data-e="0"]'); await pg.click('#quizBox [data-q="complete"]')  # easy «أكمل البيت» is practice
         nq = await pg.evaluate('qs.length')
         for _ in range(nq):
             right = await pg.evaluate("(()=>{const q=document.querySelector('#quizBox .q').textContent; const first=q.split('…')[0].trim(); const v=cur.verses.find(v=>first.startsWith(v[0].trim())); return v[1]})()")
@@ -265,6 +298,8 @@ async def main():
         await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(700)
         check(await pg.locator('#pQueue [data-st="ok"]').count() >= 1, 'the parent page lists takes waiting to be heard, memorisation first')
         check('مهمة الليلة' in await pg.text_content('#pTonight'), 'the parent page proposes tonight\'s task')
+        await pg.click('#pQueue [data-pl] >> nth=0'); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.querySelectorAll('#pQueue audio').forEach(a=>a.dispatchEvent(new Event('ended')))"); await pg.wait_for_timeout(100)
         await pg.click('#pQueue [data-st="ok"] >> nth=0'); await pg.wait_for_timeout(500)
         check(await pg.evaluate("badges(poemById('١٦')).mem"), 'the parent\'s stamp gives 🧠')
         await pg.click('#back'); await pg.wait_for_timeout(900)
@@ -285,16 +320,21 @@ async def main():
         await pg.click('#reviewBox [data-rv="١٦"]'); await pg.wait_for_timeout(400)
         await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(600)
-        r = await pg.evaluate("st('١٦').rev[0]")
-        r_ok = await pg.evaluate("st('١٦').rev[0].step===1 && st('١٦').rev[0].due>Date.now()+2*864e5")
-        check(r_ok, 'a review from memory schedules the next one further away')
+        r_ok = await pg.evaluate("st('١٦').rev[0].step===1 && (st('١٦').rpend||[]).includes(0) && !reviewsDue('١٦').includes(0)")
+        check(r_ok, 'a review from memory waits for the parent\'s ear, and is not asked again meanwhile')
         await pg.click('#sheet button:has-text("تمام")')
+        await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(700)
+        await pg.click('#pQueue [data-pl] >> nth=0'); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.querySelectorAll('#pQueue audio').forEach(a=>a.dispatchEvent(new Event('ended')))"); await pg.wait_for_timeout(100)
+        await pg.click('#pQueue [data-st="rok"] >> nth=0'); await pg.wait_for_timeout(500)
+        r_ok = await pg.evaluate("st('١٦').rev[0].step===2 && st('١٦').rev[0].due>Date.now()+6*864e5 && !(st('١٦').rpend||[]).length")
+        check(r_ok, '«✓ ثابت» moves the next review further away')
 
         # ---- character album: a memorised picture story opens its sticker ----
-        await pg.click('#back'); await pg.wait_for_timeout(300)
+        await pg.click('#back'); await pg.wait_for_timeout(900); await pg.evaluate('closeSheet()')
         n_alb = await pg.evaluate('Object.keys(ALBUM).length'); n_alb_ar = await pg.evaluate('AR(Object.keys(ALBUM).length)')
         check(f'٠ من {n_alb_ar}' in await pg.text_content('#albumBar'), 'home shows the album: nothing collected yet')
-        await pg.evaluate("st('٧').mem=[0]; saveS(); pushNews(kid,{t:'mem',poem:'٧',cert:true}); renderHome(); showNews()"); await pg.wait_for_timeout(400)
+        await pg.evaluate("st('٧').mem=[segments(poemById('٧')).length]; saveS(); pushNews(kid,{t:'mem',poem:'٧',cert:true}); renderHome(); showNews()"); await pg.wait_for_timeout(400)
         check(await pg.locator('#sheet img').count() == 1 and 'ملصق جديد' in await pg.text_content('#sheet'), 'the parent\'s stamp on a picture story brings a new sticker')
         await pg.click('#newsAlbum'); await pg.wait_for_timeout(400)
         check(await pg.locator('#albumGrid .stk').count() == n_alb and await pg.locator('#albumGrid .stk.lock').count() == n_alb - 1, f'album: {n_alb} stickers, one open')

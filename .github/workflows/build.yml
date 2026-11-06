@@ -44,6 +44,7 @@ jobs:
           scripts/ci_run.sh "e2e features" python tests/e2e_features.py
           scripts/ci_run.sh "e2e data" python tests/e2e_data.py
           scripts/ci_run.sh "e2e fixes" python tests/e2e_fixes.py
+          scripts/ci_run.sh "e2e decisions" python tests/e2e_decisions.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: www, path: www }
       - run: cp "dist/أنشودتي.html" dist/Anasheed.html

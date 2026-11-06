@@ -173,6 +173,16 @@ for name, k in packs.items():
     assert len({s['v'] for s in k.get('story', [])}) == len(k.get('story', [])), f'packs.json: {name}: two pictures on one verse'
     assert all(isinstance(w, str) and isinstance(m, str) and m.strip() for w, m in k.get('words', {}).items()), f'packs.json: {name}: a word without meaning'
     k['story'] = [dict(s, img='data:image/jpeg;base64,' + base64.b64encode(open(P(s['img']), 'rb').read()).decode()) for s in k.get('story', [])]
+# «ما معنى البيت؟»: two wrong meanings per verse, about that verse itself, so the words of the verse do not give the answer away
+bwrong = {}
+if os.path.exists(P('content', 'bayt_wrong.json')):
+    bwrong = {k: v for k, v in json.load(open(P('content', 'bayt_wrong.json'), encoding='utf-8')).items() if not k.startswith('_')}
+for pid, ws in bwrong.items():
+    right = packs[pid[5:]]['bayt'] if pid.startswith('pack:') and pid[5:] in packs else bayt[pid]['v'] if pid in bayt else None
+    assert right is not None, f'bayt_wrong.json: unknown poem {pid}'
+    assert len(ws) == len(right), f'bayt_wrong.json: {pid}: two wrong meanings for each verse ({len(ws)} ≠ {len(right)})'
+    for r, w in zip(right, ws):
+        assert isinstance(w, list) and len(w) == 2 and all(isinstance(x, str) and x.strip() and x != r for x in w) and w[0] != w[1], f'bayt_wrong.json: {pid}: a bad pair {w}'
 
 # ---------- fonts ----------
 FS = P('fonts', 'node_modules', '@fontsource')
@@ -217,6 +227,7 @@ def render(images, story, packs):
                .replace('/*__ALBUM__*/', json.dumps(album_names, ensure_ascii=False))
                .replace('/*__PATHS__*/', json.dumps(paths, ensure_ascii=False))
                .replace('/*__BAYT__*/', json.dumps(bayt, ensure_ascii=False))
+               .replace('/*__BWRONG__*/', json.dumps(bwrong, ensure_ascii=False))
                .replace('<!--__FONTS__-->', fonts))
     assert '/*__' not in page, 'unfilled placeholder'
     return page
