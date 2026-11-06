@@ -67,8 +67,11 @@ jobs:
         timeout-minutes: 3
         run: scripts/ci_run.sh "pip" python -m pip install -q playwright==1.49.1
       - name: Install WebKit
-        timeout-minutes: 6
-        run: scripts/ci_run.sh "webkit install" python -m playwright install --with-deps webkit
+        # the package mirror sometimes stalls: one bounded retry instead of a failed release
+        timeout-minutes: 12
+        run: |
+          timeout 330 python -m playwright install --with-deps webkit \
+            || scripts/ci_run.sh "webkit install" timeout 330 python -m playwright install --with-deps webkit
       - name: WebKit smoke test
         timeout-minutes: 6
         run: |
