@@ -67,6 +67,16 @@ async def main():
         sh = await pg.text_content('#sheet')
         check(await pg.locator('#sheet details.ls').count() == 5 and '📘 خلاصة التحليل' in sh and 'الوثبات التسع' in sh, 'four ideas and the summary of the analysis')
         check('(من غير المصدر)' in sh and '(البحث)' in sh and '(المقال)' in sh and 'زهية لبيض' in sh, 'every note says where it comes from')
+        # «هذه أرضي»: a song without a known author; the whole lesson is written for the app
+        P3 = json.load(open('content/packs.json', encoding='utf-8'))['هذه أرضي']
+        t3 = '\n'.join(f'{k[0]} سطر / تجريبي {i + 1}' for i, k in enumerate(P3['keys']))
+        await pg.evaluate("([t])=>{ closeSheet(); $('#aTitle').value='هذه أرضي'; $('#aPoet').value='رولا عازر'; $('#aText').value=t; $('#aSave').click(); }", [t3])
+        await pg.wait_for_timeout(400)
+        p3 = await pg.evaluate("added[added.length-1].id")
+        check(await pg.evaluate(f"poemById('{p3}').pack") == 'هذه أرضي' and await pg.evaluate(f"BAYT['{p3}'].v.length") == 13, '«هذه أرضي» is recognised, 13 verses')
+        await pg.evaluate(f"closeSheet(); openPoem('{p3}'); closeSheet()"); await pg.wait_for_timeout(300)
+        await pg.click('#lessonBtn'); await pg.wait_for_timeout(300)
+        check(await pg.locator('#sheet details.ls').count() == 6 and '🎵 الموسيقى والبناء' in await pg.text_content('#sheet'), 'five ideas and the music section')
         check(not errs, f'no page errors {errs[:2]}')
         await b.close()
     print(f'\n{len(fails)} failures'); sys.exit(1 if fails else 0)
