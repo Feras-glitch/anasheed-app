@@ -1463,7 +1463,17 @@
    "bookTitle": "📘 خلاصة التحليل",
    "bookNote": "من البحث والمقال، بأرقام أبيات هذا النشيد."
   },
-  "story": []
+  "story": [
+   {"img": "content/packs/صلح/0.jpg", "v": 0},
+   {"img": "content/packs/صلح/1.jpg", "v": 2},
+   {"img": "content/packs/صلح/2.jpg", "v": 3},
+   {"img": "content/packs/صلح/3.jpg", "v": 4},
+   {"img": "content/packs/صلح/4.jpg", "v": 6},
+   {"img": "content/packs/صلح/5.jpg", "v": 7},
+   {"img": "content/packs/صلح/6.jpg", "v": 9},
+   {"img": "content/packs/صلح/7.jpg", "v": 10},
+   {"img": "content/packs/صلح/8.jpg", "v": 11}
+  ]
  },
  "هذه أرضي": {
   "title": "هذه أرضي",
@@ -1885,7 +1895,17 @@
    "bookTitle": "🎵 الموسيقى والبناء",
    "bookNote": "كله من غير المصدر."
   },
-  "story": []
+  "story": [
+   {"img": "content/packs/أرضي/0.jpg", "v": 2},
+   {"img": "content/packs/أرضي/1.jpg", "v": 0},
+   {"img": "content/packs/أرضي/2.jpg", "v": 1},
+   {"img": "content/packs/أرضي/3.jpg", "v": 4},
+   {"img": "content/packs/أرضي/4.jpg", "v": 5},
+   {"img": "content/packs/أرضي/5.jpg", "v": 7},
+   {"img": "content/packs/أرضي/6.jpg", "v": 9},
+   {"img": "content/packs/أرضي/7.jpg", "v": 10},
+   {"img": "content/packs/أرضي/8.jpg", "v": 12}
+  ]
  },
  "إخلع نعلك يا موسى": {
   "title": "إخلع نعلك يا موسى",
@@ -2274,6 +2294,16 @@
    "bookTitle": "🎵 البناء والاقتباس",
    "bookNote": "الشرح مكتوب للتطبيق، والمصادر مذكورة حيث وُجدت."
   },
-  "story": []
+  "story": [
+   {"img": "content/packs/نعل/0.jpg", "v": 0},
+   {"img": "content/packs/نعل/1.jpg", "v": 1},
+   {"img": "content/packs/نعل/2.jpg", "v": 2},
+   {"img": "content/packs/نعل/3.jpg", "v": 3},
+   {"img": "content/packs/نعل/4.jpg", "v": 4},
+   {"img": "content/packs/نعل/5.jpg", "v": 5},
+   {"img": "content/packs/نعل/6.jpg", "v": 6},
+   {"img": "content/packs/نعل/7.jpg", "v": 7},
+   {"img": "content/packs/نعل/8.jpg", "v": 8}
+  ]
  }
 }
