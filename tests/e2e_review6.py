@@ -169,11 +169,27 @@ async def main():
         rid = await pg.evaluate(PUT, {'poem': '٦', 'who': 'دلال', 'seg': 0, 'range': [0, 6], 'memCand': True})
         await pg.evaluate(f"judgeNow({{id:{json.dumps(rid)},poem:'٦',title:'x',who:'دلال',seg:0,range:[0,6],memCand:true}})"); await pg.wait_for_timeout(100)
         check('ما حكمكِ' in await pg.text_content('#sheet'), 'in a session, the teacher judges a take as soon as it is saved')
+        await pg.click('#sheet [data-st="ok"]'); await pg.wait_for_timeout(200)
+        check(await pg.evaluate("st('٦','دلال').mem.length") == 0 and 'ما حكمكِ' in await pg.text_content('#sheet'), 'without the teacher\'s code of the minute, the child cannot stamp')
+        await pg.fill('#jCode', await pg.evaluate("tCode('00112233445566778899aabb', Math.floor(Date.now()/60000))"))
         await pg.click('#sheet [data-st="ok"]'); await pg.wait_for_timeout(300)
         r = json.loads(await pg.evaluate(f"recMeta().then(a=>JSON.stringify(a.find(x=>x.id==={json.dumps(rid)})))"))
         check(r.get('stamp') == 'ok' and r.get('by') == 'أ. آية' and 0 in json.loads(await pg.evaluate("JSON.stringify(st('٦','دلال').mem)")), f'the stamp carries her name {r.get("stamp")} {r.get("by")}')
         news = json.loads(await pg.evaluate("JSON.stringify(LS.get('news',{})['دلال']||[])"))
         check(any(x.get('by') == 'أ. آية' for x in news), 'the child\'s news says who stamped')
+
+        # ---- a teacher's PIN does not lock the parent out; a forgotten PIN has a recovery code ----
+        await pg.evaluate("closeSheet(); gateUntil=0; tSess=null; adults=[{role:'teacher',name:'م',salt:'x',pin:pinOf('1357','x'),secret:'aa'}]; saveAdults(); (()=>{ parentGate(); })()"); await pg.wait_for_timeout(100)
+        check(await pg.locator('#gateBtn').count() == 1, 'the parent without a PIN still has the long press when a teacher has one')
+        await pg.evaluate("closeSheet(); window.__f=null; const a={role:'parent',name:'بابا',salt:'s2'}; a.pin=pinOf('2468',a.salt); a.rc=pinOf('ABCD1234',a.salt); adults.push(a); saveAdults(); (()=>{ parentGate().then(v=>window.__g2=v); })()"); await pg.wait_for_timeout(100)
+        await pg.click('#gForgot'); await pg.fill('#gRc', 'abcd-1234'); await pg.click('#gRcOk'); await pg.wait_for_timeout(500)
+        check(await pg.evaluate("window.__g2===true") and await pg.locator('#pp1').count() == 1, 'the recovery code opens the page and asks for a new PIN')
+        await pg.evaluate("closeSheet(); gateUntil=0")
+        for _ in range(5):
+            await pg.evaluate("(()=>{ parentGate(); })()"); await pg.wait_for_timeout(50); await pg.fill('#gPin', '0000'); await pg.click('#gOk'); await pg.evaluate("closeSheet()")
+        await pg.evaluate("(()=>{ parentGate(); })()"); await pg.wait_for_timeout(50); await pg.fill('#gPin', '2468'); await pg.click('#gOk'); await pg.wait_for_timeout(100)
+        check(await pg.evaluate("Date.now()<gateUntil") is False, 'after five wrong tries, even the right PIN waits a minute')
+        await pg.evaluate("closeSheet(); gateLockUntil=0; gateUntil=Date.now()+6e5")
 
         # ---- «نصوصي»: the typed poems go to a file and come back without typing ----
         await pg.evaluate("closeSheet(); window.__f=null; $('#txExport').click()"); await pg.wait_for_timeout(200)

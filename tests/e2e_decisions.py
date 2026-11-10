@@ -171,6 +171,7 @@ async def main():
         await pg.evaluate("qs=qs.slice(0,2).map(x=>Object.assign(x,{cnt:false})).concat(qs.slice(2,3)); beginCount()")
         check(await pg.evaluate("qWhy==='few' && !qCounts"), 'fewer than three questions that count: the quiz is practice')
         await pg.evaluate("quizMenu()"); await pg.wait_for_timeout(100)
+        await pg.evaluate("document.body.classList.remove('prereader')")  # (a six-year-old sees no written quizzes; the rule is checked as for a reader)
         if await pg.locator('#quizBox [data-q="order"]').count():
             await pg.click('#quizBox [data-q="order"]'); await pg.wait_for_timeout(100)
             check(await pg.evaluate("new Set(qs.map(q=>q[0])).size===qs.length"), f'each arrangement is asked once ({await pg.evaluate("qs.length")})')

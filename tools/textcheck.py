@@ -17,8 +17,10 @@ def norm(s):
     s = re.sub('[أإآ]', 'ا', s).replace('ؤ', 'و').replace('ئ', 'ي').replace('ة', 'ه').replace('ى', 'ي')
     return re.sub('[^ء-ي ]', ' ', s)
 
+PFX = re.compile('^(?:[وف]?(?:[بكل]?ال|لل)|[وف][بكل]?|[بكل])(?=...)')
 def words(s):
-    return [w[2:] if w.startswith('ال') and len(w) > 3 else w for w in norm(s).split()]  # «الحرب» and «حرب» are the same word here
+    # «والحرب»، «فالحرب»، «بالحرب»، «للحرب»، «وحرب» are all «حرب» here: a copied run is found whatever particle starts it
+    return [PFX.sub('', w) if len(w) > 3 else w for w in norm(s).split()]
 
 def grams(s, n=3):
     w = words(s)
@@ -30,7 +32,8 @@ def strings(x, path=''):
         for i, y in enumerate(x): yield from strings(y, f'{path}[{i}]')
     elif isinstance(x, dict):
         for k, y in x.items():
-            if k in ('keys', 'story', 'title', 'poet', 'age', 'path'): continue
+            # only the pack's own title, poet and matching data are skipped: the titles of ideas and tales are checked
+            if not path and k in ('keys', 'story', 'title', 'poet', 'age', 'path'): continue
             yield from strings(y, f'{path}.{k}' if path else k)
         if isinstance(x.get('words'), dict): yield from ((f'{path}.words', k) for k in x['words'])
 
@@ -62,6 +65,8 @@ if __name__ == '__main__':
     packs = {k: v for k, v in json.load(open(os.path.join(here, 'content', 'packs.json'), encoding='utf-8')).items() if not k.startswith('_')}
     res = run(packs, sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, 'private'))
     bad = 0
+    for name in packs:
+        if name not in res: print(f'… {name}: no text to check against')
     for name, hits in res.items():
         print(f'{"✗" if hits else "✓"} {name}: {len(hits)}')
         for where, g in hits: print(f'    {where}: «{g}»')
