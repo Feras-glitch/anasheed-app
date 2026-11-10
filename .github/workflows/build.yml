@@ -68,11 +68,12 @@ jobs:
         timeout-minutes: 3
         run: scripts/ci_run.sh "pip" python -m pip install -q playwright==1.49.1
       - name: Install WebKit
-        # the package mirror sometimes stalls: one bounded retry instead of a failed release
-        timeout-minutes: 12
+        # the runner's own apt (unattended upgrades) sometimes holds the dpkg lock: wait for it, then one bounded retry
+        timeout-minutes: 15
         run: |
-          timeout 330 python -m playwright install --with-deps webkit \
-            || scripts/ci_run.sh "webkit install" timeout 330 python -m playwright install --with-deps webkit
+          wait_apt() { for i in $(seq 60); do sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1 || return 0; sleep 5; done; }
+          wait_apt; timeout 330 python -m playwright install --with-deps webkit \
+            || { sleep 20; wait_apt; scripts/ci_run.sh "webkit install" timeout 330 python -m playwright install --with-deps webkit; }
       - name: WebKit smoke test
         timeout-minutes: 6
         run: |
