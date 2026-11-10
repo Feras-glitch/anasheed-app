@@ -34,6 +34,8 @@ async def main():
         await pg.evaluate(f"closeSheet(); openPoem('{pid}'); closeSheet()"); await pg.wait_for_timeout(300)
         check(await pg.evaluate("M('الغسق',0)") == 'ظلام الليل' and await pg.evaluate("M('البطاح',31)") is not None, 'the lesson\'s glossary answers a tap on a word')
         check(await pg.locator('#lessonBtn').is_visible() and await pg.locator('#taleBtn').is_visible() and await pg.locator('#talkBtn').is_visible(), 'the lesson, the tale and the talk questions are there')
+        n_sc = len(PACK['story'])
+        check(await pg.evaluate(f"(STORY['{pid}']||[]).length") == n_sc and await pg.locator('#modeStory').is_visible(), f'the picture story has its {n_sc} scenes')
         await pg.click('#lessonBtn'); await pg.wait_for_timeout(300)
         sh = await pg.text_content('#sheet')
         check(await pg.locator('#sheet details.ls').count() == 6 and await pg.locator('#sheet details.ls[open]').count() == 1, 'five ideas and the textbook answers, the first idea open')
