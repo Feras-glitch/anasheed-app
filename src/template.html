@@ -140,6 +140,22 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 #bmBtn.on{background:var(--accentD);color:#fff}
 .tale p{font-family:Cairo;font-size:18px;line-height:1.9;margin:.55em 0}
 .acts li{margin:.45em 0;line-height:1.7}
+/* «الدرس كاملاً»: one fold per idea of the lesson */
+.lesson{font-family:Cairo;line-height:1.85}
+.lesson p{margin:.4em 0}
+.lesson details.ls{border:1px solid var(--line,#e6dcc6);border-radius:14px;margin:10px 0;padding:4px 12px;background:#fffdf7}
+.lesson details.ls>summary{font-weight:800;font-size:17px;cursor:pointer;padding:6px 0}
+.lesson h4{margin:.9em 0 .3em;font-size:16px}
+.lesson ul{margin:.2em 0;padding-inline-start:1.2em}
+.lesson li{margin:.25em 0}
+.lesson .lsLines{background:#f6efe0;border-radius:10px;padding:6px 10px;font-family:Amiri,serif;font-size:18px}
+.lesson .lsLines .n,.lesson .art .n{display:inline-block;min-width:1.6em;color:#9a7b45;font-family:Cairo;font-size:13px}
+.lesson details.qa{background:#f3f7f1;border-radius:10px;padding:4px 10px;margin:6px 0}
+.lesson details.qa>summary{cursor:pointer}
+.lesson details.qa p{color:#2f5d3a;font-weight:700}
+.lesson .art{border-inline-start:3px solid #e0a030;padding:2px 10px;margin:8px 0}
+.lesson .artL{font-family:Amiri,serif;font-size:18px}
+.lesson .src{color:#8a7a5a;font-size:13px}
 .albumBar{display:flex;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap}
 .albumBar img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 /* fifth review: every button a child or parent taps is at least 44 px; the bottom bar fits a 360 px phone */
@@ -195,6 +211,7 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
         <button class="btn s" id="modeStory" style="display:none">🖼 حكاية مصوّرة</button>
         <button class="btn s" id="bmBtn" style="display:none">💡 معنى البيت</button>
         <button class="btn s" id="taleBtn" style="display:none">📚 حكاية النشيد</button>
+        <button class="btn s" id="lessonBtn" style="display:none">🎓 الدرس كاملاً</button>
         <button class="btn s g" id="modelBtn" style="display:none">🔊 اسمع النموذج</button>
         <button class="btn s g" id="echoBtn" style="display:none">🦜 ردّد بعدي</button>
         <button class="btn s" id="theaterBtn" style="display:none">🎭 مسرح العائلة</button>
@@ -302,7 +319,7 @@ const BAYT = /*__BAYT__*/;
 // two wrong meanings for each verse, written about the verse itself (pack lines under «pack:<name>», aligned in applyPacks)
 const BW = /*__BWRONG__*/;
 const PACKS = /*__PACKS__*/;
-const TALES = {}, ACTS = {};
+const TALES = {}, ACTS = {}, LESSON = {};
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -376,7 +393,7 @@ function packMap(p){
   return null; }
 function applyPacks(){ for(const p of added){ const m=packMap(p); if(!m) continue; const {name,k,map}=m; p.pack=name; if(k.age) p.age=k.age.slice();
   BAYT[p.id]={idea:k.idea, v:map.map(j=>j===null?'':k.bayt[j])}; const bw=BW['pack:'+name]; if(bw) BW[p.id]=map.map(j=>j===null?null:bw[j]); else delete BW[p.id];
-  if(k.lessons) LESSONS[p.id]=k.lessons; if(k.acts) ACTS[p.id]=k.acts; if(k.tale) TALES[p.id]=k.tale;
+  if(k.lessons) LESSONS[p.id]=k.lessons; if(k.acts) ACTS[p.id]=k.acts; if(k.tale) TALES[p.id]=k.tale; if(k.lesson) LESSON[p.id]={L:k.lesson, map};
   const sc=(k.story||[]).map(s=>({img:s.img, v:map.indexOf(s.v)})).filter(s=>s.v>=0); if(sc.length) STORY[p.id]=sc;
   for(const [w,mn] of Object.entries(k.words||{})) meanings[`${p.id}|${w}`]=mn; } }
 applyPacks();
@@ -620,7 +637,7 @@ function openPoem(id){
   $('#pNote').innerHTML = (cur.note?`<div class="note">${esc(cur.note)}</div>`:'') + (cur.excerpt?`<div class="note">📌 مقتطف للحفظ: ${abyat(cur.excerpt[0])} من ${abyat(cur.excerpt[1])}</div>`:'');
   $('#pFoot').textContent = cur.foot ? '* '+cur.foot : '';
   $('#modeStory').style.display = STORY[cur.id]?'':'none'; $('#bmBtn').style.display = BAYT[cur.id]?'':'none'; $('#bmBtn').classList.toggle('on',bmOn());
-  $('#taleBtn').style.display = TALES[cur.id]?'':'none';
+  $('#taleBtn').style.display = TALES[cur.id]?'':'none'; $('#lessonBtn').style.display = LESSON[cur.id]?'':'none';
   $('#secureWarn').innerHTML = (window.isSecureContext && navigator.mediaDevices) ? '' : '<div class="warn">التسجيل لا يعمل حين يُفتح الملف بهذه الطريقة. ثبّت تطبيق «أنشودتي» أو افتحه من رابطه.</div>';
   qEasy=null; clearTimeout(qTimer); visited=new Set(); dwellLine=-1; clearTimeout(dwellT); renderSegs(); setModeUI(); renderVerses(); show('poem'); if(mode==='story') renderStory(); loadLast(); loadModel(); renderBanner();
 }
@@ -863,6 +880,23 @@ function talkHTML(bare){ const id=cur&&cur.id, q=LESSONS[id], a=ACTS[id]; if(!q&
   return bare?ol:`<div class="talk"><b>💬 حديث مع والدك</b>${ol}</div>`; }
 // «حكاية النشيد»: a short tale told around the poem, to read with the child
 $('#taleBtn').onclick=()=>{ const t=TALES[cur&&cur.id]; if(!t) return; openSheet(`<h3>📚 ${esc(t.title)}</h3><div class="tale">${t.text.map(x=>`<p>${esc(x)}</p>`).join('')}</div><div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`); };
+// «الدرس كاملاً»: a pack's whole lesson (poet, occasion, each idea with its words, explanation, discussion and line-by-line analysis, then the textbook answers).
+// The lesson keeps no word of the poem: each line it speaks of is shown as the parent typed it, found through the pack's map.
+function lessonHTML(){ const o=LESSON[cur&&cur.id]; if(!o) return ''; const {L,map}=o;
+  const ord=['الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة','الثامنة'];
+  const line = j => { const i=map.indexOf(j); return i<0 ? `<span class="small">(السطر ${AR(j+1)} لم يُكتب في النشيد)</span>` : esc(cur.verses[i].filter(Boolean).join('  ')); };
+  const ul = a => `<ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  let h=(L.intro||[]).map(x=>`<p><b>${esc(x.h)}:</b> ${esc(x.t)}</p>`).join('');
+  h+=L.parts.map((pt,n)=>{ let b=`<div class="lsLines">${[...Array(pt.to-pt.from)].map((_,k)=>`<div><span class="n">${AR(pt.from+k+1)}</span>${line(pt.from+k)}</div>`).join('')}</div>`;
+    if(pt.words&&pt.words.length) b+=`<h4>📖 معاني الكلمات</h4><ul>${pt.words.map(([w,m])=>`<li><b>${esc(w)}:</b> ${esc(m)}</li>`).join('')}</ul>`;
+    if(pt.explain) b+=`<h4>📝 الشرح</h4><p>${esc(pt.explain)}</p>`;
+    if(pt.discuss&&pt.discuss.length) b+=`<h4>💬 المناقشة</h4>${pt.discuss.map(([q,a],k)=>`<details class="qa"><summary>${AR(k+1)}. ${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}`;
+    if((pt.art&&pt.art.length)||pt.general) b+=`<h4>🔍 التحليل الفني</h4>${pt.general?`<p>${esc(pt.general)}</p>`:''}${(pt.art||[]).map(([j,notes])=>`<div class="art"><div class="artL"><span class="n">${AR(j+1)}</span>${line(j)}</div>${ul(notes)}</div>`).join('')}`;
+    return `<details class="ls"${n?'':' open'}><summary>الفكرة ${ord[n]||AR(n+1)}: ${esc(pt.title)} <span class="small">(${AR(pt.from+1)}–${AR(pt.to)})</span></summary>${b}</details>`; }).join('');
+  if(L.book&&L.book.length) h+=`<details class="ls"><summary>📘 إجابات أسئلة الكتاب</summary><p class="small">الأسئلة في كتاب المدرسة، والإجابات كما في ملف الدرس. أرقام الأسطر من هذا النشيد.</p>${L.book.map(g=>`<h4>${esc(g.h)}</h4>${ul(g.a)}`).join('')}</details>`;
+  if(L.source) h+=`<p class="src">${esc(L.source)}</p>`;
+  return h; }
+$('#lessonBtn').onclick=()=>{ const h=lessonHTML(); if(!h) return; openSheet(`<h3>🎓 درس «${esc(cur.title)}»</h3><div class="lesson">${h}</div><div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`); };
 // a short happy tune: praise a child who cannot read yet can hear
 // after an achievement: the tune, then one of the parent's recorded praises (never the same one twice in a row)
 async function cheer(){ chime(); try{ const ps=await praiseAll(); if(!ps.length) return; let i=Math.floor(Math.random()*ps.length); if(ps.length>1 && i===cheer.last) i=(i+1)%ps.length; cheer.last=i;

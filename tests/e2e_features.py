@@ -117,7 +117,8 @@ async def main():
         await pg.fill('#aTitle', 'فلسطين'); await pg.fill('#aPoet', 'سليمان العيسى'); await pg.fill('#aText', dummy)
         await pg.click('#aSave'); await pg.wait_for_timeout(300)
         pid = await pg.evaluate('added[added.length-1].id')
-        check(await pg.evaluate('added[added.length-1].pack') == 'فلسطين' and not await pg.is_visible('#packList'), 'typed in, the poem is recognised by its key words')
+        pl = await pg.text_content('#packList') if await pg.is_visible('#packList') else ''
+        check(await pg.evaluate('added[added.length-1].pack') == 'فلسطين' and 'فلسطين داري' not in pl and 'وصية لاجئ' in pl, 'typed in, the poem is recognised by its key words, and leaves the list of ready packs')
         await pg.click('#back'); await pg.click('#ages .chip[data-age="all"]'); await pg.wait_for_timeout(200)
         check(await pg.get_attribute('#grid .card >> nth=0', 'data-id') == pid and await pg.evaluate('pathOf()[0]') == pid, 'it comes first on the home screen and on the path')
         n_sc = await pg.evaluate("PACKS['فلسطين'].story.length")

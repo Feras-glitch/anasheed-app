@@ -172,6 +172,15 @@ for name, k in packs.items():
     assert all(re.fullmatch('[ابتثجحخدذرزسشصضطظعغفقكلمنهوي]+', w) for x in k['keys'] for w in x), f'packs.json: {name}: a key is not normalised'
     assert len({s['v'] for s in k.get('story', [])}) == len(k.get('story', [])), f'packs.json: {name}: two pictures on one verse'
     assert all(isinstance(w, str) and isinstance(m, str) and m.strip() for w, m in k.get('words', {}).items()), f'packs.json: {name}: a word without meaning'
+    if 'lesson' in k:  # the whole lesson: its ideas cover the verses in order, and every analysed line lies inside its idea
+        ls = k['lesson']; parts = ls.get('parts', [])
+        assert parts and parts[0]['from'] == 0 and parts[-1]['to'] == n and all(a['to'] == b['from'] for a, b in zip(parts, parts[1:])), f'packs.json: {name}: lesson ideas must cover verses 0..{n} in order'
+        for pt in parts:
+            assert pt.get('title') and pt['from'] < pt['to'], f'packs.json: {name}: an idea without title or verses'
+            assert all(pt['from'] <= j < pt['to'] and notes and all(isinstance(x, str) and x.strip() for x in notes) for j, notes in pt.get('art', [])), f'packs.json: {name}: «{pt["title"]}»: analysis on a line outside the idea'
+            assert all(len(qa) == 2 and all(isinstance(x, str) and x.strip() for x in qa) for qa in pt.get('discuss', [])), f'packs.json: {name}: «{pt["title"]}»: a question without its answer'
+            assert all(len(wm) == 2 and wm[1].strip() for wm in pt.get('words', [])), f'packs.json: {name}: «{pt["title"]}»: a word without meaning'
+        assert all(g.get('h') and g.get('a') for g in ls.get('book', [])), f'packs.json: {name}: textbook answers need a heading'
     k['story'] = [dict(s, img='data:image/jpeg;base64,' + base64.b64encode(open(P(s['img']), 'rb').read()).decode()) for s in k.get('story', [])]
 # «ما معنى البيت؟»: two wrong meanings per verse, about that verse itself, so the words of the verse do not give the answer away
 bwrong = {}
@@ -248,7 +257,7 @@ def ext_img(u):
     return name
 images_www = {k: ext_img(v) for k, v in images_d.items()}
 story_www = {pid: [dict(s, img=ext_img(s['img'])) for s in sc] for pid, sc in story_d.items()}
-packs_www = {name: dict(k, story=[dict(s, img=ext_img(s['img'])) for s in k['story']]) for name, k in packs.items()}
+packs_www = {name: dict(k, story=[dict(s, img=ext_img(s['img'])) for s in k.get('story', [])]) for name, k in packs.items()}
 for f in ('icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'):
     shutil.copy(P('icons', f), os.path.join(www, 'icons', f))
 pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">'
