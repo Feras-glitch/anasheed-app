@@ -127,7 +127,7 @@ async def main():
         # ---- a five-year-old sees the youngest poems ----
         ctx, pg, errs = await fresh(b)
         await pg.goto(URL); await pg.wait_for_timeout(500)
-        await pg.click('#kNew'); await pg.fill('#pIn', 'زين'); await pg.click('#pOk'); await pg.wait_for_timeout(200); await pg.click('#sheet [data-a="5"]'); await pg.wait_for_timeout(400)
+        await pg.click('#kNew'); await pg.fill('#pIn', 'زين'); await pg.click('#pOk'); await pg.wait_for_timeout(200); await pg.click('#sheet [data-g="b"]'); await pg.click('#sheet [data-a="5"]'); await pg.wait_for_timeout(400)
         check(await pg.locator('#grid .card').count() >= 5 and await pg.locator('#wk').count() == 1, 'age 5: poems and a weekly poem are shown')
         await ctx.close()
 

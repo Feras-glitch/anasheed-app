@@ -31,7 +31,7 @@ async def main():
         # ---- age profile ----
         await pg.click('#kNew'); await pg.fill('#pIn', 'ليلى'); await pg.click('#pOk'); await pg.wait_for_timeout(200)
         check(await pg.locator('#sheet [data-a]').count() == 8, 'new child is asked for an age')
-        await pg.click('#sheet [data-a="7"]'); await pg.wait_for_timeout(300)
+        await pg.click('#sheet [data-g="g"]'); await pg.click('#sheet [data-a="7"]'); await pg.wait_for_timeout(300)
         check(await pg.get_attribute('#ages .chip.on', 'data-age') == 'me' and all(a[0] <= 7 <= a[1] for a in await pg.evaluate("[...document.querySelectorAll('#grid .card')].map(c=>poemById(c.dataset.id).age)")), 'age 7 → only poems for age 7 shown by default')
         check(await pg.input_value('#speed') == '1', 'age 7 → slowest reading pace')
         await pg.evaluate('gateUntil=Date.now()+600000')  # the parent gate itself is tested in e2e.py
@@ -42,9 +42,12 @@ async def main():
         first = await pg.evaluate("poemById(PATHS.young[0]).title")
         check(await pg.evaluate("PATHS.young[0]") == '٧' and f'الخطوة ١ من {n_young}' in txt and first in txt, f'age 7: the path starts with the shortest, most familiar poem ({first})')
         await pg.evaluate("st(PATHS.young[0]).star=1; saveS(); renderHome()")
-        check(f'الخطوة ٢ من {n_young}' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .dots i.on').count() == 1, 'a ⭐ moves the path to the next step')
+        check(f'الخطوة ١ من {n_young}' in await pg.text_content('#pathBox'), 'a ⭐ alone does not move the path (it is practice)')
+        await pg.evaluate("(()=>{ const p=poemById(PATHS.young[0]), sg=segments(p); st(p.id).mem=[sg.length>1?sg.length:0]; saveS(); renderHome(); })()")
+        check(f'الخطوة ٢ من {n_young}' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .dots i.on').count() == 1, 'the poem memorised (🧠) moves the path to the next step')
         await pg.click('#pathGo'); await pg.wait_for_timeout(300)
         check(await pg.evaluate('cur.id') == await pg.evaluate('PATHS.young[1]'), 'the path opens its next poem')
+        await pg.evaluate("st(PATHS.young[0]).mem=[]; st(PATHS.young[0]).star=0; saveS(); renderHome()")  # the album test below starts from nothing
         await pg.click('#back'); await pg.evaluate("delete st(PATHS.young[0]).star; saveS(); renderHome()")
 
         # ---- «معنى البيت»: a plain line under each verse, and a quiz on whole verses ----
@@ -116,6 +119,8 @@ async def main():
                            'ثمار الشجر / حلوة', 'شعب كبير / طيب', 'مهدي صغير / دافئ', 'فلسطين كلمة / في الدفتر'])
         await pg.fill('#aTitle', 'فلسطين'); await pg.fill('#aPoet', 'سليمان العيسى'); await pg.fill('#aText', dummy)
         await pg.click('#aSave'); await pg.wait_for_timeout(300)
+        check('عرفنا النشيد' in await pg.text_content('#sheet'), 'after saving, the parent is told which pack was recognised')
+        await pg.evaluate('closeSheet()')
         pid = await pg.evaluate('added[added.length-1].id')
         pl = await pg.text_content('#packList') if await pg.is_visible('#packList') else ''
         check(await pg.evaluate('added[added.length-1].pack') == 'فلسطين' and 'فلسطين داري' not in pl and 'وصية لاجئ' in pl, 'typed in, the poem is recognised by its key words, and leaves the list of ready packs')
@@ -293,7 +298,7 @@ async def main():
         await pg.click('#modeSing'); await pg.click('#lvlBox .chip[data-l="4"]')
         await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(600)
-        check('بانتظار' in await pg.text_content('#sheet') and await pg.locator('#celCert').count() == 0, 'a take from memory waits for the parent\'s stamp')
+        check('تنتظر أن' in await pg.text_content('#sheet') and await pg.locator('#celCert').count() == 0, 'a take from memory waits for the parent\'s stamp')
         await pg.click('#sheet button:has-text("تمام")')
         # the parent listens and stamps
         await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(700)
@@ -321,14 +326,14 @@ async def main():
         await pg.click('#reviewBox [data-rv="١٦"]'); await pg.wait_for_timeout(400)
         await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(600)
-        r_ok = await pg.evaluate("st('١٦').rev[0].step===1 && (st('١٦').rpend||[]).includes(0) && !reviewsDue('١٦').includes(0)")
+        r_ok = await pg.evaluate("st('١٦').rev[0].step===0 && (st('١٦').rpend||[]).includes(0) && !reviewsDue('١٦').includes(0)")  # seven: the first review was tomorrow (step 0)
         check(r_ok, 'a review from memory waits for the parent\'s ear, and is not asked again meanwhile')
         await pg.click('#sheet button:has-text("تمام")')
         await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(700)
         await pg.click('#pQueue [data-pl] >> nth=0'); await pg.wait_for_timeout(500)
         await pg.evaluate("document.querySelectorAll('#pQueue audio').forEach(a=>a.dispatchEvent(new Event('ended')))"); await pg.wait_for_timeout(100)
         await pg.click('#pQueue [data-st="rok"] >> nth=0'); await pg.wait_for_timeout(500)
-        r_ok = await pg.evaluate("st('١٦').rev[0].step===2 && st('١٦').rev[0].due>Date.now()+6*864e5 && !(st('١٦').rpend||[]).length")
+        r_ok = await pg.evaluate("st('١٦').rev[0].step===1 && st('١٦').rev[0].due>Date.now()+2*864e5 && !(st('١٦').rpend||[]).length")
         check(r_ok, '«✓ ثابت» moves the next review further away')
 
         # ---- character album: a memorised picture story opens its sticker ----

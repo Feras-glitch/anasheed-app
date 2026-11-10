@@ -13,7 +13,7 @@ PACK = json.load(open('content/packs.json', encoding='utf-8'))['وصية لاج�
 
 async def main():
     # one dummy line per verse, from its first key; line 30 is left out, as a parent might skip one
-    lines = [f'{k[0]} سطر / تجريبي {i + 1}' for i, k in enumerate(PACK['keys'])]
+    lines = [f"{' '.join(k)} سطر / تجريبي {i + 1}" for i, k in enumerate(PACK['keys'])]
     lines[0] = 'الغسق سطر / تجريبي ١'
     typed = lines[:29] + lines[30:]
     async with async_playwright() as p:
@@ -56,7 +56,7 @@ async def main():
             check('(تدريب)' in await pg.text_content('#quizBox [data-q="sense"]'), '«ما معنى البيت؟» has no wrong meanings written for this pack: practice')
         # «لا تصالح»: a free-verse poem typed as twelve two-part verses; sources marked, a summary in place of textbook answers
         P2 = json.load(open('content/packs.json', encoding='utf-8'))['لا تصالح']
-        t2 = '\n'.join(f'{k[0]} سطر / تجريبي {i + 1}' for i, k in enumerate(P2['keys']))
+        t2 = '\n'.join(f'{" ".join(k)} سطر / تجريبي {i + 1}' for i, k in enumerate(P2['keys']))
         await pg.evaluate("([t])=>{ closeSheet(); $('#aTitle').value='لا تصالح'; $('#aPoet').value='أمل دنقل'; $('#aText').value=t; $('#aSave').click(); }", [t2])
         await pg.wait_for_timeout(400)
         p2 = await pg.evaluate("added[added.length-1].id")
@@ -69,7 +69,7 @@ async def main():
         check('(من غير المصدر)' in sh and '(البحث)' in sh and '(المقال)' in sh and 'زهية لبيض' in sh, 'every note says where it comes from')
         # «هذه أرضي»: a song without a known author; the whole lesson is written for the app
         P3 = json.load(open('content/packs.json', encoding='utf-8'))['هذه أرضي']
-        t3 = '\n'.join(f'{k[0]} سطر / تجريبي {i + 1}' for i, k in enumerate(P3['keys']))
+        t3 = '\n'.join(f'{" ".join(k)} سطر / تجريبي {i + 1}' for i, k in enumerate(P3['keys']))
         await pg.evaluate("([t])=>{ closeSheet(); $('#aTitle').value='هذه أرضي'; $('#aPoet').value='رولا عازر'; $('#aText').value=t; $('#aSave').click(); }", [t3])
         await pg.wait_for_timeout(400)
         p3 = await pg.evaluate("added[added.length-1].id")
@@ -79,7 +79,7 @@ async def main():
         check(await pg.locator('#sheet details.ls').count() == 6 and '🎵 الموسيقى والبناء' in await pg.text_content('#sheet'), 'five ideas and the music section')
         # «اخلع نعلك يا موسى», typed as the song's cover writes it («إخلع»): the refrain opens three verses; each is told apart by its second half
         P4 = json.load(open('content/packs.json', encoding='utf-8'))['اخلع نعلك يا موسى']
-        t4 = '\n'.join(f'نداء سطر / {k[0]} {i + 1}' for i, k in enumerate(P4['keys']))
+        t4 = '\n'.join(f'نداء سطر / {" ".join(k)} {i + 1}' for i, k in enumerate(P4['keys']))
         await pg.evaluate("([t])=>{ closeSheet(); $('#aTitle').value='إخلع نعلك يا موسى'; $('#aPoet').value='رولا عازر'; $('#aText').value=t; $('#aSave').click(); }", [t4])
         await pg.wait_for_timeout(400)
         p4 = await pg.evaluate("added[added.length-1].id")

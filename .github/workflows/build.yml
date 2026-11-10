@@ -39,13 +39,14 @@ jobs:
           scripts/ci_run.sh "pip" python -m pip install -q playwright==1.49.1
           scripts/ci_run.sh "playwright install" python -m playwright install --with-deps chromium
           (python -m http.server -d www 8765 >/dev/null 2>&1 &)
-          sleep 1
+          for i in $(seq 40); do curl -sf http://localhost:8765/index.html >/dev/null && break; sleep 0.5; done
           scripts/ci_run.sh "e2e" python tests/e2e.py
           scripts/ci_run.sh "e2e features" python tests/e2e_features.py
           scripts/ci_run.sh "e2e data" python tests/e2e_data.py
           scripts/ci_run.sh "e2e fixes" python tests/e2e_fixes.py
           scripts/ci_run.sh "e2e decisions" python tests/e2e_decisions.py
           scripts/ci_run.sh "e2e lesson" python tests/e2e_lesson.py
+          scripts/ci_run.sh "e2e review 6" python tests/e2e_review6.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: www, path: www }
       - run: cp "dist/أنشودتي.html" dist/Anasheed.html
@@ -79,7 +80,7 @@ jobs:
         timeout-minutes: 6
         run: |
           (python -m http.server -d www 8765 >/dev/null 2>&1 &)
-          sleep 1
+          for i in $(seq 40); do curl -sf http://localhost:8765/index.html >/dev/null && break; sleep 0.5; done
           scripts/ci_run.sh "webkit" timeout 330 python -u tests/webkit_smoke.py webkit
 
   android:

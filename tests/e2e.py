@@ -39,7 +39,7 @@ async def main():
         # first run: who are you
         check(await pg.locator('#kNew').count() == 1, 'first launch asks for the child name')
         await pg.click('#kNew'); await pg.fill('#pIn', 'سارة'); await pg.click('#pOk'); await pg.wait_for_timeout(200)
-        await pg.click('#sheet [data-a="10"]'); await pg.wait_for_timeout(200)
+        await pg.click('#sheet [data-g="b"]'); await pg.click('#sheet [data-a="10"]'); await pg.wait_for_timeout(200)
         check('سارة' in await pg.text_content('#kidChip'), 'kid chip shows the name')
 
         # home
@@ -109,7 +109,7 @@ async def main():
         await pg.wait_for_timeout(12800); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(500)
         txt = await pg.text_content('#sheet')
-        check('غيباً! 🧠' in txt, 'celebration names the level reached')
+        check('محاولةً غيباً 🧠' in txt, 'celebration names the level reached, without praising a memorisation nobody has heard yet')
         await pg.click('#sheet button:has-text("تمام")'); await pg.wait_for_timeout(100)
         check('⏳' in await pg.text_content('#segBox') and '🧠' not in await pg.text_content('#segBox'), 'a whole, audible take from memory waits for the parent\'s stamp')
         await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(700)

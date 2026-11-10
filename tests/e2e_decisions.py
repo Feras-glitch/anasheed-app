@@ -105,7 +105,7 @@ async def main():
         # ---- a review take waits for the parent's ear instead of moving the schedule by itself ----
         await pg.evaluate("(()=>{ const s=KS('سلمى')['٣٠']; s.rev['0'].due=Date.now()-1; s.rev['1'].due=Date.now()-1; saveS(); })()")
         check(await pg.evaluate("JSON.stringify(reviewsDue('٣٠','سلمى'))") == '[0,1]', 'both pieces are due')
-        await pg.evaluate("(()=>{ const s=KS('سلمى')['٣٠']; s.rpend=[0,1]; saveS(); })()")
+        await pg.evaluate("(()=>{ const s=KS('سلمى')['٣٠']; s.rpend=[0,1]; s.rpendAt={0:Date.now(),1:Date.now()}; saveS(); })()")
         check(await pg.evaluate("reviewsDue('٣٠','سلمى').length") == 0, 'a review waiting for the parent is not asked again')
         await pg.evaluate(PUT, {'poem': '٣٠', 'who': 'سلمى', 'seg': 0, 'review': True})
         await pg.evaluate(PUT, {'poem': '٣٠', 'who': 'سلمى', 'seg': 1, 'review': True})

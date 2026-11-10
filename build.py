@@ -230,18 +230,22 @@ def font_css():
 version = os.environ.get('APP_VERSION') or datetime.date.today().isoformat()
 tpl = open(P('src', 'template.html'), encoding='utf-8').read()
 fonts = font_css()
+def jdump(o):
+    return json.dumps(o, ensure_ascii=False).replace('</', '<\\/').replace('<!--', '<\\!--')
+
+
 def render(images, story, packs):
     page = (tpl.replace('/*__VERSION__*/', version)
-               .replace('/*__PACKS__*/', json.dumps(packs, ensure_ascii=False))
-               .replace('/*__POEMS__*/', json.dumps(poems, ensure_ascii=False))
-               .replace('/*__MEANINGS__*/', json.dumps(G, ensure_ascii=False))
-               .replace('/*__IMAGES__*/', json.dumps(images, ensure_ascii=False))
-               .replace('/*__STORY__*/', json.dumps(story, ensure_ascii=False))
-               .replace('/*__LESSONS__*/', json.dumps(lessons, ensure_ascii=False))
-               .replace('/*__ALBUM__*/', json.dumps(album_names, ensure_ascii=False))
-               .replace('/*__PATHS__*/', json.dumps(paths, ensure_ascii=False))
-               .replace('/*__BAYT__*/', json.dumps(bayt, ensure_ascii=False))
-               .replace('/*__BWRONG__*/', json.dumps(bwrong, ensure_ascii=False))
+               .replace('/*__PACKS__*/', jdump(packs))
+               .replace('/*__POEMS__*/', jdump(poems))
+               .replace('/*__MEANINGS__*/', jdump(G))
+               .replace('/*__IMAGES__*/', jdump(images))
+               .replace('/*__STORY__*/', jdump(story))
+               .replace('/*__LESSONS__*/', jdump(lessons))
+               .replace('/*__ALBUM__*/', jdump(album_names))
+               .replace('/*__PATHS__*/', jdump(paths))
+               .replace('/*__BAYT__*/', jdump(bayt))
+               .replace('/*__BWRONG__*/', jdump(bwrong))
                .replace('<!--__FONTS__-->', fonts))
     assert '/*__' not in page, 'unfilled placeholder'
     return page
@@ -277,15 +281,26 @@ json.dump({
               {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
               {'src': 'icons/maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]
 }, open(os.path.join(www, 'manifest.webmanifest'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-precache = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'] + img_files
-# only this app's caches are ever deleted: the origin may host other sites of the same account
-open(os.path.join(www, 'sw.js'), 'w', encoding='utf-8').write(f"""const C='anasheed-{version}';
-const FILES={json.dumps(precache)};
-self.addEventListener('install',e=>{{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)));self.skipWaiting()}});
-self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('anasheed-')&&k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
-// network first, but never wait more than 3 s for a slow connection
-self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return;
-  const cached=()=>caches.match(e.request,{{ignoreSearch:true}}).then(r=>r||caches.match('index.html'));
+shell = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png']
+assert all(f.startswith('img/') for f in img_files), 'pictures live under img/'
+# the app shell is cached per version; the pictures (content-hashed names) live in one lasting cache and are fetched only once:
+# an update does not download 11 MB of pictures again. Only this app's caches are ever deleted: the origin may host other sites.
+open(os.path.join(www, 'sw.js'), 'w', encoding='utf-8').write(f"""const C='anasheed-{version}', IMG='anasheed-img';
+const SHELL={json.dumps(shell)}, PICS={json.dumps(img_files)};
+self.addEventListener('install',e=>{{e.waitUntil(Promise.all([
+  caches.open(C).then(c=>c.addAll(SHELL)),
+  // a picture already kept is not fetched again; one that fails does not stop the others
+  caches.open(IMG).then(c=>Promise.all(PICS.map(f=>c.match(f).then(r=>r||fetch(f).then(x=>x.ok?c.put(f,x):0).catch(()=>0)))))
+]));self.skipWaiting()}});
+self.addEventListener('activate',e=>{{e.waitUntil(Promise.all([
+  caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('anasheed-')&&k!==C&&k!==IMG).map(k=>caches.delete(k)))),
+  caches.open(IMG).then(c=>c.keys().then(rs=>{{const keep=new Set(PICS.map(f=>new URL(f,self.registration.scope).href));return Promise.all(rs.filter(r=>!keep.has(r.url)).map(r=>c.delete(r)))}}))
+]).then(()=>self.clients.claim()))}});
+self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return; const u=new URL(e.request.url);
+  // pictures: from the lasting cache first (their names change when they change)
+  if(u.origin===location.origin&&u.pathname.includes('/img/')){{e.respondWith(caches.open(IMG).then(c=>c.match(e.request,{{ignoreSearch:true}}).then(r=>r||fetch(e.request).then(x=>{{if(x.ok)c.put(e.request,x.clone());return x}}))));return}}
+  // the rest: network first, but never wait more than 3 s for a slow connection; the page itself falls back to the kept copy
+  const cached=()=>caches.match(e.request,{{ignoreSearch:true}}).then(r=>r||(e.request.mode==='navigate'?caches.match('index.html'):undefined));
   const net=fetch(e.request).then(r=>{{if(r.ok){{const x=r.clone();caches.open(C).then(c=>c.put(e.request,x))}}return r}});
   e.respondWith(Promise.race([net,new Promise((_,rej)=>setTimeout(rej,3000))]).catch(()=>cached().then(r=>r||net)))}});
 """)

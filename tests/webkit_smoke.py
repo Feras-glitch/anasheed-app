@@ -34,7 +34,7 @@ async def main():
         await pg.goto(URL); await pg.wait_for_timeout(800)
         check(await pg.locator('#kNew').count() == 1, f'{ENGINE}: app starts and asks for the child')
         await pg.click('#kNew'); await pg.fill('#pIn', 'ليلى'); await pg.click('#pOk'); await pg.wait_for_timeout(200)
-        await pg.click('#sheet [data-a="7"]'); await pg.wait_for_timeout(200)
+        await pg.click('#sheet [data-g="b"]'); await pg.click('#sheet [data-a="7"]'); await pg.wait_for_timeout(200)
         check(await pg.locator('#grid .card').count() > 5, 'poem list renders')
         await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(300)
         await pg.click('#modeRead'); await pg.wait_for_timeout(200)  # age 7: a picture story opens on its pictures
