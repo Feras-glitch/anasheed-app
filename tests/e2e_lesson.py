@@ -77,13 +77,13 @@ async def main():
         await pg.evaluate(f"closeSheet(); openPoem('{p3}'); closeSheet()"); await pg.wait_for_timeout(300)
         await pg.click('#lessonBtn'); await pg.wait_for_timeout(300)
         check(await pg.locator('#sheet details.ls').count() == 6 and '🎵 الموسيقى والبناء' in await pg.text_content('#sheet'), 'five ideas and the music section')
-        # «إخلع نعلك يا موسى»: the refrain opens three verses; each is told apart by its second half
-        P4 = json.load(open('content/packs.json', encoding='utf-8'))['إخلع نعلك يا موسى']
+        # «اخلع نعلك يا موسى», typed as the song's cover writes it («إخلع»): the refrain opens three verses; each is told apart by its second half
+        P4 = json.load(open('content/packs.json', encoding='utf-8'))['اخلع نعلك يا موسى']
         t4 = '\n'.join(f'نداء سطر / {k[0]} {i + 1}' for i, k in enumerate(P4['keys']))
         await pg.evaluate("([t])=>{ closeSheet(); $('#aTitle').value='إخلع نعلك يا موسى'; $('#aPoet').value='رولا عازر'; $('#aText').value=t; $('#aSave').click(); }", [t4])
         await pg.wait_for_timeout(400)
         p4 = await pg.evaluate("added[added.length-1].id")
-        check(await pg.evaluate(f"poemById('{p4}').pack") == 'إخلع نعلك يا موسى' and await pg.evaluate(f"BAYT['{p4}'].v.length") == 9 and await pg.evaluate(f"BAYT['{p4}'].v[8]") == P4['bayt'][8], '«إخلع نعلك يا موسى» is recognised, each verse with its own meaning')
+        check(await pg.evaluate(f"poemById('{p4}').pack") == 'اخلع نعلك يا موسى' and await pg.evaluate(f"BAYT['{p4}'].v.length") == 9 and await pg.evaluate(f"BAYT['{p4}'].v[8]") == P4['bayt'][8], '«إخلع نعلك يا موسى» is recognised, each verse with its own meaning')
         check(not errs, f'no page errors {errs[:2]}')
         await b.close()
     print(f'\n{len(fails)} failures'); sys.exit(1 if fails else 0)

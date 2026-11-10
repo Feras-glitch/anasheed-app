@@ -182,6 +182,11 @@ for name, k in packs.items():
             assert all(len(wm) == 2 and wm[1].strip() for wm in pt.get('words', [])), f'packs.json: {name}: «{pt["title"]}»: a word without meaning'
         assert all(g.get('h') and g.get('a') for g in ls.get('book', [])), f'packs.json: {name}: textbook answers need a heading'
     k['story'] = [dict(s, img='data:image/jpeg;base64,' + base64.b64encode(open(P(s['img']), 'rb').read()).decode()) for s in k.get('story', [])]
+# no three words in a row from a protected poem: checked when the parent's private texts are on this machine (never in git)
+if os.path.isdir(P('private')):
+    sys.path.insert(0, P('tools')); import textcheck
+    hits = {n: h for n, h in textcheck.run({k: v for k, v in packs.items()}, P('private')).items() if h}
+    assert not hits, 'packs.json: words copied from the poem: ' + '; '.join(f'{n} {w} «{g}»' for n, h in hits.items() for w, g in h[:5])
 # «ما معنى البيت؟»: two wrong meanings per verse, about that verse itself, so the words of the verse do not give the answer away
 bwrong = {}
 if os.path.exists(P('content', 'bayt_wrong.json')):

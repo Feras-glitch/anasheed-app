@@ -11,3 +11,5 @@ __pycache__/
 keys/
 *.p12
 *.jks
+/private/
+نصوصي*.json
