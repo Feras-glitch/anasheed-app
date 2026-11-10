@@ -204,6 +204,25 @@ async def main():
         await pg.set_input_files('#txImport', f); await pg.wait_for_timeout(400)
         check(await pg.evaluate("added.length") == len(o['poems']), 'importing the same file twice adds nothing')
 
+        # ---- the remaining fixes: stumbled verses lead practice; a picture question can be heard; the archive hides adult buttons ----
+        await pg.evaluate("closeSheet(); gateUntil=0; setKid('دلال'); closeSheet(); const s=st('٣'); s.weak={1:2}; saveS(); openPoem('٣'); closeSheet(); goSeg(0); mode='sing'; setModeUI()"); await pg.wait_for_timeout(100)
+        check('البيت ٢' in await pg.text_content('#weakBox'), 'the verses the child stumbles on are offered for practice in their segment')
+        await pg.click('#weakBox [data-wv="1"]'); await pg.wait_for_timeout(100)
+        check(await pg.evaluate("level") == 2 and await pg.evaluate("curLine") == 0, '…with half the text, starting from the verse before')
+        await pg.evaluate("const s=st('٣'); s.mem=[0]; s.rev={0:{step:2,due:Date.now()-1}}; s.rpend=[0]; saveS()")
+        rid = await pg.evaluate(PUT, {'poem': '٣', 'who': 'دلال', 'seg': 0, 'range': [0, 6], 'review': True})
+        await pg.evaluate(f"stampEffects({{id:{json.dumps(rid)},poem:'٣',who:'دلال',seg:0,range:[0,6],review:true}},'rok',[2])")
+        check(await pg.evaluate("st('٣').rev[0].step") == 2, 'a review with a stumble marked stays at the same distance')
+        await pg.evaluate("qEasy=true; mode='quiz'; let n=0; do{ startQuiz('meaning'); n++; }while(!$('#sayW') && n<30)")
+        check(await pg.locator('#sayW').count() == 1, 'a picture question has 🔊 to hear its line')
+        await pg.evaluate("closeSheet(); renderArchive(); show('archive')"); await pg.wait_for_timeout(300)
+        if await pg.locator('#rlist .r').count():
+            check(await pg.locator('#rlist [data-del]').count() == 0, 'a child sees no delete or model buttons in the archive')
+        check('Content-Security-Policy' in await pg.evaluate("document.head.innerHTML"), 'the page declares a content security policy')
+        await pg.evaluate("window.__r=rec; rec={state:'recording'}; tabLocked=false; lockTab()")
+        check(await pg.evaluate("tabLocked") is False, 'another window does not lock this one in the middle of a take')
+        await pg.evaluate("rec=window.__r; clearTimeout(lockTab.t); show('home')")
+
         # ---- the service worker keeps pictures across versions ----
         sw = open('www/sw.js', encoding='utf-8').read()
         check("IMG='anasheed-img'" in sw and "mode==='navigate'" in sw, 'pictures live in a lasting cache; the page fallback is for pages only')

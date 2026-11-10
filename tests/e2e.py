@@ -158,7 +158,8 @@ async def main():
         check('سارة' in await pg.text_content('#kidChip'), 'saving a model does not switch the child')
 
         # second kid recording at level 1 for before/after
-        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(400); await pg.click('#sheet button:has-text("تمام")')
+        await record(pg); await pg.click('#keep'); await pg.wait_for_timeout(400)
+        check(not await pg.evaluate("$('#pop').classList.contains('on')") and (await pg.text_content('#toast')).strip() != '', 'an ordinary take gets the chime and a word, not the big celebration')
 
         # quizzes on a short poem
         await pg.click('#back'); await pg.click('#grid .card[data-id="١"]'); await pg.wait_for_timeout(200)

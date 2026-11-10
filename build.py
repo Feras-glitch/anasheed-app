@@ -159,6 +159,7 @@ for pid, sc in story_d.items():
     assert all(isinstance(s.get('img'), str) and s['img'].startswith('data:image/') for s in sc), f'story {pid}: a picture is not an image'
     assert len({s['v'] for s in sc}) == len(sc), f'story {pid}: two pictures on one verse'
 lessons = {k: v for k, v in json.load(open(P('content', 'lessons.json'), encoding='utf-8')).items() if not k.startswith('_')}
+assert all(isinstance(v, list) and all(isinstance(x, str) and x.strip() for x in v) for v in lessons.values()), 'lessons.json: each poem has a list of questions'
 assert all(any(p['id'] == k for p in poems) for k in lessons), 'lessons.json: unknown poem id'
 # ready packs for protected poems the parent types in by hand: everything around the poem, never its words
 packs = {k: v for k, v in json.load(open(P('content', 'packs.json'), encoding='utf-8')).items() if not k.startswith('_')}
@@ -168,6 +169,11 @@ for name, k in packs.items():
     assert len(k['bayt']) == n and all(isinstance(x, str) and x.strip() for x in k['bayt']), f'packs.json: {name}: one meaning per verse'
     assert all(0 <= s['v'] < n and os.path.exists(P(s['img'])) for s in k.get('story', [])), f'packs.json: {name}: a scene points to a missing verse or picture'
     assert not set(k.get('path', [])) - {'young', 'old'}, f'packs.json: {name}: path is young/old'
+    # the fields the app reads as they are: a wrong shape would only fail on a child's tap
+    assert isinstance(k.get('age', [6, 12]), list) and len(k.get('age', [6, 12])) == 2 and all(isinstance(a, int) and 5 <= a <= 12 for a in k.get('age', [6, 12])) and k.get('age', [6, 12])[0] <= k.get('age', [6, 12])[1], f'packs.json: {name}: age is [from, to] within 5–12'
+    assert all(isinstance(k.get(f, ''), str) for f in ('how', 'poet', 'idea')), f'packs.json: {name}: how, poet and idea are text'
+    assert all(isinstance(k.get(f, []), list) and all(isinstance(x, str) and x.strip() for x in k.get(f, [])) for f in ('lessons', 'acts')), f'packs.json: {name}: lessons and acts are lists of text'
+    assert 'tale' not in k or (isinstance(k['tale'].get('title'), str) and isinstance(k['tale'].get('text'), list) and all(isinstance(x, str) for x in k['tale']['text'])), f'packs.json: {name}: tale has a title and a list of paragraphs'
     # keys are compared after the app's normalisation (no hamza forms, ة→ه, ى→ي): a key written otherwise would never match
     assert all(re.fullmatch('[ابتثجحخدذرزسشصضطظعغفقكلمنهوي]+', w) for x in k['keys'] for w in x), f'packs.json: {name}: a key is not normalised'
     assert len({s['v'] for s in k.get('story', [])}) == len(k.get('story', [])), f'packs.json: {name}: two pictures on one verse'
@@ -202,6 +208,8 @@ for pid, ws in bwrong.items():
 FS = P('fonts', 'node_modules', '@fontsource')
 def font_css():
     if not os.path.isdir(os.path.join(FS, 'amiri')):
+        # a release must carry its fonts: an offline children's app does not call Google
+        assert os.environ.get('CI') != 'true', 'fonts: not installed in CI (fonts/node_modules/@fontsource) — the release would call Google Fonts'
         print('fonts: not found → Google Fonts link', file=sys.stderr)
         return ('<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?'
                 'family=Amiri:wght@400;700&family=Cairo:wght@400;700&display=swap" rel="stylesheet">')

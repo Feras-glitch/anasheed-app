@@ -91,7 +91,9 @@ async def main():
         check(len(set(icons)) == len(icons) and '👤' not in icons and icons[-1] in await pg.text_content('#kidChip'), f'each child has an animal of their own, shown by the name {icons}')
         await pg.evaluate("pKid='فرح'"); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(400)
         await pg.evaluate("pKid='فرح'; renderParent()"); await pg.wait_for_timeout(300)
-        await pg.click('#kidDel'); await pg.click('#askY'); await pg.wait_for_timeout(300)
+        await pg.click('#kidDel'); await pg.fill('#pIn', 'فر'); await pg.click('#pOk'); await pg.wait_for_timeout(200)
+        check(await pg.evaluate("kids.includes('فرح')"), 'a name typed wrong deletes nothing')
+        await pg.click('#kidDel'); await pg.fill('#pIn', 'فرح'); await pg.click('#pOk'); await pg.wait_for_timeout(300)
         check(await pg.evaluate("!own(kidInfo,'فرح') && !kids.includes('فرح')"), 'deleting a child leaves nothing for a new child of the same name')
         await ctx.close()
 
@@ -107,7 +109,7 @@ async def main():
         await pg.click('#keep'); await pg.wait_for_timeout(600); await pg.evaluate('closeSheet()')
         boxes = await pg.evaluate("[...document.querySelectorAll('#bar button, #bar .rec')].filter(e=>e.offsetParent).map(e=>{const r=e.getBoundingClientRect(); return [r.left,r.right,r.width,r.height]})")
         check(all(x[0] >= 0 and x[1] <= 360 for x in boxes) and all(x[2] >= 44 and x[3] >= 44 for x in boxes), f'with «▶ اسمعني» the bar fits 360 px and every button is ≥ 44 px {boxes}')
-        small = await pg.evaluate("[...document.querySelectorAll('.playbar .btn')].map(e=>{ e.parentElement.style.display='flex'; const r=e.getBoundingClientRect(); return Math.min(r.width,r.height); })")
+        small = await pg.evaluate("[...document.querySelectorAll('.playbar .btn')].map(e=>{ if(e.id==='pbDone') e.style.display='';  e.parentElement.style.display='flex'; const r=e.getBoundingClientRect(); return Math.min(r.width,r.height); })")
         check(all(x >= 44 for x in small), f'⏹ and 🔁 in the play bar are ≥ 44 px {small}')
         await ctx.close()
 

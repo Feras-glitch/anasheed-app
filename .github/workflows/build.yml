@@ -169,7 +169,8 @@ jobs:
   device-results:
     # the only job that writes to the repository runs no third-party code: it just publishes the screenshots
     needs: android-device
-    if: always()
+    # it publishes the device screenshots even when the device test failed, but not when no APK was ever built
+    if: always() && needs.android-device.result != 'skipped' && needs.android-device.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
