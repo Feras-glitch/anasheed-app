@@ -893,7 +893,7 @@ function lessonHTML(){ const o=LESSON[cur&&cur.id]; if(!o) return ''; const {L,m
     if(pt.discuss&&pt.discuss.length) b+=`<h4>💬 المناقشة</h4>${pt.discuss.map(([q,a],k)=>`<details class="qa"><summary>${AR(k+1)}. ${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}`;
     if((pt.art&&pt.art.length)||pt.general) b+=`<h4>🔍 التحليل الفني</h4>${pt.general?`<p>${esc(pt.general)}</p>`:''}${(pt.art||[]).map(([j,notes])=>`<div class="art"><div class="artL"><span class="n">${AR(j+1)}</span>${line(j)}</div>${ul(notes)}</div>`).join('')}`;
     return `<details class="ls"${n?'':' open'}><summary>الفكرة ${ord[n]||AR(n+1)}: ${esc(pt.title)} <span class="small">(${AR(pt.from+1)}–${AR(pt.to)})</span></summary>${b}</details>`; }).join('');
-  if(L.book&&L.book.length) h+=`<details class="ls"><summary>📘 إجابات أسئلة الكتاب</summary><p class="small">الأسئلة في كتاب المدرسة، والإجابات كما في ملف الدرس. أرقام الأسطر من هذا النشيد.</p>${L.book.map(g=>`<h4>${esc(g.h)}</h4>${ul(g.a)}`).join('')}</details>`;
+  if(L.book&&L.book.length) h+=`<details class="ls"><summary>${esc(L.bookTitle||'📘 إجابات أسئلة الكتاب')}</summary><p class="small">${esc(L.bookNote||'الأسئلة في كتاب المدرسة، والإجابات كما في ملف الدرس. أرقام الأسطر من هذا النشيد.')}</p>${L.book.map(g=>`<h4>${esc(g.h)}</h4>${ul(g.a)}`).join('')}</details>`;
   if(L.source) h+=`<p class="src">${esc(L.source)}</p>`;
   return h; }
 $('#lessonBtn').onclick=()=>{ const h=lessonHTML(); if(!h) return; openSheet(`<h3>🎓 درس «${esc(cur.title)}»</h3><div class="lesson">${h}</div><div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`); };

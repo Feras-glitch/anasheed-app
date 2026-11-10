@@ -54,6 +54,19 @@ async def main():
         await pg.click('#modeQuiz'); await pg.wait_for_timeout(200)
         if await pg.locator('#quizBox [data-q="sense"]').count():
             check('(تدريب)' in await pg.text_content('#quizBox [data-q="sense"]'), '«ما معنى البيت؟» has no wrong meanings written for this pack: practice')
+        # «لا تصالح»: a free-verse poem typed as twelve two-part verses; sources marked, a summary in place of textbook answers
+        P2 = json.load(open('content/packs.json', encoding='utf-8'))['لا تصالح']
+        t2 = '\n'.join(f'{k[0]} سطر / تجريبي {i + 1}' for i, k in enumerate(P2['keys']))
+        await pg.evaluate("([t])=>{ closeSheet(); $('#aTitle').value='لا تصالح'; $('#aPoet').value='أمل دنقل'; $('#aText').value=t; $('#aSave').click(); }", [t2])
+        await pg.wait_for_timeout(400)
+        p2 = await pg.evaluate("added[added.length-1].id")
+        r = json.loads(await pg.evaluate(f"JSON.stringify((p=>({{pack:p.pack, age:p.age, n:BAYT[p.id].v.length}}))(poemById('{p2}')))"))
+        check(r == {'pack': 'لا تصالح', 'age': [6, 12], 'n': 12}, f'«لا تصالح» is recognised, for every age {r}')
+        await pg.evaluate(f"closeSheet(); openPoem('{p2}'); closeSheet()"); await pg.wait_for_timeout(300)
+        await pg.click('#lessonBtn'); await pg.wait_for_timeout(300)
+        sh = await pg.text_content('#sheet')
+        check(await pg.locator('#sheet details.ls').count() == 5 and '📘 خلاصة التحليل' in sh and 'الوثبات التسع' in sh, 'four ideas and the summary of the analysis')
+        check('(من غير المصدر)' in sh and '(البحث)' in sh and '(المقال)' in sh and 'زهية لبيض' in sh, 'every note says where it comes from')
         check(not errs, f'no page errors {errs[:2]}')
         await b.close()
     print(f'\n{len(fails)} failures'); sys.exit(1 if fails else 0)
