@@ -45,11 +45,13 @@ async def main():
         check(r[1] == [4, [[0, 4], [4, 8], [8, 10]]], f'age 8: pieces of four {r[1]}')
         check(r[2] == [6, [[0, 10]]], f'age 10: a ten-verse poem is one piece {r[2]}')
         # ---- the young path starts with the most familiar poem, and its hint speaks to the child ----
-        check(await pg.evaluate("pathOf('كريم')[0]") == '٧' and await pg.evaluate("PATHS.young.length") == 17, 'the young path starts with «٧» (17 steps)')
+        check(await pg.evaluate("pathOf('كريم')[0]") == '١٦' and await pg.evaluate("PATHS.young.length") == 17, 'the young path starts with «طلع البدر» (17 steps)')
         check('ردّد مع بابا' in await pg.text_content('#pathBox'), 'age 6: the path hint is «ردّد مع بابا، ثم أنشد»')
         await pg.evaluate("LS.set('parentName','ماما'); kidInfo['كريم'].g='g'; renderHome()")
         check('ردّدي مع ماما' in await pg.text_content('#pathBox'), 'the hint follows the child\'s gender and the parent\'s name')
         await pg.evaluate("LS.set('parentName',''); kidInfo['كريم'].g='b'; renderHome()")
+        # the parent may arrange a child's path: here «٧» first, for the echo steps below
+        await pg.evaluate("kidInfo['كريم'].path=['٧',...PATHS.young.filter(x=>x!=='٧')]; LS.set('kidInfo',kidInfo); renderHome()")
 
         # ---- gender: the buttons speak to a girl as a girl ----
         await pg.evaluate("setKid('دلال'); closeSheet()"); await pg.click('#grid .card[data-id="٣٠"]') if await pg.locator('#grid .card[data-id="٣٠"]').count() else await pg.evaluate("openPoem('٣٠')")
@@ -137,6 +139,7 @@ async def main():
         # ---- the youngest move along the path when the parent hears the echo done well ----
         ctx, pg, errs = await fresh(b)
         await kid(pg, 'كريم', 6, 'b')
+        await pg.evaluate("kidInfo['كريم'].path=['٧',...PATHS.young.filter(x=>x!=='٧')]; LS.set('kidInfo',kidInfo)")  # the parent put «٧» first
         m = await pg.evaluate("segments(poemById('٧'),'كريم').length")
         for i in range(m):
             await pg.evaluate(PUT, {'poem': '٧', 'who': 'كريم', 'seg': i, 'echo': True, 'lvl': 0, 'dur': 3})

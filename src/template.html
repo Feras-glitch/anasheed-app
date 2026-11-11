@@ -144,6 +144,9 @@ input[type=checkbox]{transform:scale(1.6);margin-inline-end:12px}
 .acts li{margin:.45em 0;line-height:1.7}
 /* «الدرس كاملاً»: one fold per idea of the lesson */
 .lesson{font-family:Cairo;line-height:1.85}
+.nextPics{display:flex;gap:6px;margin:4px 0;overflow:hidden;max-width:100%}.banner.path .nextPics img{width:40px;height:40px;border-radius:10px;object-fit:cover;opacity:.55;flex:none}.banner.path .nextPics img.now{opacity:1;outline:3px solid #e2a33b;outline-offset:-3px}
+.pe .r{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #eee3cc}.pe .r .t{flex:1;min-width:0}
+body.young .badges span:not(.on){display:none}
 /* a child of seven or younger, who cannot read yet: fewer buttons, bigger ones, no reading quizzes or lessons */
 body.young #lessonBtn, body.prereader #hint, body.young #paceT, body.prereader #quizBox [data-q="complete"], body.prereader #quizBox [data-q="order"], body.prereader #quizBox [data-q="sense"]{display:none!important}
 body.young #modelBtn, body.young #echoBtn, body.young #modeStory{font-size:20px;padding:12px 18px}
@@ -709,6 +712,64 @@ function setupWizard(){ const DAYS=['الأحد','الإثنين','الثلاث�
   const pin=async()=>{ closeSheet(); await setParentPin(); await new Promise(r=>{ const w=setInterval(()=>{ if(!$('#pop').classList.contains('on')){ clearInterval(w); r(); } },200); }); };
   $('#swOk').onclick=async()=>{ if(!save()) return; await pin(); kidSheet(true); };
   $('#swModel').onclick=async()=>{ if(!save()) return; await pin(); gateUntil=Date.now()+600000; const t=await nextModelTarget(); if(t){ show('parent'); startModel(...t); } else kidSheet(true); }; }
+// arranging a child's path: the parent always; the teacher and/or the child when the parent allows it
+function pathEditor(k,role){ const allowed = role==='parent' || (role==='teacher'&&['teacher','both'].includes(pathBy(k))) || (role==='child'&&['child','both'].includes(pathBy(k)));
+  if(!allowed) return toast(role==='teacher'?'ترتيب المسار للوالد وحده: يسمح به من صفحته':'ترتيب المسار للوالد',3000);
+  const info=(kidInfo[k] ||= {}); let path=pathOf(k).slice(); const par=role==='parent';
+  const draw=()=>{ const rest=allPoems().filter(p=>!path.includes(p.id) && !kidHidden(p.id,k) && (par||role==='teacher'||ageOk(p)));
+    openSheet(`<h3>🗺 مسار ${esc(k)}</h3><p class="small">${Array.isArray(info.path)?'ترتيب مختار.':'الترتيب الذكي: من الأسهل إلى الأصعب.'} الأول هو ما يظهر في «ابدأ من هنا».</p>
+      <div class="pe">${path.map((id,j)=>`<div class="r"><span class="t">${AR(j+1)}. ${esc(poemById(id).title)}${stepDone(id,k)?' ✓':''}</span><button class="btn s" data-up="${j}" aria-label="أعلى" ${j?'':'disabled'}>⬆</button><button class="btn s" data-dn="${j}" aria-label="أسفل" ${j<path.length-1?'':'disabled'}>⬇</button><button class="btn s d" data-rm="${j}" aria-label="أزل من المسار">✕</button></div>`).join('')}</div>
+      ${rest.length?`<label>أضف نشيداً إلى المسار</label><select id="peAdd"><option value="">—</option>${rest.map(p=>`<option value="${esc(p.id)}">${esc(p.title)}</option>`).join('')}</select>`:''}
+      ${par?`<label>من يستطيع ترتيب هذا المسار غير الوالد؟</label><div class="chips">${[['parent','الوالد وحده'],['teacher','والمعلّمة'],['child','والطفل'],['both','والمعلّمة والطفل']].map(([v,t])=>`<span class="chip ${pathBy(k)===v?'on':''}" data-by="${v}">${t}</span>`).join('')}</div>
+        <details style="margin-top:10px"><summary>🙈 إخفاء أناشيد عن ${esc(k)}</summary><p class="small">النشيد المخفي لا يظهر في الرئيسية ولا في المسار.</p>${allPoems().map(p=>`<label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" data-hd="${esc(p.id)}" ${kidHidden(p.id,k)?'checked':''}> ${esc(p.title)}</label>`).join('')}</details>`:''}
+      <div class="row"><button class="btn p" id="peSave">احفظ</button>${par||Array.isArray(info.path)?`<button class="btn" id="peSmart">↺ الترتيب الذكي</button>`:''}<button class="btn" onclick="closeSheet()">إلغاء</button></div>`);
+    const mv=(j,d)=>{ const x=path[j]; path[j]=path[j+d]; path[j+d]=x; draw(); };
+    $$('#sheet [data-up]').forEach(b=>b.onclick=()=>mv(+b.dataset.up,-1)); $$('#sheet [data-dn]').forEach(b=>b.onclick=()=>mv(+b.dataset.dn,1));
+    $$('#sheet [data-rm]').forEach(b=>b.onclick=()=>{ path.splice(+b.dataset.rm,1); draw(); });
+    if($('#peAdd')) $('#peAdd').onchange=e=>{ if(e.target.value){ path.push(e.target.value); draw(); } };
+    $$('#sheet [data-by]').forEach(c=>c.onclick=()=>{ info.pathBy=c.dataset.by; LS.set('kidInfo',kidInfo); $$('#sheet [data-by]').forEach(x=>x.classList.toggle('on',x===c)); });
+    $$('#sheet [data-hd]').forEach(c=>c.onchange=()=>{ const h=new Set(info.hide||[]); c.checked?h.add(c.dataset.hd):h.delete(c.dataset.hd); info.hide=[...h]; if(!info.hide.length) delete info.hide; LS.set('kidInfo',kidInfo); path=path.filter(id=>!kidHidden(id,k)); });
+    $('#peSave').onclick=()=>{ info.path=path.slice(); LS.set('kidInfo',kidInfo); closeSheet(); toast('حُفظ المسار ✓'); if(k===kid) renderHome(); if(screen==='parent') renderParent(); };
+    if($('#peSmart')) $('#peSmart').onclick=()=>{ delete info.path; LS.set('kidInfo',kidInfo); closeSheet(); toast('عاد الترتيب الذكي'); if(k===kid) renderHome(); if(screen==='parent') renderParent(); }; };
+  draw(); }
+// ---------- the teacher at a distance, by files (no server): the takes go to her, her stamps come back signed ----------
+const deviceId = () => { let d=LS.get('deviceId',''); if(!/^[0-9a-f]{24}$/.test(d)){ d=rid(); LS.set('deviceId',d); } return d; };
+const iAmTeacher = () => { const t=LS.get('iAmTeacher',null); return t&&okName(t.name)&&/^[0-9a-f]{8,64}$/.test(t.secret||'')?t:null; };
+const stampSig = (secret,src,items) => sha256('anasheed-stamps:'+secret+':'+src+':'+JSON.stringify(items));
+const b64Blob = (b64,type) => { const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return new Blob([u],{type}); };
+// the parent's side: the takes waiting for an ear, in one file for the teacher
+async function sendTakes(t){ const all=(await recMeta()).filter(r=>!r.model&&!r.stamp&&!r.inbox&&(r.memCand||r.review||r.echo));
+  if(!all.length) return toast('لا تسجيلات تنتظر الحكم',3000);
+  const takes=[]; for(const m of all.slice(0,60)){ const r=await recGet(m.id); if(!r||!r.blob) continue; takes.push({rid:m.id,who:m.who,poem:m.poem,title:m.title,seg:m.seg,range:m.range,when:m.when,dur:m.dur,lvl:m.lvl,memCand:!!m.memCand,review:!!m.review,echo:!!m.echo,marks:m.marks||[],type:r.blob.type||m.type,b64:await blobB64(r.blob)}); }
+  const poems=added.filter(p=>takes.some(x=>x.poem===p.id)).map(p=>({id:p.id,title:p.title,poet:p.poet,age:p.age,verses:p.verses}));
+  const o={app:'anasheed',kind:'takes',v:1,to:t.name,src:deviceId(),family:LS.get('parentName','')||'',kidInfo:Object.fromEntries(kids.map(k=>[k,{age:kidAge(k)||0,g:kInfo(k).g||''}])),poems,takes};
+  shareFiles([{blob:new Blob([JSON.stringify(o)],{type:'application/json'}),type:'application/json',name:safeName(`تسجيلات-إلى-${t.name}-${new Date().toISOString().slice(0,10)}.json`)}],`تسجيلات للمعلّمة ${t.name}`,'تسجيلات للمعلّمة');
+  toast(`${tasjeelN(takes.length)} في الملف: أرسله إلى ${t.name}`,4000); }
+// the teacher's key for her own copy of the app: her name and secret, to sign her stamps
+function teacherKeyFile(t){ shareFiles([{blob:new Blob([JSON.stringify({app:'anasheed',kind:'teacherKey',name:t.name,secret:t.secret})],{type:'application/json'}),type:'application/json',name:safeName(`مفتاح-${t.name}-أنشودتي.json`)}],`مفتاح ${t.name} لتطبيق أنشودتي`,'مفتاح المعلّمة'); }
+// the teacher's side: the takes arrive in her queue; her stamps wait in an outbox until she sends them
+async function receiveTakes(o){ const me=iAmTeacher(); if(!me) return toast('افتحي أولاً «مفتاح المعلّمة» الذي أرسله الوالد',4500);
+  const src=/^[0-9a-f]{24}$/.test(o.src||'')?o.src:''; if(!src) return toast('ملف التسجيلات تالف');
+  for(const p of (o.poems||[]).slice(0,50)){ if(!added.some(a=>a.id===p.id) && validPoem(p)) added.push(cleanPoem(p)); } LS.set('added',added); applyPacks();
+  for(const [k,v] of Object.entries(o.kidInfo||{})) if(okName(k) && !own(kidInfo,k) && v && typeof v==='object'){ kidInfo[k]={...(num(v.age)?{age:Math.max(5,Math.min(12,num(v.age)))}:{}),...(v.g==='g'||v.g==='b'?{g:v.g}:{}),remote:true}; } LS.set('kidInfo',kidInfo);
+  const have=new Set((await recMeta()).filter(r=>r.inbox).map(r=>r.inbox.src+'|'+r.inbox.rid)); let n=0;
+  for(const x of (o.takes||[]).slice(0,200)){ if(!x||typeof x.b64!=='string'||have.has(src+'|'+x.rid)) continue;
+    try{ const r=cleanRec(x); r.inbox={src,rid:x.rid,family:String(o.family||'').slice(0,40)}; if(await recPut(Object.assign(r,{blob:b64Blob(x.b64,r.type)}))!=null) n++; }catch(e){} }
+  toast(n?`وصل ${tasjeelN(n)} ينتظر حكمكِ في «تنتظر أذنك» ✓`:'هذه التسجيلات وصلت من قبل',4500); if(screen==='parent') renderParent(); }
+function teacherOutbox(){ return LS.get('tOut',[]).filter(x=>x&&x.src&&x.rid!=null); }
+function sendStamps(){ const me=iAmTeacher(), out=teacherOutbox(); if(!me||!out.length) return toast('لا أختام جديدة');
+  const bySrc={}; for(const x of out) (bySrc[x.src] ||= []).push({rid:x.rid,stamp:x.stamp,weak:x.weak||[],at:x.at});
+  const files=Object.entries(bySrc).map(([src,items])=>({blob:new Blob([JSON.stringify({app:'anasheed',kind:'stamps',v:1,by:me.name,src,items,sig:stampSig(me.secret,src,items)})],{type:'application/json'}),type:'application/json',name:safeName(`أختام-${me.name}-${new Date().toISOString().slice(0,10)}.json`)}));
+  shareFiles(files,`أختام ${me.name}`,'الأختام'); LS.set('tOutSent',[...LS.get('tOutSent',[]),...out].slice(-500)); LS.set('tOut',[]); renderParent(); }
+// the parent's side again: stamps from a teacher this device knows, signed with her secret
+async function receiveStamps(o){ const t=teachers().find(x=>x.name===o.by&&x.secret); if(!t) return toast('أختام من معلّمة غير معروفة على هذا الجهاز',4500);
+  if(o.src!==deviceId()) return toast('هذه الأختام لتسجيلات جهاز آخر',4500);
+  if(!Array.isArray(o.items) || o.sig!==stampSig(t.secret,o.src,o.items)) return toast('توقيع الأختام غير صحيح: لم يُطبَّق شيء',4500);
+  const recs=new Map((await recMeta()).map(r=>[r.id,r])); let n=0;
+  for(const x of o.items){ const r=recs.get(x.rid); if(!r||r.stamp||!STAMP_BTN[recKind(r)].some(([st])=>st===x.stamp)) continue; const weak=(Array.isArray(x.weak)?x.weak:[]).filter(Number.isInteger).slice(0,50);
+    if(await recPatch(r.id,{stamp:x.stamp,stampAt:Date.now(),weak,by:t.name})){ stampEffects({...r,by:t.name},x.stamp,weak); n++; } }
+  toast(n?`طُبّق ${AR(n)} من أختام ${t.name} ✓`:'هذه الأختام طُبّقت من قبل',4500); if(screen==='parent') renderParent(); renderHome(); }
+
 // a live session with the teacher (by video): she says her code once, then judges each take as soon as it is saved
 function teacherSession(){ const ts=teachers().filter(t=>t.secret); if(!ts.length) return toast('لا معلّمة بعد: يضيفها الوالد من صفحته',3500);
   if(tLive()){ openSheet(`<h3>👩‍🏫 جلسة مع ${esc(tSess.name)}</h3><p>تنتهي الساعة ${new Date(tSess.until).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'})}.</p><div class="row"><button class="btn d" id="tsEnd">أنهِ الجلسة</button><button class="btn" onclick="closeSheet()">تمام</button></div>`); $('#tsEnd').onclick=()=>{ tSess=null; closeSheet(); renderTBar(); }; return; }
@@ -754,14 +815,18 @@ function renderAdults(){ const box=$('#adultsBox'); if(!box) return;
   const par=adults.find(a=>a.role==='parent');
   box.innerHTML=`${par&&par.pin?'':'<div class="warn">🔐 اختر رقماً سرياً للدخول إلى هذه الصفحة: الضغط المطوّل وحده يعرفه الأطفال.</div>'}
     <div class="row"><button class="btn s ${par&&par.pin?'':'p'}" id="adPin">${par&&par.pin?'🔐 غيّر رقمي السري':'🔐 اختر رقماً سرياً'}</button><button class="btn s g" id="adT">👩‍🏫 أضف معلّمة</button></div>
-    ${teachers().map((t,i)=>`<div class="r"><span class="t">👩‍🏫 <b>${esc(t.name)}</b> ${t.pin?'· لها رقم سري':''}</span><button class="btn s" data-tf="${i}" title="أرسل لها ملف الرمز">📤 ملف الرمز</button><button class="btn s d" data-td="${i}">حذف</button></div>`).join('')}
-    <p class="small">المعلّمة عن بُعد: أرسل لها «ملف الرمز» مرة واحدة. في الجلسة يلمس الطفل «👩‍🏫 جلسة المعلّمة» في شاشة «من سينشد؟»، وتقول المعلّمة رمزها، فتحكم على كل تسجيل حين يُحفظ. وفي البيت: تدخل صفحة الوالد برقمها السري، فيُكتب اسمها على كل ختم.</p>`;
+    ${teachers().map((t,i)=>`<div class="r"><span class="t">👩‍🏫 <b>${esc(t.name)}</b> ${t.pin?'· لها رقم سري':''}</span><button class="btn s" data-tf="${i}" title="ملف الرمز للجلسة المباشرة">📤 ملف الرمز</button><button class="btn s" data-tk="${i}" title="مفتاح تطبيقها، مرة واحدة">🔑 مفتاح تطبيقها</button><button class="btn s g" data-tt="${i}" title="تسجيلات تنتظر الحكم">📤 أرسل التسجيلات</button><button class="btn s d" data-td="${i}">حذف</button></div>`).join('')}
+    <p class="small"><b>بالملفات (في أي وقت):</b> أرسل لها «🔑 مفتاح تطبيقها» مرة واحدة لتفتحه في نسختها من التطبيق. ثم «📤 أرسل التسجيلات» متى شئت؛ فتسمعها وتختمها، وترسل لك ملف الأختام فتستورده هنا. الأختام موقّعة بمفتاحها، فلا يزوّرها أحد.</p>
+    <p class="small"><b>في الجلسة المباشرة:</b> أرسل لها «ملف الرمز» مرة واحدة. في الجلسة يلمس الطفل «👩‍🏫 جلسة المعلّمة» في شاشة «من سينشد؟»، وتقول المعلّمة رمزها، فتحكم على كل تسجيل حين يُحفظ. وفي البيت: تدخل صفحة الوالد برقمها السري، فيُكتب اسمها على كل ختم.</p>`;
   $('#adPin').onclick=async()=>{ if(await setParentPin()) renderAdults(); };
   $('#adT').onclick=async()=>{ const n=await prompt2('اسم المعلّمة كما يراه الأطفال','مثال: أ. آية'); if(!n) return; if(!okName(n)) return toast('اختر اسماً آخر');
     const t={role:'teacher',name:n.trim(),secret:rid()};
     if(await ask('هل تأتي المعلّمة إلى البيت فتحتاج رقماً سرياً لصفحة الوالد؟','نعم',false)){ const v=await pinSheet('🔐 رقم المعلّمة'); if(v){ t.salt=rid(); t.pin=pinOf(v,t.salt); } }
     adults.push(t); saveAdults(); renderAdults(); teacherFile(t); };
   $$('#adultsBox [data-tf]').forEach(b=>b.onclick=()=>teacherFile(teachers()[+b.dataset.tf]));
+  $$('#adultsBox [data-tk]').forEach(b=>b.onclick=()=>teacherKeyFile(teachers()[+b.dataset.tk]));
+  $$('#adultsBox [data-tt]').forEach(b=>b.onclick=()=>sendTakes(teachers()[+b.dataset.tt]));
+  const me=iAmTeacher(); if(me){ const n=teacherOutbox().length; box.insertAdjacentHTML('afterbegin',`<div class="note">👩‍🏫 <b>هذا تطبيق ${esc(me.name)}</b>: تصل تسجيلات الطلاب في ملفات، فتُفتح من «📂 استورد نسخة احتياطية»، وتظهر في «تنتظر أذنك». ${n?`<div class="row"><button class="btn p" id="tSend">📤 أرسل ${AR(n)} ${n===1?'ختماً':n===2?'ختمين':n<=10?'أختام':'ختماً'} إلى الوالد</button></div>`:'<span class="small">لا أختام جديدة.</span>'}</div>`); if($('#tSend')) $('#tSend').onclick=sendStamps; }
   $$('#adultsBox [data-td]').forEach(b=>b.onclick=async()=>{ const t=teachers()[+b.dataset.td]; if(!await ask(`حذف ${t.name}؟ لن يعمل رمزها بعد الآن.`,'احذف',true)) return; adults=adults.filter(x=>x!==t); saveAdults(); renderAdults(); }); }
 
 // ---------- home ----------
@@ -776,7 +841,13 @@ function weekly(){ const a=kidLevel()&&Math.max(6,kidLevel()); const fits=p=> a 
 const thumbOf = p => { if(STORY[p.id]?.[0]?.img) return STORY[p.id][0].img; const th=IMAGES['@thumb:'+p.id]; if(th) return th[0]==='@' ? IMAGES[th.slice(1)] : th;
   for(const w of String(p.title).split(/\s+/)){ const k=wkey(w); if(!k) continue; const o=`${p.id}|${k}`; const u=(o in IMAGES)?IMAGES[o]:IMAGES[k]; if(u) return u; } return null; };
 // ---------- «ابدأ من هنا»: an ordered path for each age, from the shortest and closest to the longest ----------
-const pathOf = (k=kid) => { const a=kidLevel(k); if(!a) return []; const band=a<=8?'young':'old'; return [...packFirst(band), ...PATHS[band]].filter(id=>poemById(id)); };
+// each child's path: the graded default of their band, or the order the parent (or whoever the parent allowed) chose; hidden poems never appear
+const kInfo = (k=kid) => own(kidInfo,k)&&kidInfo[k]||{};
+const kidHidden = (id,k=kid) => (kInfo(k).hide||[]).includes(id);
+const defaultPath = k => { const a=kidLevel(k); if(!a) return []; const band=a<=8?'young':'old'; return [...packFirst(band), ...PATHS[band]]; };
+const pathOf = (k=kid) => { const i=kInfo(k), base=Array.isArray(i.path)?i.path:defaultPath(k); return [...new Set(base)].filter(id=>poemById(id)&&!kidHidden(id,k)); };
+// who may arrange a child's path besides the parent: 'parent' (no one else), 'teacher', 'child', 'both'
+const pathBy = (k=kid) => ['parent','teacher','child','both'].includes(kInfo(k).pathBy)?kInfo(k).pathBy:'parent';
 const stepDone = (id,k=kid) => { const p=poemById(id), b=badges(p,k); if(b.mem) return true;
   // a child of seven or younger moves on when the parent heard every segment repeated well («✓ أتقنه» on the echo sessions)
   const a=kidAge(k), e=((own(KS(k),id)&&KS(k)[id])||{}).echoOk||[]; return !!(a && a<=7 && segments(p,k).every((_,i)=>e.includes(i))); };
@@ -784,8 +855,9 @@ function renderPath(){ const path=pathOf(); if(!path.length){ $('#pathBox').inne
   const done=path.map(id=>stepDone(id)), i=done.indexOf(false);
   if(i<0){ $('#pathBox').innerHTML=`<div class="banner" style="cursor:default">🧭 <div><b>${gw('أتممتَ','أتممتِ')} مسار «ابدأ من هنا» 🎉</b><span class="small">${gw('اختر','اختاري')} من القائمة أي نشيد ${gw('تحبّه','تحبّينه')}</span></div></div>`; return; }
   const p=poemById(path[i]), im=thumbOf(p);
-  $('#pathBox').innerHTML=`<div class="banner path" id="pathGo">${im?`<img src="${im}" alt="">`:''}<div style="flex:1;min-width:0"><span class="small">🧭 ابدأ من هنا · الخطوة ${AR(i+1)} من ${AR(path.length)}</span><b>${esc(p.title)}</b><div class="dots">${done.map((d,j)=>`<i class="${d?'on':j===i?'cur':''}"></i>`).join('')}</div><span class="small">${kidAge()&&kidAge()<=7?esc(gw('🦜 ردّد مع ','🦜 ردّدي مع ')+(LS.get('parentName','')||'بابا')+gw('، ثم 🎤 أنشد ليسمعك','، ثم 🎤 أنشدي ليسمعك')):gw('احفظه وأنشده غيباً 🧠 ليختم حفظك، فتنتقل إلى التالي','احفظيه وأنشديه غيباً 🧠 ليختم حفظكِ، فتنتقلي إلى التالي')}</span></div></div>`;
-  $('#pathGo').onclick=()=>openPoem(p.id); }
+  $('#pathBox').innerHTML=`<div class="banner path" id="pathGo">${im?`<img src="${im}" alt="">`:''}<div style="flex:1;min-width:0"><span class="small">🧭 ابدأ من هنا · الخطوة ${AR(i+1)} من ${AR(path.length)}</span><b>${esc(p.title)}</b>${kidAge()&&kidAge()<=7?`<div class="nextPics">${path.slice(i,i+3).map((id,j)=>{ const q=poemById(id), t=thumbOf(q); return t?`<img src="${t}" alt="${esc(q.title)}" class="${j?'':'now'}">`:''; }).join('')}</div>`:`<div class="dots">${done.map((d,j)=>`<i class="${d?'on':j===i?'cur':''}"></i>`).join('')}</div>`}<span class="small">${kidAge()&&kidAge()<=7?esc(gw('🦜 ردّد مع ','🦜 ردّدي مع ')+(LS.get('parentName','')||'بابا')+gw('، ثم 🎤 أنشد ليسمعك','، ثم 🎤 أنشدي ليسمعك')):gw('احفظه وأنشده غيباً 🧠 ليختم حفظك، فتنتقل إلى التالي','احفظيه وأنشديه غيباً 🧠 ليختم حفظكِ، فتنتقلي إلى التالي')}</span></div></div>`;
+  $('#pathGo').onclick=e=>{ if(e.target.closest('#pathEdit')) return; openPoem(p.id); };
+  if(['child','both'].includes(pathBy())){ const b=document.createElement('button'); b.className='btn s'; b.id='pathEdit'; b.textContent=gw('✏️ رتّب مسارك','✏️ رتّبي مسارك'); b.onclick=()=>pathEditor(kid,'child'); $('#pathBox').appendChild(b); } }
 function renderHome(){
   renderPath();
   const w=weekly();
@@ -802,7 +874,7 @@ function renderHome(){
   $('#poets').innerHTML = `<span class="chip ${poetF==='all'?'on':''}" data-p="all">كل الشعراء</span>`+ps.map(p=>`<span class="chip ${poetF===p?'on':''}" data-p="${esc(p)}">${esc(p)}</span>`).join('');
   $$('#poets .chip').forEach(c=>c.onclick=()=>{poetF=c.dataset.p;renderHome()});
   const top=new Set(packFirst()); // a ready-pack poem the parent placed first
-  const list = allPoems().filter(p=>(poetF==='all'||p.poet===poetF) && ageOk(p)).sort((x,y)=>top.has(y.id)-top.has(x.id));
+  const list = allPoems().filter(p=>(poetF==='all'||p.poet===poetF) && ageOk(p) && !kidHidden(p.id)).sort((x,y)=>top.has(y.id)-top.has(x.id));
   $('#grid').innerHTML = list.map(p=>{ const im=thumbOf(p); return `<div class="card" data-id="${esc(p.id)}">${im?`<img class="thumb" src="${im}" alt="" loading="lazy">`:`<div class="thumb ph">${esc((p.title||'؟').trim()[0])}</div>`}<h3>${esc(p.title)}</h3><div class="poet">${esc(p.poet)}</div>
     <div class="meta"><span class="tag">${abyat(p.verses.length)}</span><span class="tag">${AR(p.age[0])}–${AR(p.age[1])}</span>${STORY[p.id]?'<span class="tag">🖼 حكاية</span>':''}<span class="mtag"></span>${badgeHTML(badges(p))}</div></div>`; }).join('') || '<div class="empty">لا شيء هنا</div>';
   $$('#grid .card').forEach(c=>c.onclick=()=>openPoem(c.dataset.id));
@@ -1629,7 +1701,8 @@ async function renderParent(){
   const DAYS=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'], rd=LS.get('restDay',-1);
   $('#restChips').innerHTML=`<span class="chip ${rd<0?'on':''}" data-rd="-1">لا يوم</span>`+DAYS.map((d,i)=>`<span class="chip ${rd===i?'on':''}" data-rd="${i}">${d}</span>`).join('');
   $$('#restChips .chip').forEach(c=>c.onclick=()=>{ LS.set('restDay',+c.dataset.rd); renderParent(); });
-  if(pKid) $('#pKids').insertAdjacentHTML('beforeend',`<span class="small" style="align-self:center">${fem(pKid)?'👧':((own(kidInfo,pKid)&&kidInfo[pKid])||{}).g==='b'?'👦':''} العمر: ${kidAge(pKid)?AR(kidAge(pKid)):'—'}</span><button class="btn s" id="kidAge">العمر والجنس</button><button class="btn s" id="kidLv">📚 المستوى: ${kidLevel(pKid)!==kidAge(pKid)?'مثل عمر '+AR(kidLevel(pKid)):'حسب العمر'}</button>`);
+  if(pKid) $('#pKids').insertAdjacentHTML('beforeend',`<span class="small" style="align-self:center">${fem(pKid)?'👧':((own(kidInfo,pKid)&&kidInfo[pKid])||{}).g==='b'?'👦':''} العمر: ${kidAge(pKid)?AR(kidAge(pKid)):'—'}</span><button class="btn s" id="kidAge">العمر والجنس</button><button class="btn s" id="kidPath">🗺 المسار والأناشيد</button><button class="btn s" id="kidLv">📚 المستوى: ${kidLevel(pKid)!==kidAge(pKid)?'مثل عمر '+AR(kidLevel(pKid)):'حسب العمر'}</button>`);
+  if($('#kidPath')) $('#kidPath').onclick=()=>pathEditor(pKid, actor&&actor.role==='teacher'?'teacher':'parent');
   if($('#kidLv')) $('#kidLv').onclick=()=>{ const i=kidInfo[pKid] ||= {}; openSheet(`<h3>مستوى أناشيد ${esc(pKid)}</h3><p class="small">يحدّد الأناشيد المعروضة ومسار «ابدأ من هنا». أما طول المقطع وطريقة الكلام فتبقى حسب العمر.</p>
       <div class="ages"><button class="btn ${i.lv?'':'p'}" data-l="0">حسب العمر</button>${[6,7,8,9,10,11,12].map(a=>`<button class="btn ${i.lv===a?'p':''}" data-l="${a}">مثل ${AR(a)}</button>`).join('')}</div>`);
     $$('#sheet [data-l]').forEach(b=>b.onclick=()=>{ const v=+b.dataset.l; if(v) i.lv=v; else delete i.lv; LS.set('kidInfo',kidInfo); closeSheet(); if(pKid===kid) applyKidPrefs(); renderParent(); }); };
@@ -1656,7 +1729,7 @@ function segName(r){ r={...r, seg:recSegOf(r)}; const p=poemById(r.poem); if(!p)
 // the parent listens, and decides: 🧠 is the parent's stamp, not the app's guess
 async function renderQueue(){
   const rank=r=>r.memCand?0:r.review?1:2;
-  const all=(await recMeta()).filter(r=>!r.model && !r.praise && !r.stamp && kids.includes(r.who)).sort((a,b)=>rank(a)-rank(b) || b.when-a.when);
+  const all=(await recMeta()).filter(r=>!r.model && !r.praise && !r.stamp && (kids.includes(r.who)||r.inbox)).sort((a,b)=>rank(a)-rank(b) || b.when-a.when);
   if(!all.length){ $('#pQueue').innerHTML=''; return; }
   // the echo sessions of the youngest are long and mostly the model's voice: they wait folded below the takes to judge
   const main=all.filter(r=>!r.echo), echo=all.filter(r=>r.echo), list=main.slice(0,8), shown=list.concat(echo.slice(0,8));
@@ -1681,7 +1754,8 @@ async function renderQueue(){
         const wv=el.querySelector('.wv'); wv.style.display=''; wv.innerHTML='<div class="small">المس البيت الذي تعثّر فيه (إن وُجد):</div>'+[...Array(vb-va)].map((_,k)=>`<span class="chip" data-v="${va+k}">${AR(va+k+1)} ${esc(p.verses[va+k][0].split(' ').slice(0,3).join(' '))}…</span>`).join('');
         wv.querySelectorAll('[data-v]').forEach(c=>c.onclick=()=>c.classList.toggle('on')); } };
     sts.forEach(b=>b.onclick=async()=>{ if(b.disabled) return; const stamp=b.dataset.st, weak=[...el.querySelectorAll('.wv .chip.on')].map(c=>+c.dataset.v);
-      const by=actor?actor.name:''; if(!await recPatch(r.id,{stamp,stampAt:Date.now(),weak,...(by?{by}:{})})) return toast('تعذّر الحفظ'); stampEffects({...r,by},stamp,weak);
+      const by=r.inbox&&iAmTeacher()?iAmTeacher().name:actor?actor.name:''; if(!await recPatch(r.id,{stamp,stampAt:Date.now(),weak,...(by?{by}:{})})) return toast('تعذّر الحفظ');
+      if(r.inbox){ LS.set('tOut',[...teacherOutbox().filter(x=>!(x.src===r.inbox.src&&x.rid===r.inbox.rid)),{src:r.inbox.src,rid:r.inbox.rid,stamp,weak,at:Date.now()}]); } else stampEffects({...r,by},stamp,weak);
       toast({ok:kidAge(r.who)&&kidAge(r.who)<=8?'خُتم الحفظ ✓ والمراجعة غداً':'خُتم الحفظ ✓ والمراجعة بعد ٣ أيام',okw:'خُتم الحفظ ✓ والمراجعة غداً',again:'سيظهر في مراجعة الغد',rok:'المراجعة ثابتة ✓ والقادمة بعد أيام أطول',rweak:'سيعود إلى مراجعة الغد',eok:'أتقن الترديد ✓',heard:'وصلته رسالتك 👂'}[stamp]||'✓'); renderParent(); }); });
 }
 // what the parent's stamp does: memorised, reviewed, echo mastered, or just «I heard you»
@@ -1813,8 +1887,9 @@ function cleanRec(x){ const {b64,id,size,...r}=x; ['dur','when','loud'].forEach(
   r.marks=Array.isArray(r.marks)?r.marks.filter(m=>Array.isArray(m)).slice(0,500).map(m=>[Math.max(0,Math.floor(num(m[0]))),num(m[1]),num(m[2])?1:0]):[];
   // only the fields the app knows travel: a strange backup cannot fill the list of recordings with anything else
   if(typeof r.by==='string') r.by=r.by.slice(0,40); else delete r.by;
+  if(!(r.inbox&&typeof r.inbox==='object'&&/^[0-9a-f]{24}$/.test(r.inbox.src||'')&&Number.isFinite(+r.inbox.rid))) delete r.inbox; else r.inbox={src:r.inbox.src,rid:+r.inbox.rid,family:String(r.inbox.family||'').slice(0,40)};
   return Object.fromEntries(Object.entries(r).filter(([k])=>REC_FIELDS.has(k))); }
-const REC_FIELDS=new Set(['poem','title','who','when','dur','type','lvl','seg','range','model','praise','echo','memCand','review','stamp','stampAt','weak','marks','loud','by']);
+const REC_FIELDS=new Set(['poem','title','who','when','dur','type','lvl','seg','range','model','praise','echo','memCand','review','stamp','stampAt','weak','marks','loud','by','inbox']);
 // «نصوصي»: only the poems the parent typed, to carry to another device without typing them again
 $('#txExport').onclick=()=>{ if(!added.length) return toast('لا أناشيد مكتوبة بعد');
   const o={app:'anasheed',kind:'texts',v:1,poems:added.map(p=>({title:p.title,poet:p.poet,age:p.age0||p.age,verses:p.verses}))};
@@ -1829,11 +1904,14 @@ $('#txImport').onchange=async e=>{ const f=e.target.files[0]; e.target.value='';
   toast(n?`أُضيف ${AR(n)} من نصوصك ✓${same?' (و'+AR(same)+' موجود من قبل)':''}`:'كل هذه النصوص موجودة من قبل',4000); };
 $('#aImportBtn').onclick=async()=>{ if(!await parentGate()) return; $('#aImport').click(); };
 $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value=''; if(!fs.length) return;
-  let nOk=0, nFail=0, nSkip=0, bad=0, damaged=0, texts=0, any=false, crash=''; const groups={};
+  let nOk=0, nFail=0, nSkip=0, bad=0, damaged=0, texts=0, special='', any=false, crash=''; const groups={};
   try{
   const have=new Set((await recMeta()).map(x=>x.who+'|'+x.poem+'|'+x.when));
   for(const f of fs){ let o, txt=''; try{ txt=await f.text(); o=JSON.parse(txt); }catch(x){ if(/^\s*\{"app":"anasheed"/.test(txt)) damaged++; else bad++; continue; }
     if(o && o.app==='anasheed' && o.kind==='texts'){ texts++; continue; }
+    if(o && o.app==='anasheed' && o.kind==='teacherKey'){ if(okName(o.name)&&/^[0-9a-f]{8,64}$/.test(o.secret||'')){ LS.set('iAmTeacher',{name:String(o.name).trim(),secret:o.secret}); special=`أهلاً ${String(o.name).trim()} 👩‍🏫: صار هذا التطبيق تطبيقكِ للحكم على تسجيلات الطلاب`; } continue; }
+    if(o && o.app==='anasheed' && o.kind==='takes'){ await receiveTakes(o); special=' '; continue; }
+    if(o && o.app==='anasheed' && o.kind==='stamps'){ await receiveStamps(o); special=' '; continue; }
     if(!o || typeof o!=='object' || o.app!=='anasheed'){ bad++; continue; } any=true;
     if(o.backup){ const g=(groups[String(o.backup)] ||= {parts:new Set(),last:0}); g.parts.add(num(o.part)); if(o.last===true) g.last=num(o.part); }
     if(Array.isArray(o.added)) for(const a of o.added){ if(validPoem(a) && okKey(String(a.id)) && !added.some(b=>b.id===String(a.id)) && !POEMS.some(p=>String(p.id)===String(a.id))) added.push(cleanPoem(a)); }
@@ -1841,7 +1919,9 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
     if(Array.isArray(o.kids)) for(const k of o.kids){ if(okName(k) && !kids.includes(k.trim())) kids.push(k.trim()); }
     if(o.kidInfo && typeof o.kidInfo==='object') for(const [k,v] of Object.entries(o.kidInfo)){ if(!okName(k) || own(kidInfo,k) || !v || typeof v!=='object') continue; const x={};
       // the ages the app offers (5–12); the gender and the level travel even without an age
-      if(num(v.age)) x.age=Math.max(5,Math.min(12,Math.round(num(v.age)))); if(v.g==='g'||v.g==='b') x.g=v.g; if(Number.isInteger(v.lv)&&v.lv>=5&&v.lv<=12) x.lv=v.lv; if(Object.keys(x).length) kidInfo[k]=x; }
+      if(num(v.age)) x.age=Math.max(5,Math.min(12,Math.round(num(v.age)))); if(v.g==='g'||v.g==='b') x.g=v.g; if(Number.isInteger(v.lv)&&v.lv>=5&&v.lv<=12) x.lv=v.lv;
+      for(const f of ['path','hide']) if(Array.isArray(v[f])) x[f]=v[f].filter(id=>typeof id==='string'&&id.length<40).slice(0,200); if(['parent','teacher','child','both'].includes(v.pathBy)) x.pathBy=v.pathBy;
+      if(Object.keys(x).length) kidInfo[k]=x; }
     // the adults (hashed PINs, the teacher's code) and the day off come along when this device has none yet
     if(Array.isArray(o.adults) && !adults.length){ adults=o.adults.filter(a=>a&&typeof a==='object'&&okName(a.name)&&(a.role==='parent'||a.role==='teacher')).slice(0,10).map(a=>({role:a.role,name:String(a.name).trim(),...(typeof a.pin==='string'&&/^[0-9a-f]{64}$/.test(a.pin)&&typeof a.salt==='string'?{pin:a.pin,salt:a.salt.slice(0,40)}:{}),...(typeof a.secret==='string'&&/^[0-9a-f]{8,64}$/.test(a.secret)?{secret:a.secret}:{})})); saveAdults(); }
     if(Number.isInteger(o.restDay) && o.restDay>=-1 && o.restDay<=6 && LS.get('restDay',-1)<0) LS.set('restDay',o.restDay);
@@ -1853,6 +1933,7 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
         if(await recPut(Object.assign(rest,{blob:new Blob([u],{type:rest.type})}))!=null){ nOk++; have.add(key); } else nFail++; }catch(err){ nFail++; } } }
   }catch(err){ crash=String(err&&err.message||err).slice(0,80); }
   // whatever was merged before a failure is kept, never left half-written in memory
+  if(!any && !crash && special) return special.trim()&&toast(special,5000);
   if(!any && !crash) return toast(texts?'هذا ملف «نصوصي»: استورده من زر «📂 استورد نصوصي» في «أناشيد إضافية»':damaged?'ملف النسخة تالف أو ناقص (ربما انقطع تنزيله). صدّر النسخة مرة أخرى من الجهاز الأول':bad?'هذا ليس ملف نسخة احتياطية من «أنشودتي»':'لم يُستورد شيء',6000);
   applyPacks(); LS.set('added',added); LS.set('kids',kids); LS.set('kidInfo',kidInfo); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome();
   const missing=[]; for(const g of Object.values(groups)){ const max=g.last||Math.max(...g.parts); for(let i=1;i<=max;i++) if(!g.parts.has(i)) missing.push(i); if(!g.last) missing.push(max+1); }

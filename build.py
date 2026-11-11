@@ -149,6 +149,18 @@ for pid, b in bayt.items():
     p = next((x for x in poems if x['id'] == pid), None)
     assert p and b.get('idea') and len(b['v']) == len(p['verses']) and all(isinstance(x, str) and x.strip() for x in b['v']), f'bayt.json: {pid} does not match its verses'
 assert set(paths) == {'young', 'old'} and all(any(p['id'] == i for p in poems) for v in paths.values() for i in v), 'paths.json: unknown poem id'
+# the path is graded: the poems of each band from the easiest to the hardest — fewer verses, fewer hard words, shorter lines first.
+# paths.json says which poems are in each band; "first" may pin the opening poems (a short one every child knows).
+def difficulty(pid):
+    p = next(x for x in poems if x['id'] == pid)
+    words = [key(w) for v in p['verses'] for h in v for w in h.split()]
+    hard = sum(1 for w in set(words) if w in G)
+    return len(p['verses']) + 0.6 * hard + 0.05 * len(words) / max(1, len(p['verses']))
+path_first = {k: v for k, v in json.load(open(P('content', 'paths.json'), encoding='utf-8')).get('_first', {}).items()}
+for band, ids_ in paths.items():
+    pinned = [i for i in path_first.get(band, []) if i in ids_]
+    paths[band] = pinned + sorted([i for i in ids_ if i not in pinned], key=difficulty)
+print('path order: ' + ' | '.join(f"{b}: {' '.join(v[:6])}…" for b, v in paths.items()), file=sys.stderr)
 G.update(OVR)
 for k, v in G_PARENT.items():
     G.setdefault(k, v)

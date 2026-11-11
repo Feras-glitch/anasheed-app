@@ -40,11 +40,11 @@ async def main():
         txt = await pg.text_content('#pathBox')
         n_young = await pg.evaluate('AR(PATHS.young.length)')
         first = await pg.evaluate("poemById(PATHS.young[0]).title")
-        check(await pg.evaluate("PATHS.young[0]") == '٧' and f'الخطوة ١ من {n_young}' in txt and first in txt, f'age 7: the path starts with the shortest, most familiar poem ({first})')
+        check(await pg.evaluate("PATHS.young[0]") == '١٦' and f'الخطوة ١ من {n_young}' in txt and first in txt, f'age 7: the path starts with the shortest, most familiar poem ({first})')
         await pg.evaluate("st(PATHS.young[0]).star=1; saveS(); renderHome()")
         check(f'الخطوة ١ من {n_young}' in await pg.text_content('#pathBox'), 'a ⭐ alone does not move the path (it is practice)')
         await pg.evaluate("(()=>{ const p=poemById(PATHS.young[0]), sg=segments(p); st(p.id).mem=[sg.length>1?sg.length:0]; saveS(); renderHome(); })()")
-        check(f'الخطوة ٢ من {n_young}' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .dots i.on').count() == 1, 'the poem memorised (🧠) moves the path to the next step')
+        check(f'الخطوة ٢ من {n_young}' in await pg.text_content('#pathBox') and await pg.locator('#pathBox .nextPics img.now').count() == 1, 'the poem memorised (🧠) moves the path to the next step (a seven-year-old sees the next poems as pictures)')
         await pg.click('#pathGo'); await pg.wait_for_timeout(300)
         check(await pg.evaluate('cur.id') == await pg.evaluate('PATHS.young[1]'), 'the path opens its next poem')
         await pg.evaluate("st(PATHS.young[0]).mem=[]; st(PATHS.young[0]).star=0; saveS(); renderHome()")  # the album test below starts from nothing
