@@ -106,7 +106,7 @@ async def main():
         # the level cannot be switched to the full text mid-take
         await pg.click('#recBtn'); await pg.wait_for_timeout(700); await pg.click('#lvlBox .chip[data-l="1"]'); await pg.wait_for_timeout(100)
         check(await pg.evaluate('level') == 4, 'level locked while recording')
-        await pg.wait_for_timeout(12800); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
+        await pg.wait_for_timeout(25500); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(500)
         txt = await pg.text_content('#sheet')
         check('محاولةً غيباً 🧠' in txt, 'celebration names the level reached, without praising a memorisation nobody has heard yet')

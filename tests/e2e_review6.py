@@ -223,6 +223,12 @@ async def main():
         check(await pg.evaluate("tabLocked") is False, 'another window does not lock this one in the middle of a take')
         await pg.evaluate("rec=window.__r; clearTimeout(lockTab.t); show('home')")
 
+        # ---- «أكمل البيت» asks five verses when the poem has them; a take from memory needs about 3 s a verse ----
+        await pg.evaluate("closeSheet(); setKid('كريم'); closeSheet(); openPoem('٣٠'); closeSheet(); goSeg(0); qEasy=false; mode='quiz'; startQuiz('complete')")
+        r = json.loads(await pg.evaluate("JSON.stringify([qs.length, rng(), cur.verses.length])"))
+        check(r[0] == 5 and r[1][1] - r[1][0] < 5, f'a short segment is quizzed on five verses, the others from the poem {r}')
+        check(await pg.evaluate("MEM_SEC") == 3, 'a take from memory needs about 3 s a verse')
+
         # ---- the service worker keeps pictures across versions ----
         sw = open('www/sw.js', encoding='utf-8').read()
         check("IMG='anasheed-img'" in sw and "mode==='navigate'" in sw, 'pictures live in a lasting cache; the page fallback is for pages only')

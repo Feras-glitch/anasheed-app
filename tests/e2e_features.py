@@ -296,7 +296,7 @@ async def main():
         # ---- certificate after memorising ----
         await pg.click('#back'); await pg.click('#grid .card[data-id="١٦"]'); await pg.wait_for_timeout(300)
         await pg.click('#modeSing'); await pg.click('#lvlBox .chip[data-l="4"]')
-        await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
+        await pg.click('#recBtn'); await pg.wait_for_timeout(13000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(600)
         check('تنتظر أن' in await pg.text_content('#sheet') and await pg.locator('#celCert').count() == 0, 'a take from memory waits for the parent\'s stamp')
         await pg.click('#sheet button:has-text("تمام")')
@@ -324,7 +324,7 @@ async def main():
         await pg.click('#back'); await pg.wait_for_timeout(300)
         check(await pg.locator('#reviewBox [data-rv="١٦"]').count() == 1, 'a memorised poem comes back for review on its day')
         await pg.click('#reviewBox [data-rv="١٦"]'); await pg.wait_for_timeout(400)
-        await pg.click('#recBtn'); await pg.wait_for_timeout(7000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
+        await pg.click('#recBtn'); await pg.wait_for_timeout(13000); await pg.click('#recBtn'); await pg.wait_for_timeout(600)
         await pg.click('#keep'); await pg.wait_for_timeout(600)
         r_ok = await pg.evaluate("st('١٦').rev[0].step===0 && (st('١٦').rpend||[]).includes(0) && !reviewsDue('١٦').includes(0)")  # seven: the first review was tomorrow (step 0)
         check(r_ok, 'a review from memory waits for the parent\'s ear, and is not asked again meanwhile')
@@ -339,7 +339,7 @@ async def main():
         # ---- character album: a memorised picture story opens its sticker ----
         await pg.click('#back'); await pg.wait_for_timeout(900); await pg.evaluate('closeSheet()')
         n_alb = await pg.evaluate('Object.keys(ALBUM).length'); n_alb_ar = await pg.evaluate('AR(Object.keys(ALBUM).length)')
-        check(f'٠ من {n_alb_ar}' in await pg.text_content('#albumBar'), 'home shows the album: nothing collected yet')
+        check((await pg.text_content('#albumBar')).strip() == '', 'no album of empty locks: it appears with the first sticker')
         await pg.evaluate("st('٧').mem=[segments(poemById('٧')).length]; saveS(); pushNews(kid,{t:'mem',poem:'٧',cert:true}); renderHome(); showNews()"); await pg.wait_for_timeout(400)
         check(await pg.locator('#sheet img').count() == 1 and 'ملصق جديد' in await pg.text_content('#sheet'), 'the parent\'s stamp on a picture story brings a new sticker')
         await pg.click('#newsAlbum'); await pg.wait_for_timeout(400)

@@ -537,6 +537,7 @@ if(!LS.get('segZ2',false)){ for(const [k,o] of Object.entries(S)) if(o&&typeof o
 // the segment of a poem that a range of verses is, for one child: the whole poem in one go is the segment after the last
 function segOf(p,k,a,b){ const sg=segments(p,k), n=p.verses.length; if(sg.length<2) return a===0&&b===n ? 0 : -1; if(a===0&&b===n) return sg.length; return sg.findIndex(x=>x[0]===a&&x[1]===b); }
 const recSegOf = r => { const p=poemById(r.poem); if(!p||!Array.isArray(r.range)) return r.seg; const g=segOf(p,r.who,r.range[0],r.range[1]); return g<0 ? r.seg : g; };
+const MEM_SEC=3; // seconds per verse at least, for a take to count as an attempt from memory
 const REVIEW_DAYS=[1,3,7,21,60];
 const RPEND_DAYS=3; // a review take the parent has not heard in three days no longer hides the review: the child keeps retrieving
 function reviewsDue(pid,k=kid){ const s=(own(S,k||'—')&&S[k||'—']||{})[pid]||{}, r=s.rev||{}, at=s.rpendAt||{}, wait=(s.rpend||[]).filter(g=>num(at[g])>Date.now()-RPEND_DAYS*864e5);
@@ -815,8 +816,8 @@ $$('#ages .chip').forEach(c=>c.onclick=()=>{ $('#ages .on').classList.remove('on
 const albumIds = () => Object.keys(ALBUM).filter(id=>poemById(id));
 const albumHave = (k=kid) => albumIds().filter(id=>badges(poemById(id),k).mem);
 const albumImg = id => IMAGES['@album:'+id];
-function renderAlbumBar(){ const ids=albumIds(); if(!ids.length || !kid){ $('#albumBar').innerHTML=''; return; }
-  const have=albumHave(), seen=new Set(LS.get('albumSeen',{})[kid]||[]), fresh=have.some(id=>!seen.has(id));
+function renderAlbumBar(){ const ids=albumIds(), have=kid?albumHave():[]; if(!ids.length || !kid || !have.length){ $('#albumBar').innerHTML=''; return; } // no album of empty locks: it appears with the first sticker
+  const seen=new Set(LS.get('albumSeen',{})[kid]||[]), fresh=have.some(id=>!seen.has(id));
   $('#albumBar').innerHTML=`<div class="banner albumBar" id="goAlbum">📒 <b>ألبوم الشخصيات</b><span class="small">${AR(have.length)} من ${AR(ids.length)}</span>${have.slice(-4).map(id=>`<img src="${albumImg(id)}" alt="">`).join('')}${fresh?'<span class="tag">✨ جديد</span>':''}</div>`;
   $('#goAlbum').onclick=()=>{ renderAlbum(); show('album'); }; }
 function renderAlbum(){ const ids=albumIds(), have=new Set(albumHave()), all=LS.get('albumSeen',{}), seen=new Set(all[kid]||[]);
@@ -1029,7 +1030,7 @@ $('#recBtn').onclick = async ()=>{
         if(!okName(who)){ toast(gw('اختر اسماً آخر','اختاري اسماً آخر')); return $('#who').focus(); }
         busy=true; $('#keep').disabled=true;
         // a real recitation from memory: the whole segment, long enough, and loud enough to be heard
-        const memOk = !model && recLvl===4 && dur>=Math.max(3,(rB-rA)*1.5) && loud>=0.08;
+        const memOk = !model && recLvl===4 && dur>=Math.max(4,(rB-rA)*MEM_SEC) && loud>=0.08;
         // the segment is counted for the child the take is saved for (their segments may differ), and a memorised one is a review only when it is due
         const wSeg = model ? recSeg : segOf(rp,who,rA,rB), sw=(own(KS(who),rp.id)&&KS(who)[rp.id])||{}, known=wSeg>=0&&(sw.mem||[]).includes(wSeg);
         const isReview = memOk && known && reviewsDue(rp.id,who).includes(wSeg), isNew = memOk && wSeg>=0 && !known;
@@ -1474,7 +1475,7 @@ function quizMenu(){ clearTimeout(qTimer); stopPlay();
   const [a,b]=rng(); const canOrder=b-a>=3; const hasWords=segWords().length>0;
   if(qEasy===null) qEasy = kidAge()? kidAge()<=8 : cur.age[0]<=7;
   const s=st(cur.id), done=new Set(passedTypes({qz:((s.qzs||{})[String(seg)])||{}})), tick=t=>done.has(t)?' ✓':'';
-  const starLine = (s.star ? `⭐ ${gw('نلتَ','نلتِ')} النجمة في هذا النشيد` : `⭐ النجمة لمن ينجح في نوعين مختلفين من الاختبار${done.size?` — ${gw('نجحتَ','نجحتِ')} في ${AR(done.size)} من ٢ في هذا المقطع`:''}`)+'<br>تُحسب أول محاولة لكل اختبار في اليوم';
+  const starLine = (s.star ? `⭐ ${gw('نلتَ','نلتِ')} النجمة في هذا النشيد` : `⭐ النجمة لمن ينجح في نوعين مختلفين من الاختبار${done.size?` — ${gw('نجحتَ','نجحتِ')} في ${AR(done.size)} من ٢ في هذا المقطع`:''}`)+(kidAge()&&kidAge()<=8?'':'<br>تُحسب أول محاولة لكل اختبار في اليوم');
   const pr=t=>typeCounts(t) && !(t==='order' && !orderFair()) ? '' : ' <span class="small">(تدريب)</span>';
   $('#quizBox').innerHTML=`<div class="chips" style="justify-content:center"><span class="chip ${qEasy?'on':''}" data-e="1">🐣 سهل</span><span class="chip ${qEasy?'':'on'}" data-e="0">🦅 عادي</span></div><div class="menu"><button class="btn v" data-q="complete">${QTL('complete')}${tick('complete')}${pr('complete')}</button>${hasWords?`<button class="btn g" data-q="meaning">${QTL('meaning')}${tick('meaning')}</button>`:''}${canOrder?`<button class="btn p" data-q="order">${QTL('order')}${tick('order')}${pr('order')}</button>`:''}${senseIdx().length>=3?`<button class="btn v" data-q="sense">${QTL('sense')}${tick('sense')}${pr('sense')}</button>`:''}</div><p class="small" id="starLine" style="text-align:center">${starLine}</p>`+(segs.length>1?'<p class="small" style="text-align:center">الأسئلة من المقطع المختار فقط</p>':'');
   $$('#quizBox [data-q]').forEach(b=>b.onclick=()=>startQuiz(b.dataset.q));
@@ -1512,7 +1513,10 @@ function startQuiz(t){ clearTimeout(qTimer);
   // a refrain repeats the same verse: ask it once
   const once=(is,f)=>{ const seen=new Set(); return is.filter(i=>{ const k=f(i); if(seen.has(k)) return false; seen.add(k); return true; }); };
   if(t==='sense') qs=shuffle(once(senseIdx(),i=>BAYT[cur.id].v[i])).slice(0,5);
-  if(t==='complete'){ const all=once(idx,i=>cur.verses[i].join('|')); const whole=all.filter(i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1])); const wk=st(cur.id).weak||{}, pool=whole.length>=3?whole:all; qs=[...shuffle(pool.filter(i=>num(wk[i])>0)),...shuffle(pool.filter(i=>!(num(wk[i])>0)))].slice(0,5); }
+  if(t==='complete'){ const all=once(idx,i=>cur.verses[i].join('|')); const whole=all.filter(i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1])); const wk=st(cur.id).weak||{}, pool=whole.length>=3?whole:all; qs=[...shuffle(pool.filter(i=>num(wk[i])>0)),...shuffle(pool.filter(i=>!(num(wk[i])>0)))].slice(0,5);
+    if(qs.length<5){ const ok=i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1]), have=new Set(qs.map(i=>cur.verses[i].join('|')));
+      // a short segment: the verses before it first (already learned: their retrieval is review), then the ones after, up to five
+      for(const i of [...shuffle([...Array(a).keys()]), ...shuffle([...Array(cur.verses.length-b).keys()].map(j=>b+j))]){ if(qs.length>=5) break; const k=cur.verses[i].join('|'); if(ok(i)&&!have.has(k)){ have.add(k); qs.push(i); } } const w0=qs.filter(i=>num(wk[i])>0); qs=[...w0,...shuffle(qs.filter(i=>!w0.includes(i)))]; } }
   if(t==='meaning'){ const ws=segWords(); const withImg=shuffle(ws.filter(x=>IMG(x.k,x.i)));
     // easy: pictures only when there are enough of them — a child who cannot read cannot pick a written meaning
     if(qEasy && withImg.length>=3) qs=withImg.slice(0,5);
