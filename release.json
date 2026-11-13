@@ -1,0 +1,11 @@
+{
+ "uninstall_debug": "Success",
+ "install_previous": "Performing Streamed Install\nSuccess",
+ "previous_version": "1.0.66",
+ "previous_starts": true,
+ "install": "Performing Streamed Install\nSuccess",
+ "version": "1.0.67",
+ "starts": true,
+ "focus": "com.feras.anasheed/com.feras.anasheed.MainActivity",
+ "pid": "4900"
+}
