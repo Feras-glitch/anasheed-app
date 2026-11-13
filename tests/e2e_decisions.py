@@ -166,6 +166,8 @@ async def main():
 
         # ---- a picture whose meaning is its own name does not count; one arrangement is asked once ----
         await pg.evaluate("openPoem('٧')"); await pg.wait_for_timeout(300)
+        # (a six-year-old is asked picture questions only where the parent's voice can say them: the counting rule is checked as for a reader)
+        await pg.evaluate("document.body.classList.remove('prereader')")
         await pg.click('#modeQuiz'); await pg.wait_for_timeout(100)
         check(await pg.evaluate("trivialPic('الثعبان',2)") is False, '«الثعبان: الحيّة الكبيرة» is a real question')
         await pg.click('#quizBox [data-q="meaning"]'); await pg.wait_for_timeout(100)

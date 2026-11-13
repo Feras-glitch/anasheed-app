@@ -183,7 +183,7 @@ for name, k in packs.items():
     assert not set(k.get('path', [])) - {'young', 'old'}, f'packs.json: {name}: path is young/old'
     # the fields the app reads as they are: a wrong shape would only fail on a child's tap
     assert isinstance(k.get('age', [6, 12]), list) and len(k.get('age', [6, 12])) == 2 and all(isinstance(a, int) and 5 <= a <= 12 for a in k.get('age', [6, 12])) and k.get('age', [6, 12])[0] <= k.get('age', [6, 12])[1], f'packs.json: {name}: age is [from, to] within 5–12'
-    assert all(isinstance(k.get(f, ''), str) for f in ('how', 'poet', 'idea')), f'packs.json: {name}: how, poet and idea are text'
+    assert all(isinstance(k.get(f, ''), str) for f in ('how', 'poet', 'idea', 'adultNote')), f'packs.json: {name}: how, poet, idea and adultNote are text'
     assert all(isinstance(k.get(f, []), list) and all(isinstance(x, str) and x.strip() for x in k.get(f, [])) for f in ('lessons', 'acts')), f'packs.json: {name}: lessons and acts are lists of text'
     assert 'tale' not in k or (isinstance(k['tale'].get('title'), str) and isinstance(k['tale'].get('text'), list) and all(isinstance(x, str) for x in k['tale']['text'])), f'packs.json: {name}: tale has a title and a list of paragraphs'
     # keys are compared after the app's normalisation (no hamza forms, ة→ه, ى→ي): a key written otherwise would never match
@@ -200,9 +200,25 @@ for name, k in packs.items():
             assert all(len(wm) == 2 and wm[1].strip() for wm in pt.get('words', [])), f'packs.json: {name}: «{pt["title"]}»: a word without meaning'
         assert all(g.get('h') and g.get('a') for g in ls.get('book', [])), f'packs.json: {name}: textbook answers need a heading'
     k['story'] = [dict(s, img='data:image/jpeg;base64,' + base64.b64encode(open(P(s['img']), 'rb').read()).decode()) for s in k.get('story', [])]
-# no three words in a row from a protected poem: checked when the parent's private texts are on this machine (never in git)
+# no three words in a row from a protected poem, anywhere in the repository: checked on every build against the poems'
+# fingerprints (content/fingerprints.json: hashes, no words); only the place is named, never the words
+sys.path.insert(0, P('tools')); import textcheck
+fpf = P('content', 'fingerprints.json')
+FP = json.load(open(fpf, encoding='utf-8')) if os.path.exists(fpf) else {}
+fps, salt = FP.get('packs', {}), FP.get('_salt', '')
+assert all(isinstance(h, list) and all(isinstance(x, str) and re.fullmatch('[0-9a-f]{16}', x) for x in h) for h in fps.values()) and (not fps or re.fullmatch('[0-9a-f]{32}', salt)), 'fingerprints.json: bad shape'
+for name, k in packs.items():
+    if name in fps:
+        hits = textcheck.check_fp(k, fps[name], salt)
+        assert not hits, f'packs.json: {name}: three words in a row from the poem in ' + ', '.join(f'{w} ({c})' for w, c in hits[:12])
+hits = textcheck.scan(P(), fps, salt, P('content', 'packs.json')) if fps else []
+assert not hits, 'three words in a row from a protected poem in: ' + ', '.join(f'{f} ({n}: {c})' for f, n, c in hits[:12])
+no_fp = [n for n in packs if n not in fps]
+if no_fp:
+    assert not FP.get('_strict'), f'fingerprints.json is strict: no fingerprints for {", ".join(no_fp)} (python3 tools/textcheck.py --fingerprints نصوصي.json)'
+    print(('::warning::' if os.environ.get('GITHUB_ACTIONS') else '⚠️ ') + f'no fingerprints yet for {len(no_fp)} of {len(packs)} packs ({", ".join(no_fp)}): the copy guard covers them only where private/ holds their texts', file=sys.stderr)
+# and directly against the texts, when the parent's private texts are on this machine (never in git)
 if os.path.isdir(P('private')):
-    sys.path.insert(0, P('tools')); import textcheck
     hits = {n: h for n, h in textcheck.run({k: v for k, v in packs.items()}, P('private')).items() if h}
     assert not hits, 'packs.json: words copied from the poem: ' + '; '.join(f'{n} {w} «{g}»' for n, h in hits.items() for w, g in h[:5])
 # «ما معنى البيت؟»: two wrong meanings per verse, about that verse itself, so the words of the verse do not give the answer away
@@ -312,16 +328,23 @@ self.addEventListener('install',e=>{{e.waitUntil(Promise.all([
   // a picture already kept is not fetched again; one that fails does not stop the others
   caches.open(IMG).then(c=>Promise.all(PICS.map(f=>c.match(f).then(r=>r||fetch(f).then(x=>x.ok?c.put(f,x):0).catch(()=>0)))))
 ]));self.skipWaiting()}});
+// the pictures of this version and of the one before it are kept: a page of the old version still open (offline) shows its own
+const LIST=new URL('__pics__',self.registration.scope).href, abs=f=>new URL(f,self.registration.scope).href;
 self.addEventListener('activate',e=>{{e.waitUntil(Promise.all([
   caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('anasheed-')&&k!==C&&k!==IMG).map(k=>caches.delete(k)))),
-  caches.open(IMG).then(c=>c.keys().then(rs=>{{const keep=new Set(PICS.map(f=>new URL(f,self.registration.scope).href));return Promise.all(rs.filter(r=>!keep.has(r.url)).map(r=>c.delete(r)))}}))
+  caches.open(IMG).then(c=>c.match(LIST).then(r=>r?r.json():[]).catch(()=>[]).then(prev=>{{
+    const keep=new Set([...PICS,...(Array.isArray(prev)?prev:[])].map(abs)); keep.add(LIST);
+    return c.keys().then(rs=>Promise.all(rs.filter(r=>!keep.has(r.url)).map(r=>c.delete(r))))
+      .then(()=>c.put(LIST,new Response(JSON.stringify(PICS),{{headers:{{'Content-Type':'application/json'}}}})));
+  }}))
 ]).then(()=>self.clients.claim()))}});
 self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return; const u=new URL(e.request.url);
   // pictures: from the lasting cache first (their names change when they change)
   if(u.origin===location.origin&&u.pathname.includes('/img/')){{e.respondWith(caches.open(IMG).then(c=>c.match(e.request,{{ignoreSearch:true}}).then(r=>r||fetch(e.request).then(x=>{{if(x.ok)c.put(e.request,x.clone());return x}}))));return}}
-  // the rest: network first, but never wait more than 3 s for a slow connection; the page itself falls back to the kept copy
+  // the rest: network first, but never wait more than 3 s for a slow connection; the page itself falls back to the kept copy,
+  // and so does an answer that is not a success (a 404 or 500 from a server being updated is never shown instead of the app)
   const cached=()=>caches.match(e.request,{{ignoreSearch:true}}).then(r=>r||(e.request.mode==='navigate'?caches.match('index.html'):undefined));
-  const net=fetch(e.request).then(r=>{{if(r.ok){{const x=r.clone();caches.open(C).then(c=>c.put(e.request,x))}}return r}});
+  const net=fetch(e.request).then(r=>{{if(r.ok){{const x=r.clone();caches.open(C).then(c=>c.put(e.request,x));return r}}return cached().then(k=>k||r)}});
   e.respondWith(Promise.race([net,new Promise((_,rej)=>setTimeout(rej,3000))]).catch(()=>cached().then(r=>r||net)))}});
 """)
 

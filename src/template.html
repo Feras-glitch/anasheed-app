@@ -340,7 +340,7 @@ const BAYT = /*__BAYT__*/;
 // two wrong meanings for each verse, written about the verse itself (pack lines under «pack:<name>», aligned in applyPacks)
 const BW = /*__BWRONG__*/;
 const PACKS = /*__PACKS__*/;
-const TALES = {}, ACTS = {}, LESSON = {};
+const TALES = {}, ACTS = {}, LESSON = {}, ADULT = {};
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -366,8 +366,10 @@ const localDay = () => Math.floor((Date.now()-new Date().getTimezoneOffset()*6e4
 // Arabic counting: one, two (dual), three to ten (plural), eleven and up (singular accusative)
 const countAr = (n,one,two,few,many) => n===1?one:n===2?two:n<=10?AR(n)+' '+few:AR(n)+' '+many;
 const marrat = n => countAr(n,'مرة واحدة','مرتان','مرات','مرة'), daqaiq = n => countAr(n,'دقيقة واحدة','دقيقتين','دقائق','دقيقة'), tasjeelN = n => countAr(n,'تسجيل واحد','تسجيلان','تسجيلات','تسجيلاً');
-// «… not in any backup»: the verb and adjective agree with the count
-const notIn = n => n>=3&&n<=10 ? 'ليست' : 'ليس', fresh_ = n => n>=3&&n<=10 ? 'جديدة' : 'جديد';
+// «… not in any backup»: the adjective and the verb agree with the count (one, two, three to ten, eleven and up)
+const notIn = n => n===1?'ليس':n===2?'ليسا':'ليست', fresh_ = n => n===1?'جديد':n===2?'جديدان':n<=10?'جديدة':'جديداً';
+// a verb after its counted subject: «ينتظر»، «ينتظران»، «تنتظر»
+const vN = (n,one,two,more) => n===1?one:n===2?two:more;
 const abyatAcc = n => n===1?'بيتاً واحداً':n===2?'بيتين':n<=10?AR(n)+' أبيات':AR(n)+' بيتاً';
 const abyat = n => n===1?'بيت واحد':n===2?'بيتان':n<=10?AR(n)+' أبيات':AR(n)+' بيتاً';
 const fmt = s => { s=Math.floor(s||0); return AR(Math.floor(s/60)+':'+String(s%60).padStart(2,'0')); };
@@ -383,12 +385,17 @@ function showUndo(fn){ const u=$('#undo'); u.style.display=''; clearTimeout(undo
 function hideUndo(){ clearTimeout(undoT); const u=$('#undo'); if(u){ u.style.display='none'; $('#undoBtn').onclick=null; } }
 function toast(m,ms=2400){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),ms); }
 let onSheetClose=null, sheetModal=false;
-function openSheet(html,onClose,modal){ if(onSheetClose){const f=onSheetClose;onSheetClose=null;f()} $('#sheet').innerHTML=html; $('#pop').classList.add('on'); document.body.classList.add('sheetOn'); onSheetClose=onClose||null; sheetModal=!!modal; try{ $('#sheet').focus({preventScroll:true}); }catch(e){} }
+// while a sheet is open, the page behind it is inert (a keyboard or a screen reader stays in the sheet); closing it returns the focus
+let sheetFrom=null;
+const pageInert = on => { for(const el of document.body.children) if(el.id!=='pop' && el.id!=='toast' && el.tagName!=='SCRIPT') el.inert=on; };
+function openSheet(html,onClose,modal){ if(onSheetClose){const f=onSheetClose;onSheetClose=null;f()} if(!$('#pop').classList.contains('on')) sheetFrom=document.activeElement;
+  $('#sheet').innerHTML=html; $('#pop').classList.add('on'); document.body.classList.add('sheetOn'); pageInert(true); onSheetClose=onClose||null; sheetModal=!!modal; try{ $('#sheet').focus({preventScroll:true}); }catch(e){} }
 // chips are tapped like buttons: a keyboard or a switch reaches them too; Esc closes a sheet that may be closed
-new MutationObserver(()=>{ for(const c of document.querySelectorAll('.chip:not([tabindex]),.stk:not([tabindex])')){ c.tabIndex=0; c.setAttribute('role','button'); } }).observe(document.body,{childList:true,subtree:true});
+new MutationObserver(()=>{ for(const c of document.querySelectorAll('.chip:not([tabindex]),.stk:not([tabindex]),.card:not([tabindex]),.banner[id]:not([tabindex])')){ c.tabIndex=0; c.setAttribute('role','button'); } }).observe(document.body,{childList:true,subtree:true});
 document.addEventListener('keydown',e=>{ const t=e.target; if((e.key==='Enter'||e.key===' ') && t && t.getAttribute && t.getAttribute('role')==='button' && t.tagName!=='BUTTON'){ e.preventDefault(); t.click(); }
   else if(e.key==='Escape' && $('#pop').classList.contains('on') && !sheetModal) closeSheet(); });
-function closeSheet(){ $('#pop').classList.remove('on'); document.body.classList.remove('sheetOn'); $$('#sheet audio').forEach(a=>a.pause()); if(onSheetClose){const f=onSheetClose;onSheetClose=null;f()} }
+function closeSheet(){ const was=$('#pop').classList.contains('on'); $('#pop').classList.remove('on'); document.body.classList.remove('sheetOn'); pageInert(false);
+  if(was && sheetFrom && document.contains(sheetFrom) && sheetFrom!==document.body){ try{ sheetFrom.focus({preventScroll:true}); }catch(e){} } if(was) sheetFrom=null; $$('#sheet audio').forEach(a=>a.pause()); if(onSheetClose){const f=onSheetClose;onSheetClose=null;f()} }
 $('#pop').onclick=e=>{ if(e.target.id==='pop' && !sheetModal) closeSheet(); };
 function ask(msg,yes='نعم',danger=true){ return new Promise(res=>{ let done=false; const fin=v=>{if(!done){done=true;res(v)}};
   openSheet(`<p style="font-size:19px;margin-top:0">${esc(msg)}</p><div class="row"><button class="btn ${danger?'d':'p'}" id="askY">${yes}</button><button class="btn" id="askN">إلغاء</button></div>`,()=>fin(false));
@@ -426,23 +433,29 @@ function packMap(p){
     const D=[...Array(n+1)].map(()=>new Array(m+1).fill(0));
     for(let i=1;i<=n;i++) for(let j=1;j<=m;j++) D[i][j]=Math.max(D[i-1][j], D[i][j-1], sc[i-1][j-1]>0 ? D[i-1][j-1]+sc[i-1][j-1] : -1);
     const map=new Array(n).fill(null); for(let i=n,j=m;i>0&&j>0;){ if(sc[i-1][j-1]>0 && D[i][j]===D[i-1][j-1]+sc[i-1][j-1]){ map[i-1]=j-1; i--; j--; } else if(D[i][j]===D[i-1][j]) i--; else j--; }
-    const hits=map.filter(x=>x!==null).length, words=D[n][m], titled=pnorm(p.title).includes(pnorm(k.title));
+    // two verses typed on one line: the line also holds the pack's verse next to its match, when no other line took that verse
+    // and most of that verse's key words are on the line (its meaning, pictures and lesson then come with the line)
+    const taken=new Set(map.filter(x=>x!==null)), cov=map.map(j=>j===null?[]:[j]);
+    map.forEach((j,i)=>{ if(j===null) return; for(const d of [1,-1]) for(let t=j+d; t>=0&&t<m&&!taken.has(t)&&sc[i][t]>=Math.ceil(0.6*K[t].length); t+=d){ if(d>0) cov[i].push(t); else cov[i].unshift(t); taken.add(t); } });
+    const hits=taken.size, words=D[n][m], titled=pnorm(p.title).includes(pnorm(k.title));
     // and how many of the pack's key words appear anywhere in the poem (a parent may type two verses on one line)
     const bag=V.flat(), kw=K.flat(), seen=kw.filter(w=>pHit(bag,w)).length;
     // most of the pack's verses found in order, and most of its key words: a title and a few common words are never enough
     const ok = hits >= (titled ? Math.max(3,Math.ceil(m*0.5)) : Math.max(5,Math.ceil(m*0.75))) && seen >= kw.length*0.5;
-    if(ok && (!best || words>best.words)) best={name,k,map,words,hits};
+    if(ok && (!best || words>best.words)) best={name,k,map,cov,words,hits};
   }
   return best; }
 // a pack taken back: the poem is the parent's own again, with the age they chose
-function unPack(p){ for(const T of [BAYT,BW,LESSONS,ACTS,TALES,LESSON,STORY]) delete T[p.id]; for(const x of Object.keys(meanings)) if(x.startsWith(p.id+'|')) delete meanings[x]; if(Array.isArray(p.age0)) p.age=p.age0.slice(); delete p.pack; }
-function applyPacks(){ for(const p of added){ const m=packMap(p); if(!m){ if(p.pack) unPack(p); continue; } const {name,k,map}=m; p.pack=name; if(k.age) p.age=k.age.slice(); PACKMAP[p.id]=map;
-  BAYT[p.id]={idea:k.idea, v:map.map(j=>j===null?'':k.bayt[j])}; const bw=BW['pack:'+name]; if(bw) BW[p.id]=map.map(j=>j===null?null:bw[j]); else delete BW[p.id];
-  if(k.lessons) LESSONS[p.id]=k.lessons; if(k.acts) ACTS[p.id]=k.acts; if(k.tale) TALES[p.id]=k.tale; if(k.lesson) LESSON[p.id]={L:k.lesson, map};
-  const sc=(k.story||[]).map(s=>({img:s.img, v:map.indexOf(s.v)})).filter(s=>s.v>=0); if(sc.length) STORY[p.id]=sc;
+function unPack(p){ for(const T of [BAYT,BW,LESSONS,ACTS,TALES,LESSON,STORY,PACKMAP,PACKCOV,ADULT]) delete T[p.id]; for(const x of Object.keys(meanings)) if(x.startsWith(p.id+'|')) delete meanings[x]; if(Array.isArray(p.age0)) p.age=p.age0.slice(); delete p.pack; }
+function applyPacks(){ for(const p of added){ const m=packMap(p); if(!m){ if(p.pack) unPack(p); continue; } const {name,k,map,cov}=m; p.pack=name; if(k.age) p.age=k.age.slice(); PACKMAP[p.id]=map; PACKCOV[p.id]=cov;
+  // inv: the typed line that holds each verse of the pack. A line with two verses has both meanings; it is not asked in «ما معنى البيت؟»
+  const inv=[], multi=cov.map((js,i)=>js.length>1?i:-1).filter(i=>i>=0); cov.forEach((js,i)=>js.forEach(j=>{ if(inv[j]===undefined) inv[j]=i; }));
+  BAYT[p.id]={idea:k.idea, v:cov.map(js=>js.map(j=>k.bayt[j]).filter(Boolean).join(' ')), ...(multi.length?{multi}:{})}; const bw=BW['pack:'+name]; if(bw) BW[p.id]=cov.map(js=>js.length===1?bw[js[0]]:null); else delete BW[p.id];
+  if(k.lessons) LESSONS[p.id]=k.lessons; if(k.acts) ACTS[p.id]=k.acts; if(k.tale) TALES[p.id]=k.tale; if(k.lesson) LESSON[p.id]={L:k.lesson, map, inv}; if(k.adultNote) ADULT[p.id]=k.adultNote; else delete ADULT[p.id];
+  const sc=(k.story||[]).map(s=>({img:s.img, v:inv[s.v]??-1})).filter(s=>s.v>=0); if(sc.length) STORY[p.id]=sc; else delete STORY[p.id];
   // a word is found however the parent spells it (ى or ي, with or without hamza, with or without shadda)
   for(const [w,mn] of Object.entries(k.words||{})) for(const x of new Set([w,wkey(w),pnorm(w)])) if(x) meanings[`${p.id}|${x}`]=mn; } }
-const PACKMAP={};
+const PACKMAP={}, PACKCOV={};
 applyPacks();
 const packFirst = band => added.filter(p=>p.pack && (!band ? PACKS[p.pack].first : (PACKS[p.pack].path||[]).includes(band))).map(p=>p.id);
 // a word can mean different things in different poems: "poem:verse|word" > "poem|word" > "word"
@@ -517,8 +530,13 @@ const segSize = (k=kid) => { const a=kidAge(k); return a&&a<=7 ? 3 : a&&a<=9 ? 4
 // the segment size a poem was started with stays with it: a birthday or a corrected age must not move the child's progress
 const okZ = z => z===3||z===4||z===6;
 const segZ = (p,k=kid) => { const o=own(S,okName(k)?k:'—')&&S[okName(k)?k:'—'], x=o&&own(o,p.id)&&o[p.id]; return x&&okZ(x.z) ? x.z : segSize(k); };
-function segments(p,k=kid){ const n=p.verses.length, z=segZ(p,k), one = z===6 ? 12 : z===4 ? 6 : 4; if(n<=one) return [[0,n]];
+// the segments of a poem of n verses at size z (the same rule for any size)
+function segsZ(n,z){ const one = z===6 ? 12 : z===4 ? 6 : 4; if(n<=one) return [[0,n]];
   const out=[]; for(let i=0;i<n;i+=z) out.push([i,Math.min(n,i+z)]); const l=out[out.length-1]; if(out.length>1 && l[1]-l[0]<Math.ceil(z/2)){ out.pop(); out[out.length-1][1]=n; } return out; }
+function segments(p,k=kid){ return segsZ(p.verses.length, segZ(p,k)); }
+// the verses that a list of segment numbers holds at size z (the number after the last is the whole poem in one go)
+const rangesOf = (n,z,list) => { const sg=segsZ(n,z); return (Array.isArray(list)?list:[]).map(g=>g===sg.length&&sg.length>1?[0,n]:sg[g]).filter(Boolean); };
+const okRange = (x,n) => Array.isArray(x)&&x.length===2&&Number.isInteger(x[0])&&Number.isInteger(x[1])&&x[0]>=0&&x[0]<x[1]&&x[1]<=n;
 
 // badges
 const BADGES=[['heard','👂','سمعتُه أو تابعتُه إلى آخره'],['sang','🎤','أنشدتُه'],['quiz','⭐','نجحتُ في اختبارين مختلفين'],['mem','🧠','حفظتُه غيباً']];
@@ -539,7 +557,9 @@ if(!LS.get('segZ2',false)){ for(const [k,o] of Object.entries(S)) if(o&&typeof o
   if((x.rpend||[]).length && !x.rpendAt) x.rpendAt=Object.fromEntries(x.rpend.map(g=>[g,Date.now()])); } saveS(); LS.set('segZ2',true); }
 // the segment of a poem that a range of verses is, for one child: the whole poem in one go is the segment after the last
 function segOf(p,k,a,b){ const sg=segments(p,k), n=p.verses.length; if(sg.length<2) return a===0&&b===n ? 0 : -1; if(a===0&&b===n) return sg.length; return sg.findIndex(x=>x[0]===a&&x[1]===b); }
-const recSegOf = r => { const p=poemById(r.poem); if(!p||!Array.isArray(r.range)) return r.seg; const g=segOf(p,r.who,r.range[0],r.range[1]); return g<0 ? r.seg : g; };
+// a take carries the verses it holds; when they are not exactly one of this child's segments (a take made on another device,
+// with other segments), it counts for no segment: three verses never stand for six
+const recSegOf = r => { const p=poemById(r.poem); if(!p||!Array.isArray(r.range)) return r.seg; return segOf(p,r.who,r.range[0],r.range[1]); };
 const MEM_SEC=3; // seconds per verse at least, for a take to count as an attempt from memory
 const REVIEW_DAYS=[1,3,7,21,60];
 const RPEND_DAYS=3; // a review take the parent has not heard in three days no longer hides the review: the child keeps retrieving
@@ -590,7 +610,8 @@ const fromStore = r => (r && r.buf && !r.blob) ? Object.assign(r,{blob:new Blob(
 const recAll = () => store('rec','readonly',tx=>req2p(tx.objectStore('rec').getAll())).then(a=>(a||[]).map(fromStore)).catch(()=>[]);
 const recMeta = () => store('meta','readonly',tx=>req2p(tx.objectStore('meta').getAll())).then(a=>a||[]).catch(()=>[]);
 const recGet = id => store('rec','readonly',tx=>req2p(tx.objectStore('rec').get(id))).then(fromStore).catch(()=>null);
-const recPut = async o => { let row=Object.assign({},o);
+// every take gets a lasting name (uid), written on the caller's object too: a stamp applied at once and the check at start-up name it alike
+const recPut = async o => { if(!/^[0-9a-f]{24}$/.test(o.uid||'')) o.uid=rid(); let row=Object.assign({},o);
   try{ if(o.blob instanceof Blob){ delete row.blob; row.buf=await o.blob.arrayBuffer(); } }catch(e){ return null; }
   try{ return await store(['rec','meta'],'readwrite',tx=>{ const done=txDone(tx); let id=null; const q=tx.objectStore('rec').put(row);
       q.onsuccess=()=>{ id=q.result; tx.objectStore('meta').put(metaOf(Object.assign({},row,{id}))); }; return done.then(()=>id); }); }
@@ -630,7 +651,9 @@ let gateUntil=0;
 // ---------- the adults: the parent and the teacher(s) ----------
 // SHA-256 (small, synchronous): for the adults' PINs and the teacher's changing code. It keeps children out, not experts.
 function sha256(m){ const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
-  const b=[...new TextEncoder().encode(m)], l=b.length*8; b.push(0x80); while(b.length%64!==56) b.push(0); for(let i=7;i>=0;i--) b.push(i>3?0:(l>>>(i*8))&255);
+  // a string (PINs, codes, signatures) or the bytes of a recording (its fingerprint, where the browser has no crypto.subtle)
+  const s=typeof m==='string'?new TextEncoder().encode(m):m, n=s.length, L=((n+72)>>6)<<6, b=new Uint8Array(L); b.set(s); b[n]=0x80;
+  for(let i=0;i<4;i++){ b[L-1-i]=((n*8)>>>(i*8))&255; b[L-5-i]=(Math.floor(n/0x20000000)>>>(i*8))&255; }
   let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]; const r=(x,n)=>(x>>>n)|(x<<(32-n)), W=new Array(64);
   for(let o=0;o<b.length;o+=64){ for(let i=0;i<16;i++) W[i]=(b[o+4*i]<<24)|(b[o+4*i+1]<<16)|(b[o+4*i+2]<<8)|b[o+4*i+3];
     for(let i=16;i<64;i++){ const s0=r(W[i-15],7)^r(W[i-15],18)^(W[i-15]>>>3), s1=r(W[i-2],17)^r(W[i-2],19)^(W[i-2]>>>10); W[i]=(W[i-16]+s0+W[i-7]+s1)|0; }
@@ -664,26 +687,32 @@ async function setParentPin(){ const v=await pinSheet('🔐 رقم سري للو
   const rc=rid().slice(0,8).toUpperCase(); a.salt=rid(); a.pin=pinOf(v,a.salt); a.rc=pinOf(rc,a.salt); saveAdults(); actor=a;
   openSheet(`<h3>✓ حُفظ الرقم السري</h3><p>رمز الاسترجاع إن نسيت الرقم:</p><p style="font-size:28px;text-align:center;letter-spacing:4px;direction:ltr"><b>${rc.slice(0,4)}-${rc.slice(4)}</b></p><p class="small">اكتبه واحفظه بعيداً عن الأطفال. لن يظهر مرة أخرى.</p><div class="row"><button class="btn p" onclick="closeSheet()">كتبته</button></div>`);
   return true; }
-let gateFails=0, gateLockUntil=0;
+// attempts at a secret (the adults' PINs, the recovery code, the teacher's code): five wrong in a row lock it for a minute,
+// the next five for two, then four…; the count is kept on the device, so closing and reopening the app does not reset it
+const lockOf = k => { const x=LS.get('lock_'+k,null); return x&&typeof x==='object'?x:{f:0,until:0,n:0}; };
+const lockWait = k => { const x=lockOf(k), t=num(x.until)-Date.now(); return t>0&&t<=64*60000 ? Math.ceil(t/60000) : 0; };
+const waitMsg = m => `انتظر ${m===1?'دقيقة':m===2?'دقيقتين':AR(m)+(m<=10?' دقائق':' دقيقة')} ثم أعد المحاولة`;
+function lockFail(k){ const x=lockOf(k); x.f=num(x.f)+1; if(x.f>=5){ x.n=Math.min(7,num(x.n)+1); x.until=Date.now()+60000*2**(x.n-1); x.f=0; } LS.set('lock_'+k,x); }
+const lockOk = k => { if(num(lockOf(k).f)||num(lockOf(k).n)) LS.set('lock_'+k,{f:0,until:0,n:0}); };
 function parentGate(){ if(Date.now()<gateUntil) return Promise.resolve(true);
   const par=adults.find(a=>a.role==='parent'&&a.pin), withPin=adults.filter(a=>a.pin);
   return new Promise(res=>{ let done=false; const fin=v=>{ if(!done){ done=true; res(v); } };
-    const open=a=>{ actor=a; gateFails=0; gateUntil=Date.now()+600000; fin(true); closeSheet(); };
-    const tryPin=v=>{ if(Date.now()<gateLockUntil){ toast('انتظر دقيقة ثم أعد المحاولة'); return null; } const a=withPin.find(x=>x.pin===pinOf(v,x.salt));
-      if(!a && ++gateFails>=5){ gateLockUntil=Date.now()+60000; gateFails=0; } return a; };
+    const open=a=>{ actor=a; lockOk('gate'); gateUntil=Date.now()+600000; fin(true); closeSheet(); };
+    const tryPin=v=>{ const w=lockWait('gate'); if(w){ toast(waitMsg(w),3500); return false; } const a=withPin.find(x=>x.pin===pinOf(v,x.salt));
+      if(!a) lockFail('gate'); return a||null; };
     if(par){
       openSheet(`<h3>🔐 للكبار</h3><label>الرقم السري</label><input id="gPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" style="font-size:24px;text-align:center;letter-spacing:6px"><div class="row"><button class="btn p" id="gOk">دخول</button><button class="btn" id="gateNo">إلغاء</button></div><p class="small" style="text-align:center"><a href="#" id="gForgot">نسيت الرقم؟</a></p>`,()=>fin(false));
-      const go=()=>{ const a=tryPin($('#gPin').value.trim()); if(!a){ $('#gPin').value=''; return toast('الرقم غير صحيح'); } open(a); };
+      const go=()=>{ const a=tryPin($('#gPin').value.trim()); if(!a){ $('#gPin').value=''; return a===null&&toast('الرقم غير صحيح'); } open(a); };
       $('#gOk').onclick=go; $('#gPin').onkeydown=e=>{ if(e.key==='Enter') go(); }; $('#gateNo').onclick=()=>closeSheet(); setTimeout(()=>$('#gPin')&&$('#gPin').focus(),50);
       // a forgotten PIN: the recovery code, typed in this same sheet
       $('#gForgot').onclick=e=>{ e.preventDefault(); e.target.parentNode.innerHTML=`<label>رمز الاسترجاع (ظهر حين اخترت الرقم)</label><input id="gRc" autocomplete="off" placeholder="XXXX-XXXX" style="text-align:center;direction:ltr"><div class="row"><button class="btn" id="gRcOk">تحقّق</button></div>`;
-        $('#gRcOk').onclick=()=>{ const c=$('#gRc').value; if(Date.now()<gateLockUntil) return toast('انتظر دقيقة ثم أعد المحاولة');
-          if(!par.rc || pinOf(c.replace(/[^0-9a-f]/gi,'').toUpperCase(),par.salt)!==par.rc){ if(++gateFails>=5){ gateLockUntil=Date.now()+60000; gateFails=0; } return toast('رمز الاسترجاع غير صحيح',3500); }
+        $('#gRcOk').onclick=()=>{ const c=$('#gRc').value, w=lockWait('gate'); if(w) return toast(waitMsg(w),3500);
+          if(!par.rc || pinOf(c.replace(/[^0-9a-f]/gi,'').toUpperCase(),par.salt)!==par.rc){ lockFail('gate'); return toast(par.rc?'رمز الاسترجاع غير صحيح':'لا رمز استرجاع محفوظ على هذا الجهاز',3500); }
           open(par); setTimeout(()=>setParentPin(),300); }; };
       return; }
     // no PIN for the parent yet: the long press (a teacher with a PIN can type it instead)
     openSheet(`<h3>👨‍👧 للكبار</h3><button class="btn p" id="gateBtn" style="position:relative;overflow:hidden;width:100%;justify-content:center;font-size:20px;padding:16px;touch-action:none;user-select:none;-webkit-user-select:none"><span id="gateFill" style="position:absolute;inset:0;width:0;background:rgba(255,255,255,.35)"></span><span style="position:relative">🔒</span></button>${withPin.length?`<label>أو رقم المعلّمة</label><input id="gPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" style="text-align:center">`:''}<div class="row"><button class="btn" id="gateNo">إلغاء</button></div>`,()=>fin(false));
-    if($('#gPin')) $('#gPin').onkeydown=e=>{ if(e.key!=='Enter') return; const a=tryPin($('#gPin').value.trim()); if(a) open(a); else { $('#gPin').value=''; toast('الرقم غير صحيح'); } };
+    if($('#gPin')) $('#gPin').onkeydown=e=>{ if(e.key!=='Enter') return; const a=tryPin($('#gPin').value.trim()); if(a) open(a); else { $('#gPin').value=''; if(a===null) toast('الرقم غير صحيح'); } };
     const b=$('#gateBtn'), f=$('#gateFill'); let t=null;
     const down=e=>{ e.preventDefault(); if(t) return; f.style.transition='width 3s linear'; f.style.width='100%'; t=setTimeout(()=>open(adults.find(a=>a.role==='parent')||null),3000); };
     const up=()=>{ clearTimeout(t); t=null; f.style.transition='none'; f.style.width='0'; };
@@ -734,48 +763,114 @@ function pathEditor(k,role){ const allowed = role==='parent' || (role==='teacher
   draw(); }
 // ---------- the teacher at a distance, by files (no server): the takes go to her, her stamps come back signed ----------
 const deviceId = () => { let d=LS.get('deviceId',''); if(!/^[0-9a-f]{24}$/.test(d)){ d=rid(); LS.set('deviceId',d); } return d; };
+// the teacher's keys: one from each family (or each device of a family) that sent her one; her stamps for a family are signed
+// with that family's key. The newest is «hers» on this device (her name on the page)
 const iAmTeacher = () => { const t=LS.get('iAmTeacher',null); return t&&okName(t.name)&&/^[0-9a-f]{8,64}$/.test(t.secret||'')?t:null; };
+const keyId = s => sha256('anasheed-kid:'+s).slice(0,16);
+const tKeys = () => { const a=LS.get('tKeys',[]), me=iAmTeacher(), ks=(Array.isArray(a)?a:[]).filter(k=>k&&okName(k.name)&&/^[0-9a-f]{8,64}$/.test(k.secret||''));
+  if(me && !ks.some(k=>k.secret===me.secret)) ks.push({name:me.name,secret:me.secret}); return ks; };
+const tKey = kid => tKeys().find(k=>keyId(k.secret)===kid)||null;
+function addTeacherKey(o){ const name=String(o.name).trim(), secret=o.secret; LS.set('iAmTeacher',{name,secret});
+  LS.set('tKeys',[...tKeys().filter(k=>k.secret!==secret),{name,secret,family:String(o.family||'').slice(0,40)}].slice(-20)); return name; }
 const stampSig = (secret,src,items) => sha256('anasheed-stamps:'+secret+':'+src+':'+JSON.stringify(items));
 const b64Blob = (b64,type) => { const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return new Blob([u],{type}); };
-// the parent's side: the takes waiting for an ear, in one file for the teacher
-async function sendTakes(t){ const all=(await recMeta()).filter(r=>!r.model&&!r.stamp&&!r.inbox&&(r.memCand||r.review||r.echo));
+// the fingerprint of a take's sound: the teacher's signed stamp names what she heard, and the family's app checks it is the take it holds
+async function bytesHash(u8){ try{ if(typeof crypto!=='undefined'&&crypto.subtle){ const d=new Uint8Array(await crypto.subtle.digest('SHA-256',u8)); return [...d].map(x=>x.toString(16).padStart(2,'0')).join(''); } }catch(e){} return sha256(u8); }
+const blobHash = async b => bytesHash(new Uint8Array(await b.arrayBuffer()));
+const khatmN = n => countAr(n,'ختماً واحداً','ختمين','أختام','ختماً'), khatmNom = n => countAr(n,'ختم واحد','ختمان','أختام','ختماً'), khatmGen = n => countAr(n,'ختم واحد','ختمين','أختام','ختماً');
+// the parent's side: the takes waiting for an ear, in one file for the teacher; each with its lasting name and the fingerprint of its sound
+async function sendTakes(t){ if(!t.secret) return toast('أعطِ المعلّمة مفتاحاً جديداً أولاً (🔑 في سطرها)',4000);
+  const all=(await recMeta()).filter(r=>!r.model&&!r.stamp&&!r.inbox&&kids.includes(r.who)&&(r.memCand||r.review||r.echo));
   if(!all.length) return toast('لا تسجيلات تنتظر الحكم',3000);
-  const takes=[]; for(const m of all.slice(0,60)){ const r=await recGet(m.id); if(!r||!r.blob) continue; takes.push({rid:m.id,who:m.who,poem:m.poem,title:m.title,seg:m.seg,range:m.range,when:m.when,dur:m.dur,lvl:m.lvl,memCand:!!m.memCand,review:!!m.review,echo:!!m.echo,marks:m.marks||[],type:r.blob.type||m.type,b64:await blobB64(r.blob)}); }
+  const takes=[]; for(const m of all.slice(0,60)){ const r=await recGet(m.id); if(!r||!r.blob) continue;
+    const uid=/^[0-9a-f]{24}$/.test(m.uid||'')?m.uid:rid(), h=/^[0-9a-f]{64}$/.test(m.h||'')?m.h:await blobHash(r.blob);
+    if(uid!==m.uid||h!==m.h) await recPatch(m.id,{uid,h});
+    // the teacher is asked what this device would ask (a take that is not one of the child's segments: only to be heard)
+    const kd=takeKind(m); takes.push({rid:m.id,uid,h,who:m.who,poem:m.poem,title:m.title,seg:m.seg,range:m.range,when:m.when,dur:m.dur,lvl:m.lvl,memCand:kd==='mem',review:kd==='rev',echo:kd==='echo',marks:m.marks||[],type:r.blob.type||m.type,b64:await blobB64(r.blob)}); }
   const poems=added.filter(p=>takes.some(x=>x.poem===p.id)).map(p=>({id:p.id,title:p.title,poet:p.poet,age:p.age,verses:p.verses}));
-  const o={app:'anasheed',kind:'takes',v:1,to:t.name,src:deviceId(),family:LS.get('parentName','')||'',kidInfo:Object.fromEntries(kids.map(k=>[k,{age:kidAge(k)||0,g:kInfo(k).g||''}])),poems,takes};
-  shareFiles([{blob:new Blob([JSON.stringify(o)],{type:'application/json'}),type:'application/json',name:safeName(`تسجيلات-إلى-${t.name}-${new Date().toISOString().slice(0,10)}.json`)}],`تسجيلات للمعلّمة ${t.name}`,'تسجيلات للمعلّمة');
-  toast(`${tasjeelN(takes.length)} في الملف: أرسله إلى ${t.name}`,4000); }
+  const o={app:'anasheed',kind:'takes',v:2,to:t.name,kid:keyId(t.secret),src:deviceId(),family:LS.get('parentName','')||'',kidInfo:Object.fromEntries(kids.map(k=>[k,{age:kidAge(k)||0,g:kInfo(k).g||''}])),poems,takes};
+  const ok=await shareFiles([{blob:new Blob([JSON.stringify(o)],{type:'application/json'}),type:'application/json',name:safeName(`تسجيلات-إلى-${t.name}-${new Date().toISOString().slice(0,10)}.json`)}],`تسجيلات للمعلّمة ${t.name}`,'تسجيلات للمعلّمة');
+  if(ok) toast(`${tasjeelN(takes.length)} في الملف: أرسله إلى ${t.name}`,4000); }
 // the teacher's key for her own copy of the app: her name and secret, to sign her stamps
-function teacherKeyFile(t){ shareFiles([{blob:new Blob([JSON.stringify({app:'anasheed',kind:'teacherKey',name:t.name,secret:t.secret})],{type:'application/json'}),type:'application/json',name:safeName(`مفتاح-${t.name}-أنشودتي.json`)}],`مفتاح ${t.name} لتطبيق أنشودتي`,'مفتاح المعلّمة'); }
-// the teacher's side: the takes arrive in her queue; her stamps wait in an outbox until she sends them
-async function receiveTakes(o){ const me=iAmTeacher(); if(!me) return toast('افتحي أولاً «مفتاح المعلّمة» الذي أرسله الوالد',4500);
+function teacherKeyFile(t){ if(!t.secret) return; shareFiles([{blob:new Blob([JSON.stringify({app:'anasheed',kind:'teacherKey',name:t.name,secret:t.secret,family:LS.get('parentName','')||''})],{type:'application/json'}),type:'application/json',name:safeName(`مفتاح-${t.name}-أنشودتي.json`)}],`مفتاح ${t.name} لتطبيق أنشودتي`,'مفتاح المعلّمة'); }
+// a teacher whose secret did not travel with the backup (it never does), or whose key may have leaked: a new key, and her two files again
+async function rekeyTeacher(t){ if(t.secret && !await ask(`مفتاح جديد لـ${t.name}؟ لن تُقبل بعده أختام موقّعة بمفتاحها القديم على هذا الجهاز، ويتغيّر رمز جلستها.`,'مفتاح جديد',true)) return;
+  t.secret=rid(); saveAdults(); renderAdults();
+  openSheet(`<h3>🔑 مفتاح جديد لـ${esc(t.name)}</h3><p>أرسل لها الملفين من جديد: «مفتاح تطبيقها» لتفتحه في نسختها، و«ملف الرمز» للجلسات المباشرة.</p><div class="row"><button class="btn p" id="rkKey">🔑 مفتاح تطبيقها</button><button class="btn" id="rkCode">📤 ملف الرمز</button><button class="btn s" onclick="closeSheet()">لاحقاً</button></div>`);
+  $('#rkKey').onclick=()=>teacherKeyFile(t); $('#rkCode').onclick=()=>teacherFile(t); }
+// the teacher's side: the takes arrive in her queue. A take whose sound is not what the family's app fingerprinted (damaged, or changed
+// on the way) is not judged; the fingerprint she keeps is of the sound she will hear
+async function receiveTakes(o){ const key=typeof o.kid==='string'?tKey(o.kid):iAmTeacher();
+  if(!key) return toast(iAmTeacher()?'لم يصلكِ مفتاح هذه الأسرة بعد: اطلبي من الوالد «🔑 مفتاح تطبيقها»':'افتحي أولاً «مفتاح المعلّمة» الذي أرسله الوالد',5000);
   const src=/^[0-9a-f]{24}$/.test(o.src||'')?o.src:''; if(!src) return toast('ملف التسجيلات تالف');
   for(const p of (o.poems||[]).slice(0,50)){ if(!added.some(a=>a.id===p.id) && validPoem(p)) added.push(cleanPoem(p)); } LS.set('added',added); applyPacks();
   for(const [k,v] of Object.entries(o.kidInfo||{})) if(okName(k) && !own(kidInfo,k) && v && typeof v==='object'){ kidInfo[k]={...(num(v.age)?{age:Math.max(5,Math.min(12,num(v.age)))}:{}),...(v.g==='g'||v.g==='b'?{g:v.g}:{}),remote:true}; } LS.set('kidInfo',kidInfo);
-  const have=new Set((await recMeta()).filter(r=>r.inbox).map(r=>r.inbox.src+'|'+r.inbox.rid)); let n=0;
-  for(const x of (o.takes||[]).slice(0,200)){ if(!x||typeof x.b64!=='string'||have.has(src+'|'+x.rid)) continue;
-    try{ const r=cleanRec(x); r.inbox={src,rid:x.rid,family:String(o.family||'').slice(0,40)}; if(await recPut(Object.assign(r,{blob:b64Blob(x.b64,r.type)}))!=null) n++; }catch(e){} }
-  toast(n?`وصل ${tasjeelN(n)} ينتظر حكمكِ في «تنتظر أذنك» ✓`:'هذه التسجيلات وصلت من قبل',4500); if(screen==='parent') renderParent(); }
-function teacherOutbox(){ return LS.get('tOut',[]).filter(x=>x&&x.src&&x.rid!=null); }
-function sendStamps(){ const me=iAmTeacher(), out=teacherOutbox(); if(!me||!out.length) return toast('لا أختام جديدة');
-  const bySrc={}; for(const x of out) (bySrc[x.src] ||= []).push({rid:x.rid,stamp:x.stamp,weak:x.weak||[],at:x.at});
-  const files=Object.entries(bySrc).map(([src,items])=>({blob:new Blob([JSON.stringify({app:'anasheed',kind:'stamps',v:1,by:me.name,src,items,sig:stampSig(me.secret,src,items)})],{type:'application/json'}),type:'application/json',name:safeName(`أختام-${me.name}-${new Date().toISOString().slice(0,10)}.json`)}));
-  shareFiles(files,`أختام ${me.name}`,'الأختام'); LS.set('tOutSent',[...LS.get('tOutSent',[]),...out].slice(-500)); LS.set('tOut',[]); renderParent(); }
-// the parent's side again: stamps from a teacher this device knows, signed with her secret
-async function receiveStamps(o){ const t=teachers().find(x=>x.name===o.by&&x.secret); if(!t) return toast('أختام من معلّمة غير معروفة على هذا الجهاز',4500);
-  if(o.src!==deviceId()) return toast('هذه الأختام لتسجيلات جهاز آخر',4500);
-  if(!Array.isArray(o.items) || o.sig!==stampSig(t.secret,o.src,o.items)) return toast('توقيع الأختام غير صحيح: لم يُطبَّق شيء',4500);
-  const recs=new Map((await recMeta()).map(r=>[r.id,r])); let n=0;
-  for(const x of o.items){ const r=recs.get(x.rid); if(!r||r.stamp||!STAMP_BTN[recKind(r)].some(([st])=>st===x.stamp)) continue; const weak=(Array.isArray(x.weak)?x.weak:[]).filter(Number.isInteger).slice(0,50);
-    if(await recPatch(r.id,{stamp:x.stamp,stampAt:Date.now(),weak,by:t.name})){ stampEffects({...r,by:t.name},x.stamp,weak); n++; } }
-  toast(n?`طُبّق ${AR(n)} من أختام ${t.name} ✓`:'هذه الأختام طُبّقت من قبل',4500); if(screen==='parent') renderParent(); renderHome(); }
+  const ibKey=ib=>ib.uid||ib.src+'|'+ib.rid, have=new Set((await recMeta()).filter(r=>r.inbox).map(r=>ibKey(r.inbox))); let n=0, bad=0;
+  for(const x of (o.takes||[]).slice(0,200)){ if(!x||typeof x.b64!=='string'||!Number.isFinite(+x.rid)) continue; const uid=/^[0-9a-f]{24}$/.test(x.uid||'')?x.uid:'';
+    const ib={src,rid:+x.rid,...(uid?{uid}:{})}; if(have.has(ibKey(ib))) continue;
+    try{ const r=cleanRec(x), blob=b64Blob(x.b64,r.type), h=await blobHash(blob); if(typeof x.h==='string' && x.h!==h){ bad++; continue; }
+      ['uid','h','stamp','stampAt','by','sdev','revDue'].forEach(f=>delete r[f]); r.weak=[];
+      r.inbox={...ib,h,...(typeof o.kid==='string'&&/^[0-9a-f]{16}$/.test(o.kid)?{kid:o.kid}:{}),family:String(o.family||'').slice(0,40)};
+      if(await recPut(Object.assign(r,{blob}))!=null){ n++; have.add(ibKey(ib)); } }catch(e){} }
+  toast((n?`وصل ${tasjeelN(n)} ${vN(n,'ينتظر','ينتظران','تنتظر')} حكمكِ في «تنتظر أذنك» ✓`:bad?'':'هذه التسجيلات وصلت من قبل')+(bad?`${n?' · ':''}⚠️ تالف لم يُقبل: ${AR(bad)}، اطلبي إرساله مرة أخرى`:''),5000); if(screen==='parent') renderParent(); }
+// the teacher's outbox: one line per take she judged, written before the take is marked; kept until a send really went out,
+// and thirty days more, to send again if the file was lost (the family's app applies a stamp once, however often it comes)
+const outKey = x => x.uid||x.src+'|'+x.rid;
+function teacherOutbox(){ const a=LS.get('tOut',[]); return (Array.isArray(a)?a:[]).filter(x=>x&&typeof x==='object'&&/^[0-9a-f]{24}$/.test(x.src||'')&&(x.uid||Number.isFinite(+x.rid))&&STAMPS.includes(x.stamp)); }
+// stamps that the earlier version took out of the outbox as soon as the share sheet opened (even when it was cancelled):
+// back in the outbox as sent, so «↻ أعيدي إرسال ما أُرسل» can send them again (the family's app applies each once)
+function migrateOutbox(){ try{ const old=LS.get('tOutSent',null); if(!Array.isArray(old)) return; const out=teacherOutbox(), k=new Set(out.map(outKey)), t=Date.now();
+  for(const x of old) if(x&&/^[0-9a-f]{24}$/.test(x.src||'')&&Number.isFinite(+x.rid)&&STAMPS.includes(x.stamp)&&!k.has(outKey(x))){ out.push({src:x.src,rid:+x.rid,stamp:x.stamp,weak:Array.isArray(x.weak)?x.weak:[],at:num(x.at)||t,sentAt:t}); k.add(outKey(x)); }
+  if(LS.set('tOut',out.slice(-500))) LS.set('tOutSent',null); }catch(e){} }
+function outboxPut(r,stamp,weak){ const ib=r.inbox||{};
+  const item={src:ib.src,rid:ib.rid,...(ib.uid?{uid:ib.uid}:{}),...(ib.h?{h:ib.h}:{}),...(ib.kid?{kid:ib.kid}:{}),family:ib.family||'',who:r.who,poem:r.poem,...(okRange(r.range,1000)?{range:r.range}:{}),stamp,weak:weak||[],at:Date.now()};
+  return LS.set('tOut',[...teacherOutbox().filter(x=>outKey(x)!==outKey(item)),item].slice(-500)); }
+// one file for each family (and each of its devices): each goes to its own family; a send cancelled or failed keeps the stamps
+async function sendStamps(again=false){ const me=iAmTeacher(); if(!me) return;
+  const now=Date.now(), pick=x=>again?x.sentAt&&now-x.sentAt<30*864e5:!x.sentAt, out=teacherOutbox().filter(pick);
+  if(!out.length) return toast(again?'لا أختام مرسلة في الثلاثين يوماً الماضية':'لا أختام جديدة');
+  const groups=[]; for(const x of out){ let g=groups.find(y=>y.src===x.src&&y.kid===(x.kid||'')); if(!g) groups.push(g={src:x.src,kid:x.kid||'',family:x.family||'',xs:[]}); g.xs.push(x); }
+  const send=async g=>{ const key=g.kid?tKey(g.kid):me; if(!key){ toast('مفتاح هذه الأسرة لم يعد هنا: افتحي «مفتاح تطبيقها» من جديد',4500); return false; }
+    const items=g.xs.map(x=>({...(x.uid?{uid:x.uid}:{}),rid:x.rid,...(x.h?{h:x.h}:{}),who:x.who,poem:x.poem,...(x.range?{range:x.range}:{}),stamp:x.stamp,weak:x.weak||[],at:x.at}));
+    const f={blob:new Blob([JSON.stringify({app:'anasheed',kind:'stamps',v:2,by:key.name,src:g.src,...(g.kid?{kid:g.kid}:{}),items,sig:stampSig(key.secret,g.src,items)})],{type:'application/json'}),type:'application/json',name:safeName(`أختام-${key.name}${g.family?'-إلى-'+g.family:''}-${new Date().toISOString().slice(0,10)}.json`)};
+    if(!await shareFiles([f],`أختام ${key.name}`,'الأختام')){ toast('لم تُرسَل الأختام: بقيت هنا، أعيدي الإرسال',4500); return false; }
+    // marked as sent only now: the outbox is read again, so a stamp given meanwhile is not lost
+    const sent=new Map(g.xs.map(x=>[outKey(x),x.at])), t=Date.now();
+    LS.set('tOut',teacherOutbox().map(x=>sent.get(outKey(x))===x.at?{...x,sentAt:t}:x).filter(x=>!x.sentAt||t-x.sentAt<30*864e5).slice(-500));
+    toast(again?`أُعيد إرسال ${khatmGen(items.length)} ✓`:`أُرسل ${khatmNom(items.length)} ✓`,3500); return true; };
+  if(groups.length===1){ await send(groups[0]); if(screen==='parent') renderParent(); return; }
+  openSheet(`<h3>📤 أختام لأكثر من أسرة</h3><p class="small">أرسلي كل ملف إلى أسرته.</p>${groups.map((g,i)=>`<div class="row"><button class="btn" data-sg="${i}">📤 ${g.family?'إلى '+esc(g.family):'أسرة '+AR(i+1)} · ${khatmNom(g.xs.length)}</button></div>`).join('')}<div class="row"><button class="btn s" onclick="closeSheet()">تمّ</button></div>`,()=>{ if(screen==='parent') renderParent(); });
+  $$('#sheet [data-sg]').forEach(b=>b.onclick=async()=>{ if(await send(groups[+b.dataset.sg])){ b.disabled=true; b.classList.add('g'); } }); }
+// the parent's side again: stamps signed with the key this device gave the teacher. Each is applied only to the take it names (its
+// lasting name, the child, the poem, the verses and the fingerprint of the sound she heard), once, its effect before its mark
+async function receiveStamps(o){ const ts=teachers().filter(x=>x.secret), t=(typeof o.kid==='string'&&ts.find(x=>keyId(x.secret)===o.kid))||(!o.kid&&ts.find(x=>x.name===o.by))||null;
+  if(!t) return toast('أختام بمفتاح لا يعرفه هذا الجهاز: من معلّمة غير مضافة هنا، أو من مفتاحها القديم',5000);
+  if(!Array.isArray(o.items) || typeof o.src!=='string' || o.sig!==stampSig(t.secret,o.src,o.items)) return toast('توقيع الأختام غير صحيح: لم يُطبَّق شيء',4500);
+  const metas=await recMeta(), byUid=new Map(metas.filter(r=>r.uid).map(r=>[r.uid,r])), here=o.src===deviceId(), seen=new Set(), rg=x=>Array.isArray(x)?x.join('-'):'';
+  let n=0, old=0, bad=0, none=0;
+  for(const x of o.items.slice(0,500)){ if(!x||typeof x!=='object'){ bad++; continue; }
+    // a stamp from an older teacher's app has no lasting name: it is matched by the number its take had on the device that sent it
+    const r=(typeof x.uid==='string'&&byUid.get(x.uid)) || (!x.uid&&here&&metas.find(m=>m.id===x.rid)) || null;
+    if(!r||r.model||r.praise||r.inbox||!kids.includes(r.who)||seen.has(r.id)){ none++; continue; } seen.add(r.id);
+    if(r.stamp){ old++; continue; }
+    let h=/^[0-9a-f]{64}$/.test(r.h||'')?r.h:null;
+    if(typeof x.h==='string'){ if(!h){ const full=await recGet(r.id); h=full&&full.blob?await blobHash(full.blob):null; } if(x.h!==h){ bad++; continue; } }
+    else if(h){ bad++; continue; }   // a take sent with its fingerprint takes no stamp without one
+    if((x.who!==undefined&&x.who!==r.who) || (x.poem!==undefined&&x.poem!==r.poem) || (x.range!==undefined&&rg(x.range)!==rg(r.range)) || !STAMP_BTN[takeKind(r)].some(([st])=>st===x.stamp)){ bad++; continue; }
+    const weak=(Array.isArray(x.weak)?x.weak:[]).filter(i=>Number.isInteger(i)&&i>=0&&i<1000).slice(0,50);
+    stampEffects({...r,by:t.name},x.stamp,weak);
+    if(await recPatch(r.id,{stamp:x.stamp,stampAt:Date.now(),weak,by:t.name,sdev:deviceId()})) n++; }
+  const parts=[]; if(n) parts.push(`طُبّق ${khatmNom(n)} من ${t.name} ✓`); if(old) parts.push(`مطبَّق من قبل: ${AR(old)}`);
+  if(bad) parts.push(`⚠️ لا يطابق التسجيلَ الذي هنا فلم يُطبَّق: ${AR(bad)}`); if(none&&!n&&!old&&!bad) parts.push(here?'لم أجد هذه التسجيلات على هذا الجهاز':'هذه الأختام لتسجيلات جهاز آخر');
+  toast(parts.join(' · ')||'لا شيء جديد',5000); if(screen==='parent') renderParent(); renderHome(); }
 
 // a live session with the teacher (by video): she says her code once, then judges each take as soon as it is saved
 function teacherSession(){ const ts=teachers().filter(t=>t.secret); if(!ts.length) return toast('لا معلّمة بعد: يضيفها الوالد من صفحته',3500);
   if(tLive()){ openSheet(`<h3>👩‍🏫 جلسة مع ${esc(tSess.name)}</h3><p>تنتهي الساعة ${new Date(tSess.until).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'})}.</p><div class="row"><button class="btn d" id="tsEnd">أنهِ الجلسة</button><button class="btn" onclick="closeSheet()">تمام</button></div>`); $('#tsEnd').onclick=()=>{ tSess=null; closeSheet(); renderTBar(); }; return; }
   openSheet(`<h3>👩‍🏫 جلسة المعلّمة</h3><p class="small">تقول المعلّمة رمزها الآن (أربعة أرقام تظهر عندها).</p><input id="tCode" inputmode="numeric" maxlength="4" autocomplete="off" style="font-size:30px;text-align:center;letter-spacing:10px"><div class="row"><button class="btn p" id="tGo">ابدأ</button><button class="btn" onclick="closeSheet()">إلغاء</button></div>`);
-  const go=()=>{ const c=$('#tCode').value.trim(), t=ts.find(x=>tCodeOk(x.secret,c)); if(!t){ $('#tCode').value=''; return toast('الرمز غير صحيح أو انتهى وقته'); }
-    tSess={name:t.name, until:Date.now()+50*60000}; closeSheet(); renderTBar(); toast(`أهلاً ${t.name} 👩‍🏫`); };
+  const go=()=>{ const w=lockWait('tcode'); if(w) return toast(waitMsg(w),3500);
+    const c=$('#tCode').value.trim(), t=ts.find(x=>tCodeOk(x.secret,c)); if(!t){ lockFail('tcode'); $('#tCode').value=''; return toast('الرمز غير صحيح أو انتهى وقته'); }
+    lockOk('tcode'); tSess={name:t.name, until:Date.now()+50*60000}; closeSheet(); renderTBar(); toast(`أهلاً ${t.name} 👩‍🏫`); };
   $('#tGo').onclick=go; $('#tCode').onkeydown=e=>{ if(e.key==='Enter') go(); }; }
 function renderTBar(){ let b=$('#tBar'); if(!b){ b=document.createElement('div'); b.id='tBar'; b.className='tBar'; document.body.appendChild(b); b.onclick=teacherSession; }
   b.style.display=tLive()?'':'none'; if(tLive()) b.textContent=`👩‍🏫 جلسة مع ${tSess.name}`; }
@@ -784,6 +879,8 @@ setInterval(()=>{ if(tSess && !tLive()){ tSess=null; renderTBar(); } },30000);
 // the buttons of a stamp, by the kind of take (the parent's queue and the teacher's live judging share them)
 const STAMP_BTN={mem:[['ok','g','✓ حفظه'],['okw','','✓ حفظه مع تردّد'],['again','','🔁 نراجعه غداً']], rev:[['rok','g','✓ ثابت'],['rweak','','🔁 ضعُف']], echo:[['eok','g','✓ أتقنه'],['heard','','👍 سمعته']], rec:[['heard','g','👍 سمعته']]};
 const recKind = r => r.memCand?'mem':r.review?'rev':r.echo?'echo':'rec';
+// what a take asks of an adult on this device: one whose verses are not one of the child's segments (made on another device) is only to be heard
+const takeKind = r => !r.inbox&&(r.memCand||r.review||r.echo)&&recSegOf(r)<0 ? 'rec' : recKind(r);
 const STAMP_MSG = r => ({ok:kidAge(r.who)&&kidAge(r.who)<=8?'خُتم الحفظ ✓ والمراجعة غداً':'خُتم الحفظ ✓ والمراجعة بعد ٣ أيام',okw:'خُتم الحفظ ✓ والمراجعة غداً',again:'سيظهر في مراجعة الغد',rok:'المراجعة ثابتة ✓ والقادمة بعد أيام أطول',rweak:'سيعود إلى مراجعة الغد',eok:'أتقن الترديد ✓',heard:'وصلته رسالتك 👂'});
 // in a live session: the teacher heard the take as it was sung, and judges it at once
 async function judgeNow(r){ if(!tLive()) return false; const p=poemById(r.poem), k=recKind(r); if(k==='rec') return false;
@@ -795,13 +892,16 @@ async function judgeNow(r){ if(!tLive()) return false; const p=poemById(r.poem),
     <div class="row">${STAMP_BTN[k].map(([st,c,t])=>`<button class="btn ${c}" data-st="${st}">${t}</button>`).join('')}<button class="btn s" onclick="closeSheet()">لاحقاً</button></div>
     <p class="small">«لاحقاً»: يبقى التسجيل في صفحة الوالد ليُسمع.</p>`,null,true);
   $$('#sheet .wv .chip').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
-  $$('#sheet [data-st]').forEach(b=>b.onclick=async()=>{ if(!tCodeOk(T.secret,$('#jCode').value.trim())){ $('#jCode').value=''; return toast('الرمز غير صحيح: تقوله المعلّمة',3000); }
+  $$('#sheet [data-st]').forEach(b=>b.onclick=async()=>{ const w=lockWait('tcode'); if(w) return toast(waitMsg(w),3500);
+    if(!tCodeOk(T.secret,$('#jCode').value.trim())){ lockFail('tcode'); $('#jCode').value=''; return toast('الرمز غير صحيح: تقوله المعلّمة',3000); } lockOk('tcode');
     const stamp=b.dataset.st, weak=[...$$('#sheet .wv .chip.on')].map(c=>+c.dataset.v);
-    if(!await recPatch(r.id,{stamp,stampAt:Date.now(),weak,by:tName})) return toast('تعذّر الحفظ'); stampEffects({...r,by:tName},stamp,weak); closeSheet(); toast(STAMP_MSG(r)[stamp]||'✓'); if(cur&&screen==='poem') renderSegs(); });
+    // the effect first (written once, by the take's lasting name), then the mark: a crash in between repeats nothing
+    stampEffects({...r,by:tName},stamp,weak);
+    if(!await recPatch(r.id,{stamp,stampAt:Date.now(),weak,by:tName,sdev:deviceId()})) return toast('تعذّر الحفظ'); closeSheet(); toast(STAMP_MSG(r)[stamp]||'✓'); if(cur&&screen==='poem') renderSegs(); });
   return true; }
 
 // the teacher's code page: one file the parent sends her; it shows her code, which changes every minute
-function teacherFile(t){ const page=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>رمز ${esc(t.name)} · أنشودتي</title>
+function teacherFile(t){ if(!t||!t.secret) return; const page=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>رمز ${esc(t.name)} · أنشودتي</title>
 <style>body{font-family:system-ui,sans-serif;background:#fbf6ec;color:#2b2118;text-align:center;padding:40px 16px}b{display:block;font-size:72px;letter-spacing:14px;margin:24px 0}i{display:block;height:6px;background:#e6dcc6;border-radius:3px;max-width:320px;margin:auto}i span{display:block;height:100%;background:#7a5c3e;border-radius:3px}</style></head>
 <body><h1>👩‍🏫 ${esc(t.name)}</h1><p>رمز جلسة «أنشودتي»: قوليه للطفل في بداية الجلسة.</p><b id="c">····</b><i><span id="p"></span></i><p style="font-size:13px;opacity:.7">يتغيّر كل دقيقة. لا تشاركي هذا الملف مع الأطفال.</p>
 <script>${sha256.toString()}
@@ -815,7 +915,8 @@ function renderAdults(){ const box=$('#adultsBox'); if(!box) return;
   const par=adults.find(a=>a.role==='parent');
   box.innerHTML=`${par&&par.pin?'':'<div class="warn">🔐 اختر رقماً سرياً للدخول إلى هذه الصفحة: الضغط المطوّل وحده يعرفه الأطفال.</div>'}
     <div class="row"><button class="btn s ${par&&par.pin?'':'p'}" id="adPin">${par&&par.pin?'🔐 غيّر رقمي السري':'🔐 اختر رقماً سرياً'}</button><button class="btn s g" id="adT">👩‍🏫 أضف معلّمة</button></div>
-    ${teachers().map((t,i)=>`<div class="r"><span class="t">👩‍🏫 <b>${esc(t.name)}</b> ${t.pin?'· لها رقم سري':''}</span><button class="btn s" data-tf="${i}" title="ملف الرمز للجلسة المباشرة">📤 ملف الرمز</button><button class="btn s" data-tk="${i}" title="مفتاح تطبيقها، مرة واحدة">🔑 مفتاح تطبيقها</button><button class="btn s g" data-tt="${i}" title="تسجيلات تنتظر الحكم">📤 أرسل التسجيلات</button><button class="btn s d" data-td="${i}">حذف</button></div>`).join('')}
+    ${teachers().map((t,i)=>t.secret?`<div class="r"><span class="t">👩‍🏫 <b>${esc(t.name)}</b> ${t.pin?'· لها رقم سري':''}</span><button class="btn s" data-tf="${i}" title="ملف الرمز للجلسة المباشرة">📤 ملف الرمز</button><button class="btn s" data-tk="${i}" title="مفتاح تطبيقها، مرة واحدة">🔑 مفتاح تطبيقها</button><button class="btn s g" data-tt="${i}" title="تسجيلات تنتظر الحكم">📤 أرسل التسجيلات</button><button class="btn s" data-tr="${i}" title="إن ضاع ملفها أو وصل إلى غيرها">↻ مفتاح جديد</button><button class="btn s d" data-td="${i}">حذف</button></div>`
+      :`<div class="r"><span class="t">👩‍🏫 <b>${esc(t.name)}</b> · <span class="small">مفتاحها لا ينتقل مع النسخة الاحتياطية: أعطها مفتاحاً جديداً</span></span><button class="btn s p" data-tr="${i}">🔑 مفتاح جديد</button><button class="btn s d" data-td="${i}">حذف</button></div>`).join('')}
     <p class="small"><b>بالملفات (في أي وقت):</b> أرسل لها «🔑 مفتاح تطبيقها» مرة واحدة لتفتحه في نسختها من التطبيق. ثم «📤 أرسل التسجيلات» متى شئت؛ فتسمعها وتختمها، وترسل لك ملف الأختام فتستورده هنا. الأختام موقّعة بمفتاحها، فلا يزوّرها أحد.</p>
     <p class="small"><b>في الجلسة المباشرة:</b> أرسل لها «ملف الرمز» مرة واحدة. في الجلسة يلمس الطفل «👩‍🏫 جلسة المعلّمة» في شاشة «من سينشد؟»، وتقول المعلّمة رمزها، فتحكم على كل تسجيل حين يُحفظ. وفي البيت: تدخل صفحة الوالد برقمها السري، فيُكتب اسمها على كل ختم.</p>`;
   $('#adPin').onclick=async()=>{ if(await setParentPin()) renderAdults(); };
@@ -826,7 +927,10 @@ function renderAdults(){ const box=$('#adultsBox'); if(!box) return;
   $$('#adultsBox [data-tf]').forEach(b=>b.onclick=()=>teacherFile(teachers()[+b.dataset.tf]));
   $$('#adultsBox [data-tk]').forEach(b=>b.onclick=()=>teacherKeyFile(teachers()[+b.dataset.tk]));
   $$('#adultsBox [data-tt]').forEach(b=>b.onclick=()=>sendTakes(teachers()[+b.dataset.tt]));
-  const me=iAmTeacher(); if(me){ const n=teacherOutbox().length; box.insertAdjacentHTML('afterbegin',`<div class="note">👩‍🏫 <b>هذا تطبيق ${esc(me.name)}</b>: تصل تسجيلات الطلاب في ملفات، فتُفتح من «📂 استورد نسخة احتياطية»، وتظهر في «تنتظر أذنك». ${n?`<div class="row"><button class="btn p" id="tSend">📤 أرسل ${AR(n)} ${n===1?'ختماً':n===2?'ختمين':n<=10?'أختام':'ختماً'} إلى الوالد</button></div>`:'<span class="small">لا أختام جديدة.</span>'}</div>`); if($('#tSend')) $('#tSend').onclick=sendStamps; }
+  $$('#adultsBox [data-tr]').forEach(b=>b.onclick=()=>rekeyTeacher(teachers()[+b.dataset.tr]));
+  const me=iAmTeacher(); if(me){ const out=teacherOutbox(), n=out.filter(x=>!x.sentAt).length, sent=out.filter(x=>x.sentAt).length;
+    box.insertAdjacentHTML('afterbegin',`<div class="note">👩‍🏫 <b>هذا تطبيق ${esc(me.name)}</b>: تصل تسجيلات الطلاب في ملفات، فتُفتح من «📂 استورد نسخة احتياطية»، وتظهر في «تنتظر أذنك». ${n?`<div class="row"><button class="btn p" id="tSend">📤 أرسلي ${khatmN(n)} إلى الأسرة</button></div>`:'<span class="small">لا أختام جديدة.</span>'}${sent?`<div class="small"><a href="#" id="tAgain">↻ أعيدي إرسال ما أُرسل في الثلاثين يوماً (${AR(sent)})</a>: إن ضاع الملف. لا يُطبَّق ختم مرتين.</div>`:''}</div>`);
+    if($('#tSend')) $('#tSend').onclick=()=>sendStamps(false); if($('#tAgain')) $('#tAgain').onclick=e=>{ e.preventDefault(); sendStamps(true); }; }
   $$('#adultsBox [data-td]').forEach(b=>b.onclick=async()=>{ const t=teachers()[+b.dataset.td]; if(!await ask(`حذف ${t.name}؟ لن يعمل رمزها بعد الآن.`,'احذف',true)) return; adults=adults.filter(x=>x!==t); saveAdults(); renderAdults(); }); }
 
 // ---------- home ----------
@@ -836,7 +940,7 @@ function ageOk(p){ if(ageF==='all') return true;
   const [lo,hi]=ageF==='6'?[6,8]:[9,12]; return p.age[0]<=hi && p.age[1]>=lo; }
 // the weekly poem must suit the child: within the child's age when known, otherwise the youngest end of the band
 function weekly(){ const a=kidLevel()&&Math.max(6,kidLevel()); const fits=p=> a ? (p.age[0]<=a && a<=p.age[1]) : ageF==='9' ? p.age[0]>=9 : p.age[0]<=7;
-  const pool=POEMS.filter(p=>p.verses.length<=16 && fits(p)); if(!pool.length) return null; const wk=Math.floor((localDay()+4)/7); return pool[wk%pool.length]; }
+  const pool=POEMS.filter(p=>p.verses.length<=16 && fits(p) && !kidHidden(p.id)); if(!pool.length) return null; const wk=Math.floor((localDay()+4)/7); return pool[wk%pool.length]; }
 // a picture on every card: children who cannot read yet choose by the picture
 const thumbOf = p => { if(STORY[p.id]?.[0]?.img) return STORY[p.id][0].img; const th=IMAGES['@thumb:'+p.id]; if(th) return th[0]==='@' ? IMAGES[th.slice(1)] : th;
   for(const w of String(p.title).split(/\s+/)){ const k=wkey(w); if(!k) continue; const o=`${p.id}|${k}`; const u=(o in IMAGES)?IMAGES[o]:IMAGES[k]; if(u) return u; } return null; };
@@ -864,13 +968,14 @@ function renderHome(){
   $('#weekly').innerHTML = w ? `<div class="banner" id="wk"><span class="big">🏆</span><div style="flex:1"><span class="small">نشيد الأسبوع</span><b>${esc(w.title)}</b><span class="small">${esc(w.poet)}</span></div>${badgeHTML(badges(w))}</div>` : '';
   if(w) $('#wk').onclick=()=>openPoem(w.id);
   // 🔁 segments whose review day has come (and those the parent asked to practise again)
-  const due=allPoems().map(p=>({p,g:reviewsDue(p.id)})).filter(x=>x.g.length);
+  // a hidden poem keeps its progress and its dates, but is not offered on the child's screen
+  const due=allPoems().filter(p=>!kidHidden(p.id)).map(p=>({p,g:reviewsDue(p.id)})).filter(x=>x.g.length);
   $('#reviewBox').innerHTML = due.length? `<div class="banner" style="display:block;cursor:default"><b style="font-size:19px">🔁 حان وقت المراجعة</b><div class="row">${due.map(x=>`<button class="btn" data-rv="${esc(x.p.id)}" data-g="${x.g[0]}">${esc(x.p.title)}</button>`).join('')}</div></div>` : '';
   $$('#reviewBox [data-rv]').forEach(b=>b.onclick=()=>{ openPoem(b.dataset.rv); goSeg(Math.min(+b.dataset.g, segs.length>1?segs.length:0)); const memd=(st(cur.id).mem||[]).includes(seg);
     mode='sing'; level=memd?4:1; setModeUI(); renderVerses();
     toast(memd?gw('أنشد المقطع غيباً، ثم احفظ التسجيل','أنشدي المقطع غيباً، ثم احفظي التسجيل'):gw('🦜 المس «ردّد بعدي» وردّد مع النموذج','🦜 المسي «ردّدي بعدي» ورددي مع النموذج'),3500); });
   renderAlbumBar();
-  const ps=[...new Set(allPoems().map(p=>p.poet))];
+  const ps=[...new Set(allPoems().filter(p=>!kidHidden(p.id)).map(p=>p.poet))]; if(poetF!=='all'&&!ps.includes(poetF)) poetF='all';
   $('#poets').innerHTML = `<span class="chip ${poetF==='all'?'on':''}" data-p="all">كل الشعراء</span>`+ps.map(p=>`<span class="chip ${poetF===p?'on':''}" data-p="${esc(p)}">${esc(p)}</span>`).join('');
   $$('#poets .chip').forEach(c=>c.onclick=()=>{poetF=c.dataset.p;renderHome()});
   const top=new Set(packFirst()); // a ready-pack poem the parent placed first
@@ -996,7 +1101,8 @@ function markSeen(){ const [a,b]=rng(); let n=0; for(let i=a;i<b;i++) if(visited
 async function renderStory(){
   const sc=(STORY[cur.id]||[]).slice().sort((x,y)=>x.v-y.v), n=cur.verses.length, p0=cur;
   const rangeOf=k=>[k?sc[k].v:0, k<sc.length-1?sc[k+1].v:n];
-  $('#storyBox').innerHTML = sc.map((x,k)=>{ const [a,b]=rangeOf(k); let vs=''; for(let i=a;i<b;i++) vs+=`<div class="sv ${i===x.v?'key':''}" data-i="${i}">${esc(cur.verses[i][0])}<br>${esc(cur.verses[i][1])}</div>`;
+  // two pictures may fall on one typed line (two verses written on it): each picture shows that line
+  $('#storyBox').innerHTML = adultNote(cur.id) + sc.map((x,k)=>{ const [a,b0]=rangeOf(k), b=Math.max(b0,a+1); let vs=''; for(let i=a;i<b;i++) vs+=`<div class="sv ${i===x.v?'key':''}" data-i="${i}">${esc(cur.verses[i][0])}<br>${esc(cur.verses[i][1])}</div>`;
     return `<div class="scene" data-k="${k}"><div class="simg"><img src="${x.img}" alt=""><span class="splay" style="display:none">🔊</span></div><div class="cap">${vs}</div></div>`; }).join('')
     + `<div style="text-align:center" id="storyEnd"><button class="btn p" id="storySing">🎵 الآن أنشدها بصوتك</button></div>${talkHTML()}`;
   $('#storySing').onclick=()=>$('#modeSing').click();
@@ -1106,7 +1212,9 @@ $('#recBtn').onclick = async ()=>{
         // the segment is counted for the child the take is saved for (their segments may differ), and a memorised one is a review only when it is due
         const wSeg = model ? recSeg : segOf(rp,who,rA,rB), sw=(own(KS(who),rp.id)&&KS(who)[rp.id])||{}, known=wSeg>=0&&(sw.mem||[]).includes(wSeg);
         const isReview = memOk && known && reviewsDue(rp.id,who).includes(wSeg), isNew = memOk && wSeg>=0 && !known;
-        const saved=await recPut({poem:rp.id,title:rp.title,who,when:Date.now(),dur,blob,type:blob.type,lvl:recLvl,seg:wSeg<0?recSeg:wSeg,range:[rA,rB],model,marks,loud,memCand:isNew,review:isReview});
+        const revDue=isReview?(((sw.rev||{})[wSeg])||{}).due:undefined;
+        const row={poem:rp.id,title:rp.title,who,when:Date.now(),dur,blob,type:blob.type,lvl:recLvl,seg:wSeg<0?recSeg:wSeg,range:[rA,rB],model,marks,loud,memCand:isNew,review:isReview,...(Number.isFinite(revDue)?{revDue}:{})};
+        const saved=await recPut(row);
         if(saved==null){ busy=false; $('#keep').disabled=false;
           $('#saveErr').innerHTML='<div class="warn">تعذّر حفظ التسجيل في ذاكرة الجهاز. أرسله لنفسك الآن حتى لا يضيع، ثم أعد تشغيل التطبيق.<div class="row"><button class="btn s g" id="saveShare">📤 أرسله لنفسك</button></div></div>';
           $('#saveShare').onclick=()=>shareBlob(blob,blob.type,`أنشودتي-${rp.title}-${who}`,`${who} ${gw('ينشد','تنشد',who)} «${rp.title}»`,rp.title); return; }
@@ -1120,7 +1228,7 @@ $('#recBtn').onclick = async ()=>{
         // a review moves its next date only when the parent heard it and said «ثابت ✓»
         if(isReview){ s.rpend=[...new Set([...(s.rpend||[]),wSeg])]; (s.rpendAt ||= {})[wSeg]=Date.now(); }
         saveS(); if(cur===rp) renderSegs();
-        if((isNew||isReview) && tLive() && await judgeNow({id:saved,poem:rp.id,title:rp.title,who,seg:wSeg<0?recSeg:wSeg,range:[rA,rB],memCand:isNew,review:isReview})) return;
+        if((isNew||isReview) && tLive() && await judgeNow({...row,blob:undefined,id:saved})) return;
         // the big celebration is kept for real steps (a new badge, the first take, a harder level, from memory); an ordinary take gets the chime and a word
         const nb=earned(b0,badges(rp)); if(!nb.length && recLvl<=2 && s.rec>1 && recLvl<=lvl0){ cheer(); toast(praiseHead()+' 🎤',2500); }
         else celebrate(nb, recLvl, rp, recLvl===4&&!memOk, isNew, isReview, rB-rA, s.rec===1);
@@ -1172,14 +1280,17 @@ function talkHTML(bare){ const id=cur&&cur.id, q=LESSONS[id], a=ACTS[id]; if(!q&
   const ol=(q?`<ol>${q.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:'')+(a?`<b>🎨 نشاطات</b><ul class="acts">${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'');
   return bare?ol:`<div class="talk"><b>💬 حديث مع والدك</b>${ol}</div>`; }
 // «حكاية النشيد»: a short tale told around the poem, to read with the child
-$('#taleBtn').onclick=()=>{ const t=TALES[cur&&cur.id]; if(!t) return; openSheet(`<h3>📚 ${esc(t.title)}</h3><div class="tale">${t.text.map(x=>`<p>${esc(x)}</p>`).join('')}</div><div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`); };
+$('#taleBtn').onclick=()=>{ const t=TALES[cur&&cur.id]; if(!t) return; openSheet(`<h3>📚 ${esc(t.title)}</h3>${adultNote(cur.id)}<div class="tale">${t.text.map(x=>`<p>${esc(x)}</p>`).join('')}</div><div class="row"><button class="btn" onclick="closeSheet()">تمام</button></div>`); };
 // «الدرس كاملاً»: a pack's whole lesson (poet, occasion, each idea with its words, explanation, discussion and line-by-line analysis, then the textbook answers).
 // The lesson keeps no word of the poem: each line it speaks of is shown as the parent typed it, found through the pack's map.
-function lessonHTML(){ const o=LESSON[cur&&cur.id]; if(!o) return ''; const {L,map}=o;
+// a heavy poem (death, loss, war): a word for the adult at the top of what the child reads or sees with it
+const adultNote = id => ADULT[id] ? `<div class="note adultNote">👨‍👩‍👧 ${esc(ADULT[id])}</div>` : '';
+function lessonHTML(){ const o=LESSON[cur&&cur.id]; if(!o) return ''; const {L,map}=o, inv=o.inv||map.reduce((a,j,i)=>{ if(j!==null&&a[j]===undefined) a[j]=i; return a; },[]);
   const ord=['الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة','الثامنة'];
-  const line = j => { const i=map.indexOf(j); return i<0 ? `<span class="small">(السطر ${AR(j+1)} لم يُكتب في النشيد)</span>` : esc(cur.verses[i].filter(Boolean).join('  ')); };
+  // a verse typed on the same line as the one before it is shown once, with that one
+  const line = j => { const i=inv[j]; return i===undefined||i<0 ? `<span class="small">(السطر ${AR(j+1)} لم يُكتب في النشيد)</span>` : j>0&&inv[j-1]===i ? `<span class="small">(كُتب مع السطر ${AR(j)} في سطر واحد)</span>` : esc(cur.verses[i].filter(Boolean).join('  ')); };
   const ul = a => `<ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
-  let h=(L.intro||[]).map(x=>`<p><b>${esc(x.h)}:</b> ${esc(x.t)}</p>`).join('');
+  let h=adultNote(cur.id)+(L.intro||[]).map(x=>`<p><b>${esc(x.h)}:</b> ${esc(x.t)}</p>`).join('');
   h+=L.parts.map((pt,n)=>{ let b=`<div class="lsLines">${[...Array(pt.to-pt.from)].map((_,k)=>`<div><span class="n">${AR(pt.from+k+1)}</span>${line(pt.from+k)}</div>`).join('')}</div>`;
     if(pt.words&&pt.words.length) b+=`<h4>📖 معاني الكلمات</h4><ul>${pt.words.map(([w,m])=>`<li><b>${esc(w)}:</b> ${esc(m)}</li>`).join('')}</ul>`;
     if(pt.explain) b+=`<h4>📝 الشرح</h4><p>${esc(pt.explain)}</p>`;
@@ -1294,7 +1405,8 @@ async function echoYoung(r){ if(rec&&rec.state==='recording') return toast(gw('�
   // stop only this session: the child may already have started something else (the family theatre, say)
   const done=sess.alive, mine=!playSess||playSess===sess; if(mine){ level=1; stopPlay(); if(cur===p0) renderVerses(); }
   const took=mic?await mic.stop():null;
-  if(took && took.dur>3 && cur===p0) await recPut({poem:p0.id,title:p0.title,who:kid||'—',when:Date.now(),dur:took.dur,blob:took.blob,type:took.blob.type,lvl:0,seg:sg0,range:[rg0[0],rg0[1]],model:false,echo:true,marks:[],loud:1});
+  if(took && took.dur>3 && cur===p0){ const ex=((st(p0.id).rev)||{})[sg0], revDue=ex&&ex.due<=Date.now()?ex.due:undefined;
+    await recPut({poem:p0.id,title:p0.title,who:kid||'—',when:Date.now(),dur:took.dur,blob:took.blob,type:took.blob.type,lvl:0,seg:sg0,range:[rg0[0],rg0[1]],model:false,echo:true,marks:[],loud:1,...(Number.isFinite(revDue)?{revDue}:{})}); }
   if(!done || cur!==p0) return;
   markHeard(); cheer();
   // the next step is shown as pictures, not words
@@ -1516,6 +1628,8 @@ async function beforeAfter(g){
 
 // ---------- quizzes ----------
 let qs=[], qi=0, score=0, qType='', qEasy=null, qTimer=null;
+// for a child who cannot read yet: the verses of this poem that the parent's voice can say (a model marked verse by verse)
+let preVoiced={id:null,v:new Set()};
 // what the child missed is shown at the end, never during the quiz: a revealed answer is remembered, not learned
 let qMiss=[], qCur=null, qRes=[], qCounts=false, qWhy='';
 // «أيّ صورة هي الثعلب؟»: a picture whose meaning is its own name is too easy to count for ⭐
@@ -1544,7 +1658,9 @@ const rhymeOf = x => strip(x).replace(/[\sاوىيه]+$/,'').slice(-1);
 // the rhyme the ear hears is two letters: wrong endings that share them cannot be told apart by sound
 const rhyme2 = x => strip(x).replace(/[\sاوىيه]+$/,'').slice(-2);
 function quizMenu(){ clearTimeout(qTimer); stopPlay();
-  const [a,b]=rng(); const canOrder=b-a>=3; const hasWords=segWords().length>0;
+  // a child who cannot read yet (six or younger): questions by ear and by picture only; written answers are never offered
+  const pre=document.body.classList.contains('prereader');
+  const [a,b]=rng(); const canOrder=b-a>=3; const hasWords=!pre && segWords().length>0;
   if(qEasy===null) qEasy = kidAge()? kidAge()<=8 : cur.age[0]<=7;
   const s=st(cur.id), done=new Set(passedTypes({qz:((s.qzs||{})[String(seg)])||{}})), tick=t=>done.has(t)?' ✓':'';
   const starLine = (s.star ? `⭐ ${gw('نلتَ','نلتِ')} النجمة في هذا النشيد` : `⭐ النجمة لمن ينجح في نوعين مختلفين من الاختبار${done.size?` — ${gw('نجحتَ','نجحتِ')} في ${AR(done.size)} من ٢ في هذا المقطع`:''}`)+(kidAge()&&kidAge()<=8?'':'<br>تُحسب أول محاولة لكل اختبار في اليوم');
@@ -1553,8 +1669,18 @@ function quizMenu(){ clearTimeout(qTimer); stopPlay();
   $$('#quizBox [data-q]').forEach(b=>b.onclick=()=>startQuiz(b.dataset.q));
   $$('#quizBox [data-e]').forEach(c=>c.onclick=()=>{ qEasy=c.dataset.e==='1'; quizMenu(); });
   // for the young: hear a verse in the parent's voice and pick its picture (needs a verse-marked model)
-  if(qEasy){ const p0=cur, s0=seg; listenCands().then(c=>{ if(c.length<3 || cur!==p0 || seg!==s0 || mode!=='quiz' || $('#quizBox [data-q="listen"]') || !$('#quizBox .menu')) return;
-    $('#quizBox .menu').insertAdjacentHTML('afterbegin',`<button class="btn g" data-q="listen">${QTL('listen')}${tick('listen')}</button>`); $('#quizBox [data-q="listen"]').onclick=()=>startQuiz('listen'); }); }
+  if(qEasy||pre){ const p0=cur, s0=seg; listenCands().then(async c=>{ if(cur!==p0 || seg!==s0 || mode!=='quiz' || !$('#quizBox .menu')) return;
+    if(c.length>=3 && !$('#quizBox [data-q="listen"]')){ $('#quizBox .menu').insertAdjacentHTML('afterbegin',`<button class="btn g" data-q="listen">${QTL('listen')}${tick('listen')}</button>`); $('#quizBox [data-q="listen"]').onclick=()=>startQuiz('listen'); }
+    if(!pre) return;
+    // a child who cannot read: «what is this picture?» only where the parent's voice can say each question; otherwise the adults see what to prepare
+    const ms=(await recMeta()).filter(r=>String(r.poem)===String(p0.id)&&r.model&&(r.marks||[]).length>1);
+    preVoiced={id:p0.id, v:new Set(ms.flatMap(r=>r.marks.map(m=>m[0])))};
+    if(cur!==p0 || seg!==s0 || mode!=='quiz' || !$('#quizBox .menu')) return;
+    const pw=segWords().filter(x=>IMG(x.k,x.i)&&preVoiced.v.has(x.i));
+    if(pw.length>=3 && !$('#quizBox [data-q="meaning"]')){ $('#quizBox .menu').insertAdjacentHTML('beforeend',`<button class="btn g" data-q="meaning">${QTL('meaning')}${tick('meaning')}</button>`); $('#quizBox [data-q="meaning"]').onclick=()=>startQuiz('meaning'); }
+    if(c.length<3 && pw.length<3){
+      if(!ms.length){ const w=LS.get('wantModel',{}); if(!own(w,p0.id)){ w[p0.id]=Date.now(); LS.set('wantModel',w); } }
+      if(!$('#preNote')) $('#quizBox .menu').insertAdjacentHTML('beforeend',`<div class="note" id="preNote" style="text-align:center">${ms.length?`🖼 لا صور كافية في ${segs.length>1?'هذا المقطع':'هذا النشيد'} لأسئلة بالسمع${segs.length>1?'. جرّبوا «الكل»':''}، أو 🦜 ردّد مع النموذج.`:`🎧 أسئلة الصغير بالسمع والصور: تحتاج تسجيل الكبار للنشيد بيتاً بيتاً. أُضيف إلى «سجّل نماذج» في صفحة الوالد.`}</div>`); } }); }
 }
 // what can be asked by ear: each story picture under its verse, then the pictured words of the chosen segment (by half-verse)
 async function listenCands(){ const p=cur, [a,b]=rng();
@@ -1578,7 +1704,7 @@ async function sayHemi(i,hi){ const ms=(await recMeta()).filter(r=>String(r.poem
 function segWords(){ const [a,b]=rng(); const seen=new Set(), out=[]; for(let i=a;i<b;i++) cur.verses[i].forEach((h,hi)=>h.split(' ').forEach(w=>{const k=wkey(w); if(k&&M(k,i)&&!seen.has(k)){seen.add(k);out.push({k,w,i,hi})}})); return out; }
 // «ما معنى البيت؟»: a whole verse, three plain meanings; lines that only lead into the next verse are not asked
 const bmFull = x => !/[،:]\s*$/.test(x) && x.split(' ').length>=5;
-function senseIdx(){ const B=BAYT[cur&&cur.id]; if(!B) return []; const [a,b]=rng(); return [...Array(b-a)].map((_,k)=>a+k).filter(i=>bmFull(B.v[i])); }
+function senseIdx(){ const B=BAYT[cur&&cur.id]; if(!B) return []; const [a,b]=rng(); return [...Array(b-a)].map((_,k)=>a+k).filter(i=>bmFull(B.v[i]) && !(B.multi||[]).includes(i)); }
 function startQuiz(t){ clearTimeout(qTimer);
   qType=t; qi=0; score=0; qMiss=[]; qRes=[]; qCur=null; const [a,b]=rng(); const idx=[...Array(b-a)].map((_,i)=>a+i);
   if(t==='listen') return startListen();
@@ -1589,9 +1715,11 @@ function startQuiz(t){ clearTimeout(qTimer);
     if(qs.length<5){ const ok=i=>!/ـ\s*$/.test(cur.verses[i][0]) && !/^\s*ـ/.test(cur.verses[i][1]), have=new Set(qs.map(i=>cur.verses[i].join('|')));
       // a short segment: the verses before it first (already learned: their retrieval is review), then the ones after, up to five
       for(const i of [...shuffle([...Array(a).keys()]), ...shuffle([...Array(cur.verses.length-b).keys()].map(j=>b+j))]){ if(qs.length>=5) break; const k=cur.verses[i].join('|'); if(ok(i)&&!have.has(k)){ have.add(k); qs.push(i); } } const w0=qs.filter(i=>num(wk[i])>0); qs=[...w0,...shuffle(qs.filter(i=>!w0.includes(i)))]; } }
-  if(t==='meaning'){ const ws=segWords(); const withImg=shuffle(ws.filter(x=>IMG(x.k,x.i)));
+  if(t==='meaning'){ const ws=segWords(), pre=document.body.classList.contains('prereader'); let withImg=shuffle(ws.filter(x=>IMG(x.k,x.i)));
+    // a child who cannot read: pictured words the parent's voice can say, at least three, or no quiz (the menu says what to prepare)
+    if(pre){ withImg=withImg.filter(x=>preVoiced.id===cur.id&&preVoiced.v.has(x.i)); if(withImg.length<3) return quizMenu(); }
     // easy: pictures only when there are enough of them — a child who cannot read cannot pick a written meaning
-    if(qEasy && withImg.length>=3) qs=withImg.slice(0,5);
+    if((qEasy||document.body.classList.contains('prereader')) && withImg.length>=3) qs=withImg.slice(0,5);
     // the pictures first, then written words, so a picture is never dropped for a written one (the order is shuffled after)
     else { const nImg=qEasy?5:2, pics=withImg.slice(0,nImg); qs=shuffle(pics.concat(shuffle(ws.filter(x=>!pics.includes(x)))).slice(0,5)); }
     qs.forEach(x=>x.cnt = !(IMG(x.k,x.i) && trivialPic(x.k,x.i))); }
@@ -1636,7 +1764,7 @@ function nextQ(){
       const inVerse=new Set(cur.verses[x.i].flatMap(t=>t.split(' ')).map(w=>wkey(w)).filter(Boolean).map(k=>IMG(k,x.i)).filter(Boolean));
       others=[...new Set(Object.entries(IMAGES).filter(([k,u])=>u&&k[0]!=='@'&&u[0]!=='@'&&!inVerse.has(u)).map(([k,u])=>u))]; }
     const opts=shuffle([right,...shuffle(others).slice(0,2)]); qCur={q:'🔊'+(x.w?' «'+esc(x.w)+'»':' البيت'), a:`<img class="mimg" src="${right}" alt="">`, cnt:x.cnt};
-    $('#quizBox').innerHTML=head+`<div class="q"><button class="btn p" id="lsPlay" style="font-size:34px;padding:10px 26px" title="اسمع">🔊</button><br><span class="small">${x.scene?gw('اسمع البيت، ثم المس صورته','اسمعي البيت، ثم المسي صورته'):gw('اسمع، ثم المس صورة ما سمعت','اسمعي، ثم المسي صورة ما سمعتِ')}</span></div><div class="imgs">`+opts.map(u=>`<button class="opt" data-ok="${u===right?1:0}"><img src="${u}" alt=""></button>`).join('')+'</div>';
+    $('#quizBox').innerHTML=head+`<div class="q"><button class="btn p" id="lsPlay" style="font-size:34px;padding:10px 26px" title="اسمع">🔊</button><br><span class="small">${x.scene?gw('اسمع البيت، ثم المس صورته','اسمعي البيت، ثم المسي صورته'):gw('اسمع، ثم المس صورة ما سمعت','اسمعي، ثم المسي صورة ما سمعتِ')}</span></div><div class="imgs">`+opts.map((u,j)=>`<button class="opt" data-ok="${u===right?1:0}" aria-label="الصورة ${AR(j+1)}"><img src="${u}" alt=""></button>`).join('')+'</div>';
     const play=()=>{ const sess=newSess(); playBuf(x.buf,x.span[0],x.span[1],sess).then(()=>{ if(playSess===sess) playSess=null; }); };
     $('#lsPlay').onclick=play; play();
     const btns=$$('#quizBox .opt'); btns.forEach(b=>b.onclick=()=>{ stopPlay(); const ok=b.dataset.ok==='1'; b.classList.add(ok?'ok':'no'); answer(btns,ok); if(ok&&x.w) toast(x.w); });
@@ -1664,8 +1792,10 @@ function nextQ(){
     const others=[...new Set(Object.entries(IMAGES).filter(([k,u])=>u&&u!==im&&k[0]!=='@'&&u[0]!=='@').map(([k,u])=>u))];
     if(im && others.length>=2){
       const opts=shuffle([im,...shuffle(others).slice(0,2)]); qCur={q:'«'+esc(x.w)+'»', a:`<img class="mimg" src="${im}" alt=""> ${esc(optNorm(right))}`, cnt:x.cnt};
-      $('#quizBox').innerHTML=head+`<div class="q"><button class="btn g" id="sayW" style="font-size:24px" aria-label="اسمع">🔊</button> ${hl}<br><span class="small">أيّ صورة هي «${esc(x.w)}»؟</span></div><div class="imgs">`+opts.map(u=>`<button class="opt" data-ok="${u===im?1:0}"><img src="${u}" alt=""></button>`).join('')+'</div>';
+      $('#quizBox').innerHTML=head+`<div class="q"><button class="btn g" id="sayW" style="font-size:24px" aria-label="اسمع">🔊</button> ${hl}<br><span class="small">أيّ صورة هي «${esc(x.w)}»؟</span></div><div class="imgs">`+opts.map((u,j)=>`<button class="opt" data-ok="${u===im?1:0}" aria-label="الصورة ${AR(j+1)}"><img src="${u}" alt=""></button>`).join('')+'</div>';
       $('#sayW').onclick=()=>sayHemi(x.i,x.hi);
+      // a child who cannot read hears the question at once
+      if(document.body.classList.contains('prereader')){ const q0=qi; setTimeout(()=>{ if(qi===q0&&qType==='meaning'&&mode==='quiz') sayHemi(x.i,x.hi); },350); }
       const btns=$$('#quizBox .opt'); btns.forEach(b=>b.onclick=()=>{ const ok=b.dataset.ok==='1'; b.classList.add(ok?'ok':'no'); answer(btns,ok,btns.find(y=>y.dataset.ok==='1')); if(ok) toast(right); });
     } else {
       // wrong options come from the same poem's words first: plausible, and they revise the poem's vocabulary
@@ -1712,7 +1842,7 @@ async function renderParent(){
   const ps=allPoems(); const B=ps.map(p=>({p,b:badges(p,pKid),s:(KS(pKid)[p.id])||{}}));
   const cnt=k=>B.filter(x=>x.b[k]).length; const mins=Math.round(recs.reduce((a,r)=>a+(r.dur||0),0)/60);
   // verses memorised (stamped segments), so partial progress shows before a whole poem is done
-  const memV=B.reduce((t,x)=>{ const sg=segments(x.p,pKid), m=new Set(x.s.mem||[]); if(sg.length>1&&m.has(sg.length)) return t+x.p.verses.length; return t+sg.filter((_,i)=>m.has(i)).reduce((a,[u,v])=>a+v-u,0); },0);
+  const memV=B.reduce((t,x)=>{ const n=x.p.verses.length, V=new Set(); for(const [u,v] of [...rangesOf(n,segZ(x.p,pKid),x.s.mem||[]),...(x.s.memR||[]).filter(y=>okRange(y,n))]) for(let i=u;i<v;i++) V.add(i); return t+V.size; },0);
   const wk=recs.filter(r=>Date.now()-r.when<7*864e5).length; const lastT=Math.max(0,...recs.map(r=>r.when),...B.map(x=>x.s.last||0));
   $('#pKpis').innerHTML = pKid? [[cnt('sang'),'أنشد'],[cnt('mem'),'حفظ كاملاً'],[memV,'عدد الأبيات المحفوظة'],[cnt('quiz'),'نجح في اختبار'],[AR(recs.length),'تسجيل'],[AR(mins),'دقيقة إنشاد'],[AR(wk),'تسجيل هذا الأسبوع']].map(([n,t])=>`<div class="kpi"><b>${typeof n==='number'?AR(n):n}</b>${t}</div>`).join('') + (lastT?`<div class="kpi"><b style="font-size:16px">${new Date(lastT).toLocaleDateString('ar-EG',{day:'numeric',month:'short'})}</b>آخر نشاط</div>`:'') : '';
   const rows=B.filter(x=>x.s.rec||x.s.quiz||x.s.heard||(x.s.mem||[]).length).sort((a,b)=>(b.s.last||0)-(a.s.last||0));
@@ -1725,7 +1855,9 @@ function weakHTML(k){ const items=[]; for(const [pid,s] of Object.entries(KS(k))
   if(!items.length) return ''; items.sort((x,y)=>y.c-x.c || x.p.title.localeCompare(y.p.title));
   return `<h2 class="sec">🧩 أبيات ${gw('يتعثّر','تتعثّر',k)} فيها ${esc(k)}</h2><div class="rlist">${items.slice(0,10).map(x=>`<div class="r"><div class="t"><b>${esc(x.p.title)}</b> <span class="tag">البيت ${AR(x.i+1)}${x.c>1?' · '+marrat(x.c):''}</span><div style="font-family:Amiri,serif;font-size:18px">${esc(x.p.verses[x.i][0])} …</div></div></div>`).join('')}</div><p class="small">تأتي هذه الأبيات أولاً في «أكمل البيت». وتخرج من القائمة حين تسمعها مرة بلا تعثّر.</p>`; }
 const tasjeel = n => n===1?'تسجيلاً واحداً':n===2?'تسجيلين':n<=10?AR(n)+' تسجيلات':AR(n)+' تسجيلاً';
-function segName(r){ r={...r, seg:recSegOf(r)}; const p=poemById(r.poem); if(!p) return ''; const sg=segments(p,r.who); if(sg.length<2) return 'النشيد كله'; if(r.seg>=sg.length) return 'النشيد كله متصلاً'; const [a,b]=sg[r.seg]; return 'الأبيات '+AR(a+1)+'–'+AR(b); }
+function segName(r){ const p=poemById(r.poem); if(!p) return ''; const n=p.verses.length;
+  if(okRange(r.range,n)) return r.range[0]===0&&r.range[1]===n ? 'النشيد كله' : 'الأبيات '+AR(r.range[0]+1)+'–'+AR(r.range[1]);
+  const sg=segments(p,r.who), g=recSegOf(r); if(sg.length<2) return 'النشيد كله'; if(g>=sg.length) return 'النشيد كله متصلاً'; const x=sg[g]; return x?'الأبيات '+AR(x[0]+1)+'–'+AR(x[1]):''; }
 // the parent listens, and decides: 🧠 is the parent's stamp, not the app's guess
 async function renderQueue(){
   const rank=r=>r.memCand?0:r.review?1:2;
@@ -1734,7 +1866,8 @@ async function renderQueue(){
   // the echo sessions of the youngest are long and mostly the model's voice: they wait folded below the takes to judge
   const main=all.filter(r=>!r.echo), echo=all.filter(r=>r.echo), list=main.slice(0,8), shown=list.concat(echo.slice(0,8));
   const BTN={mem:[['ok','g','✓ حفظه'],['okw','','✓ حفظه مع تردّد'],['again','','🔁 نراجعه غداً']], rev:[['rok','g','✓ ثابت'],['rweak','','🔁 ضعُف']], echo:[['eok','g','✓ أتقنه'],['heard','','👍 سمعته']], rec:[['heard','g','👍 سمعته']]};
-  const kind=r=>r.memCand?'mem':r.review?'rev':r.echo?'echo':'rec';
+  // the teacher judges what the child's device asked; on the family's device a take whose verses are not one of the child's segments is only heard
+  const kind=takeKind;
   const tag=r=>({mem:'🧠 غيباً · '+segName(r), rev:'🔁 مراجعة · '+segName(r), echo:'🦜 ترديد · '+segName(r), rec:'🎤 إنشاد'})[kind(r)];
   // the buttons wake up once most of the take was heard: a stamp is the parent's ear, not a guess
   const row=r=>`<div class="r" data-q="${esc(r.id)}"><div class="t"><b style="font-family:Amiri,serif;font-size:19px">${kidIcon(r.who)} ${esc(r.title)}</b> <span class="tag">${tag(r)}</span><div class="small">${esc(r.who)} · ${new Date(r.when).toLocaleDateString('ar-EG',{day:'numeric',month:'long'})} · ${fmt(r.dur)}</div></div>
@@ -1742,7 +1875,7 @@ async function renderQueue(){
   // how long the oldest take has waited: a queue left for days stops the children's reviews and steps
   const oldest=Math.min(...all.map(r=>num(r.when))), days=Math.floor((Date.now()-oldest)/864e5);
   const ageNote=days>=2?`<div class="warn">⏳ أقدم تسجيل ينتظر منذ ${days===2?'يومين':AR(days)+' '+(days<=10?'أيام':'يوماً')}. ${days>=RPEND_DAYS?'المراجعات التي لم تُسمع تعود إلى الأطفال بعد ثلاثة أيام.':''}</div>`:'';
-  $('#pQueue').innerHTML=`<h2 class="sec">📥 تنتظر أذنك (${AR(all.length)})</h2>${ageNote}${list.length?`<div class="rlist">${list.map(row).join('')}</div>`:''}${main.length>list.length?`<p class="small">وبعدها ${tasjeel(main.length-list.length)}</p>`:''}`
+  $('#pQueue').innerHTML=`<h2 class="sec">📥 تنتظر أذنك (${AR(all.length)})</h2>${ageNote}${list.length?`<div class="rlist">${list.map(row).join('')}</div>`:''}${main.length>list.length?`<p class="small">وبعدها ${tasjeelN(main.length-list.length)}</p>`:''}`
     +(echo.length?`<details class="small" style="margin-bottom:10px" ${main.length?'':'open'}><summary>🦜 جلسات الترديد (${AR(echo.length)})</summary><div class="rlist" style="margin-top:8px">${echo.slice(0,8).map(row).join('')}</div></details>`:'');
   $$('#pQueue .r').forEach(el=>{ const r=shown.find(x=>String(x.id)===el.dataset.q); const sts=[...el.querySelectorAll('[data-st]')];
     const wake=()=>{ sts.forEach(b=>{ b.disabled=false; b.title=''; }); const h=el.querySelector('.hearFirst'); if(h) h.remove(); };
@@ -1754,32 +1887,54 @@ async function renderQueue(){
         const wv=el.querySelector('.wv'); wv.style.display=''; wv.innerHTML='<div class="small">المس البيت الذي تعثّر فيه (إن وُجد):</div>'+[...Array(vb-va)].map((_,k)=>`<span class="chip" data-v="${va+k}">${AR(va+k+1)} ${esc(p.verses[va+k][0].split(' ').slice(0,3).join(' '))}…</span>`).join('');
         wv.querySelectorAll('[data-v]').forEach(c=>c.onclick=()=>c.classList.toggle('on')); } };
     sts.forEach(b=>b.onclick=async()=>{ if(b.disabled) return; const stamp=b.dataset.st, weak=[...el.querySelectorAll('.wv .chip.on')].map(c=>+c.dataset.v);
-      const by=r.inbox&&iAmTeacher()?iAmTeacher().name:actor?actor.name:''; if(!await recPatch(r.id,{stamp,stampAt:Date.now(),weak,...(by?{by}:{})})) return toast('تعذّر الحفظ');
-      if(r.inbox){ LS.set('tOut',[...teacherOutbox().filter(x=>!(x.src===r.inbox.src&&x.rid===r.inbox.rid)),{src:r.inbox.src,rid:r.inbox.rid,stamp,weak,at:Date.now()}]); } else stampEffects({...r,by},stamp,weak);
+      const by=r.inbox&&iAmTeacher()?iAmTeacher().name:actor?actor.name:'';
+      // the decision is written first (the child's progress, or the teacher's outbox), then the take is marked: a crash in between repeats nothing
+      if(r.inbox){ if(!outboxPut(r,stamp,weak)) return; } else stampEffects({...r,by},stamp,weak);
+      if(!await recPatch(r.id,{stamp,stampAt:Date.now(),weak,sdev:deviceId(),...(by?{by}:{})})) return toast('تعذّر الحفظ: أعد المحاولة');
       toast({ok:kidAge(r.who)&&kidAge(r.who)<=8?'خُتم الحفظ ✓ والمراجعة غداً':'خُتم الحفظ ✓ والمراجعة بعد ٣ أيام',okw:'خُتم الحفظ ✓ والمراجعة غداً',again:'سيظهر في مراجعة الغد',rok:'المراجعة ثابتة ✓ والقادمة بعد أيام أطول',rweak:'سيعود إلى مراجعة الغد',eok:'أتقن الترديد ✓',heard:'وصلته رسالتك 👂'}[stamp]||'✓'); renderParent(); }); });
 }
-// what the parent's stamp does: memorised, reviewed, echo mastered, or just «I heard you»
-function stampEffects(r,stamp,weak=[]){ r={...r, seg:recSegOf(r)}; const p=poemById(r.poem); const s=st(r.poem,r.who); s.pend=(s.pend||[]).filter(x=>x!==r.seg);
-  // stumbled verses: one more when marked, one less when the verse was heard again without a stumble
-  if(p && (r.memCand||r.review||r.echo)){ const sg=segments(p,r.who), [a,b]=r.seg>=sg.length||sg.length<2?[0,p.verses.length]:sg[r.seg], w=s.weak||{};
-    for(let i=a;i<b;i++){ if(weak.includes(i)) w[i]=num(w[i])+1; else if(w[i]){ w[i]=num(w[i])-1; if(w[i]<=0) delete w[i]; } } if(Object.keys(w).length) s.weak=w; else delete s.weak; }
-  if(stamp==='ok'||stamp==='okw'){ const before=p?badges(p,r.who).mem:false, sg=p?segments(p,r.who):[], whole=sg.length>1&&r.seg>=sg.length;
+// what an adult's stamp does: memorised, reviewed, echo mastered, or just «I heard you».
+// • once only: the take's key is kept with the child's progress and written with it in the same step (a stamp applied
+//   twice, by a retry, a teacher's file opened again or the check at start-up, changes nothing the second time);
+// • only for the verses the take holds (a take that is not one of this child's segments counts as «heard»);
+// • a take recorded for a review date that has since been settled by another take moves no date and erases no stumble.
+const takeKey = r => r.uid || ('#'+r.id);
+function stampEffects(r,stamp,weak=[]){ const p=poemById(r.poem); if(!p) return false; const s=st(r.poem,r.who), key=takeKey(r);
+  if((s.done||[]).includes(key)) return false;
+  const n=p.verses.length, g=recSegOf(r), sg=segments(p,r.who), whole=sg.length>1&&g>=sg.length; r={...r, seg:g};
+  const [a,b] = okRange(r.range,n) ? r.range : g>=sg.length||sg.length<2 ? [0,n] : (sg[g]||[0,0]);
+  const x=g>=0?(s.rev||{})[g]:null, stale = g>=0 && (r.review||r.echo) && Number.isFinite(r.revDue) && !(x && x.due===r.revDue);
+  if(g>=0) s.pend=(s.pend||[]).filter(v=>v!==g);
+  // stumbled verses: one more when marked; one less when heard again without a stumble (never by a stale take)
+  if(r.memCand||r.review||r.echo){ const w=s.weak||{};
+    for(let i=a;i<b;i++){ if(weak.includes(i)) w[i]=num(w[i])+1; else if(w[i] && !stale){ w[i]=num(w[i])-1; if(w[i]<=0) delete w[i]; } } if(Object.keys(w).length) s.weak=w; else delete s.weak; }
+  const news=(t,o={})=>pushNews(r.who,{t,poem:r.poem,by:r.by||'',...o});
+  const young=kidAge(r.who)&&kidAge(r.who)<=8; let out=null;
+  if(g<0){ out=['heard']; }
+  else if(stamp==='ok'||stamp==='okw'){ const before=badges(p,r.who).mem, known=(s.mem||[]).includes(g);
     // the whole poem in one go holds every segment: they are memorised too (their reviews come with the whole)
-    s.mem=[...new Set([...(s.mem||[]),r.seg,...(whole?sg.map((_,i)=>i):[])])]; if(whole) s.pend=(s.pend||[]).filter(x=>x>=sg.length);
-    // «✓ حفظه»: the first review in three days; «حفظه مع تردّد»: tomorrow
-    scheduleReview(s,r.seg,stamp==='ok'&&!(kidAge(r.who)&&kidAge(r.who)<=8)?1:0);
-    if(whole && s.rev){ for(const g of Object.keys(s.rev)) if(+g<sg.length) delete s.rev[g]; s.rpend=(s.rpend||[]).filter(g=>g>=sg.length); }
-    saveS();
-    pushNews(r.who,{t:'mem',poem:r.poem,whole,cert:!!p&&!before&&badges(p,r.who).mem,by:r.by||''}); }
-  else if(stamp==='again'){ (s.rev ||= {})[r.seg]={step:0,due:dueIn(1)}; saveS(); pushNews(r.who,{t:'again',poem:r.poem,by:r.by||''}); }
-  else if(stamp==='rok'||stamp==='rweak'){ s.rpend=(s.rpend||[]).filter(x=>x!==r.seg); if(s.rpendAt){ delete s.rpendAt[r.seg]; if(!Object.keys(s.rpendAt).length) delete s.rpendAt; }
-    const x=(s.rev||{})[r.seg]; if(stamp==='rok'){ if(!x || x.due<=Date.now()) scheduleReview(s,r.seg,(x||{step:0}).step+(weak.length?0:1)); } else (s.rev ||= {})[r.seg]={step:0,due:dueIn(1)};
-    saveS(); pushNews(r.who,{t:'rev',poem:r.poem,ok:stamp==='rok',by:r.by||''}); }
-  else if(stamp==='eok'){ const g=r.seg, first=!(s.echoOk||[]).includes(g); s.echoOk=[...new Set([...(s.echoOk||[]),g])];
+    s.mem=[...new Set([...(s.mem||[]),g,...(whole?sg.map((_,i)=>i):[])])]; if(whole) s.pend=(s.pend||[]).filter(v=>v>=sg.length);
+    // «✓ حفظه»: the first review in three days (tomorrow up to eight); «حفظه مع تردّد»: tomorrow. Already memorised by another take: its dates stay
+    if(!known || !x) scheduleReview(s,g,stamp==='ok'&&!young?1:0);
+    if(whole && s.rev){ for(const v of Object.keys(s.rev)) if(+v<sg.length) delete s.rev[v]; s.rpend=(s.rpend||[]).filter(v=>v>=sg.length); }
+    out=['mem',{whole,cert:!before&&badges(p,r.who).mem}]; }
+  else if(stamp==='again'){ if(!stale) (s.rev ||= {})[g]={step:0,due:dueIn(1)}; out=['again']; }
+  else if(stamp==='rok'||stamp==='rweak'){
+    if(!stale){ s.rpend=(s.rpend||[]).filter(v=>v!==g); if(s.rpendAt){ delete s.rpendAt[g]; if(!Object.keys(s.rpendAt).length) delete s.rpendAt; }
+      if(stamp==='rok'){ if(!x || x.due<=Date.now()) scheduleReview(s,g,(x||{step:0}).step+(weak.length?0:1)); } else (s.rev ||= {})[g]={step:0,due:dueIn(1)}; }
+    out=['rev',{ok:stamp==='rok'}]; }
+  else if(stamp==='eok'){ const first=!(s.echoOk||[]).includes(g); s.echoOk=[...new Set([...(s.echoOk||[]),g])];
     // echo mastered is retrieved again later: the first review tomorrow, then further apart each time the child echoes it when due
-    if(!(s.mem||[]).includes(g)){ const x=(s.rev||{})[g]; if(first||!x) scheduleReview(s,g,0); else if(x.due<=Date.now()) scheduleReview(s,g,x.step+1); }
-    saveS(); pushNews(r.who,{t:'echo',poem:r.poem,by:r.by||''}); }
-  else { saveS(); pushNews(r.who,{t:'heard',poem:r.poem,by:r.by||''}); } }
+    if(!(s.mem||[]).includes(g) && !stale){ if(first||!x) scheduleReview(s,g,0); else if(x.due<=Date.now()) scheduleReview(s,g,x.step+1); }
+    out=['echo']; }
+  else out=['heard'];
+  (s.done ||= []).push(key); if(s.done.length>300) s.done=s.done.slice(-300);
+  saveS(); news(...out); return true; }
+// the check at start-up: a stamp saved on this device whose effect was lost (the app closed in between, storage full) is applied now; never twice
+async function reconcileStamps(){ try{ const me=deviceId(); let n=0;
+  for(const r of await recMeta()){ if(!r.stamp||r.model||r.praise||r.inbox||r.sdev!==me||!kids.includes(r.who)||Date.now()-num(r.stampAt)>30*864e5) continue;
+    const s=own(S,r.who)&&own(S[r.who],r.poem)?S[r.who][r.poem]:null; if(s&&(s.done||[]).includes(takeKey(r))) continue; if(stampEffects(r,r.stamp,Array.isArray(r.weak)?r.weak:[])) n++; }
+  if(n){ renderHome(); } }catch(e){} }
 // ten minutes tonight: listen, record one model, ask one question
 async function renderTonight(){ const items=[];
   const q=(await recMeta()).filter(r=>!r.model&&!r.praise&&!r.stamp&&kids.includes(r.who)).length; if(q) items.push(`📥 اسمع ${tasjeel(q)} (في الأعلى)`);
@@ -1814,15 +1969,16 @@ $('#aSave').onclick=()=>{
   const bad=lines.findIndex(l=>l.split('/').length!==2||l.split('/').some(x=>!clean(x)));
   if(bad>-1) return toast('السطر '+AR(bad+1)+' ليس على صورة «الشطر الأول / الشطر الثاني»',4000);
   const age=$('#aAge').value.split(',').map(Number), np={id:'u'+Date.now(), title, poet, age, age0:age.slice(), verses:lines.map(l=>l.split('/').map(x=>x.trim())), user:true};
-  added.push(np); applyPacks();
+  added.push(np); applyPacks(); foldAlts();
   LS.set('added',added); $('#aTitle').value=$('#aPoet').value=$('#aText').value=''; renderAdded(); renderHome();
   if(!np.pack) return toast('حُفظ النشيد ✓',3500);
   // what the pack recognised: the parent sees it, and can say «this is not that poem»
-  const map=PACKMAP[np.id]||[], k=PACKS[np.pack], got=new Set(map.filter(x=>x!==null)), miss=k.keys.map((_,j)=>j).filter(j=>!got.has(j)), lost=map.map((x,i)=>x===null?i:-1).filter(i=>i>=0);
-  openSheet(`<h3>📦 عرفنا النشيد: «${esc(k.title)}»</h3><p>معه شرحه ومعاني أبياته${k.lesson?' والدرس كاملاً':''}${k.tale?' وحكايته':''}${(k.story||[]).length?' وصوره':''}.</p>
+  const cov=PACKCOV[np.id]||[], k=PACKS[np.pack], got=new Set(cov.flat()), miss=k.keys.map((_,j)=>j).filter(j=>!got.has(j)), lost=cov.map((x,i)=>x.length?-1:i).filter(i=>i>=0), two=cov.map((x,i)=>x.length>1?i:-1).filter(i=>i>=0);
+  openSheet(`<h3>📦 عرفنا النشيد: «${esc(k.title)}»</h3><p>معه شرحه ومعاني أبياته${k.lesson?' والدرس كاملاً':''}${k.tale?' وحكايته':''}${(k.story||[]).length?' وصوره':''}.</p>${adultNote(np.id)}
     <p>عُرف <b>${AR(got.size)}</b> من ${AR(k.keys.length)} بيتاً.</p>
     ${miss.length?`<div class="warn">لم أجد في ما كتبتَ: ${miss.map(j=>'البيت '+AR(j+1)).join('، ')} من الحزمة. إن نسيته فاحذف النشيد وأعد لصقه كاملاً.</div>`:''}
     ${lost.length?`<div class="warn">لم أعرف ${lost.map(i=>'السطر '+AR(i+1)).join('، ')}: لن يظهر له شرح. راجع كتابته.</div>`:''}
+    ${two.length?`<div class="note">${two.map(i=>'السطر '+AR(i+1)).join('، ')}: فيه بيتان في سطر واحد، فمعناهما معاً تحته، ولا يُسأل عنه في «ما معنى البيت؟». يمكنك فصلهما سطرين.</div>`:''}
     <div class="row"><button class="btn p" onclick="closeSheet()">تمام</button><button class="btn" id="notPack">ليست هذه القصيدة</button></div>`);
   $('#notPack').onclick=()=>{ np.noPack=true; unPack(np); LS.set('added',added); closeSheet(); renderAdded(); renderHome(); toast('حسناً: النشيد بلا الشرح الجاهز',3000); };
 };
@@ -1836,7 +1992,7 @@ $('#aExport').onclick=()=>{ openSheet(`<h3>💾 نسخة احتياطية</h3><p
 // the backup is built from pieces and split into files of at most 60 MB: one giant string fails silently on large libraries
 async function doExport(withRecs){
   closeSheet(); const base='أنشودتي-نسخة-'+new Date().toISOString().slice(0,10), bid=Date.now();
-  const head={added,meanings:LS.get('meanings',{}),kids,kidInfo,stats:S,parentName:LS.get('parentName',''),adults,restDay:LS.get('restDay',-1)};
+  const head={added,meanings:LS.get('meanings',{}),kids,kidInfo,stats:S,parentName:LS.get('parentName',''),adults:adults.map(({secret,...a})=>a),restDay:LS.get('restDay',-1)};
   const items=[]; let pieces=[], size=0, partNo=1, nRec=0;
   const open_=()=>{ pieces=[JSON.stringify({app:'anasheed',v:4,backup:bid,part:partNo}).slice(0,-1)+(partNo===1?','+JSON.stringify(head).slice(1,-1):'')+',"recs":[']; size=0; };
   const close_=last=>{ pieces.push(last?'],"last":true}':'],"last":false}'); items.push(new Blob(pieces,{type:'application/json'})); partNo++; };
@@ -1856,27 +2012,68 @@ async function doExport(withRecs){
   if(ok && !sure) return toast('لم تُسجَّل النسخة. صدّرها مرة أخرى واحفظها في مكان آمن',4500);
   if(ok){ if(withRecs) LS.set('lastBackup',Date.now()); toast(withRecs?`النسخة فيها ${tasjeelN(nRec)}${files.length>1?' في '+(files.length===2?'ملفين':AR(files.length)+(files.length<=10?' ملفات':' ملفاً')):''} ✓`:'حُفظت النسخة ✓',4000); if(screen==='parent') renderParent(); }
 }
-function mergeStat(a,b){ a=a&&typeof a==='object'?a:{}; b=b&&typeof b==='object'?b:{};
-  // segments are counted in the size the poem was begun with: progress counted in another size cannot be merged segment by segment
-  const prog=x=>['mem','pend','rpend','echoOk'].some(f=>(x[f]||[]).length)||Object.keys(x.rev||{}).length||Object.keys(x.qzs||{}).length;
-  const CLR={mem:[],pend:[],rpend:[],rpendAt:{},rev:{},echoOk:[],qzs:{},weak:{},seg:0};
-  let z=okZ(a.z)?a.z:okZ(b.z)?b.z:0; if(okZ(a.z)&&okZ(b.z)&&a.z!==b.z){ if(!prog(a)){ z=b.z; a={...a,...CLR}; } else b={...b,...CLR}; }
+// two copies of a child's progress in one poem (this device and a backup) become one, losing no evidence.
+// Each copy counts segments in its own size (z). Every memorised segment is turned into its verses; a segment of the size kept
+// here is memorised when one recited stretch holds all its verses. Stretches that hold only part of a segment are kept as verses (memR)
+// and count for the parent's verse total. Reviews come with the segment they belong to.
+function mergeStat(a,b,pid,k){ a=a&&typeof a==='object'?a:{}; b=b&&typeof b==='object'?b:{};
+  const p=pid!=null?poemById(pid):null, n=p?p.verses.length:0;
+  // copies counted in another size, kept aside while the poem was not on this device: counted now that it is
+  if(p && (Array.isArray(a.alt)||Array.isArray(b.alt))){ const al=[...(Array.isArray(a.alt)?a.alt:[]),...(Array.isArray(b.alt)?b.alt:[])].filter(y=>y&&typeof y==='object').slice(-8), {alt:_1,...a2}=a, {alt:_2,...b2}=b;
+    let x=mergeStat(a2,b2,pid,k); for(const y of al) x=mergeStat(x,y,pid,k); return x; }
+  const prog=x=>['mem','pend','rpend','echoOk','memR','echoR'].some(f=>(x[f]||[]).length)||Object.keys(x.rev||{}).length;
+  const za=okZ(a.z)?a.z:0, zb=okZ(b.z)?b.z:0, zk=k!=null&&(okName(k)||k==='—')?segSize(k):6;
+  let z = za&&zb ? (za===zb||prog(a)||!prog(b) ? za : zb) : (za||zb);
   const ints=x=>(Array.isArray(x)?x:[]).map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<100); const newer=num(b.last)>num(a.last)?b:a, older=newer===a?b:a;
-  const mem=[...new Set([...ints(a.mem),...ints(b.mem)])];
-  // the review schedule travels with the backup: for each segment the newer device's entry wins
-  const rev={}; for(const x of [older,newer]){ const r=x.rev; if(!r||typeof r!=='object') continue; for(const [g,v] of Object.entries(r)) if(/^\d{1,2}$/.test(g) && v && typeof v==='object' && Number.isFinite(+v.due)) rev[g]={step:Math.max(0,Math.min(REVIEW_DAYS.length-1,Math.floor(num(v.step)))),due:+v.due}; }
-  const pend=[...new Set([...ints(a.pend),...ints(b.pend)])].filter(g=>!mem.includes(g)), rpend=[...new Set([...ints(a.rpend),...ints(b.rpend)])].filter(g=>mem.includes(g)), echoOk=[...new Set([...ints(a.echoOk),...ints(b.echoOk)])];
+  let mem, echoOk, rev={}, memR=[], echoR=[], alt=[];
+  const same=x=>!za||!zb||(okZ(x.z)?x.z:z)===z;
+  const revOf=(x,g)=>{ const v=x.rev&&typeof x.rev==='object'?x.rev[g]:null; return v&&typeof v==='object'&&Number.isFinite(+v.due)?{step:Math.max(0,Math.min(REVIEW_DAYS.length-1,Math.floor(num(v.step)))),due:+v.due}:null; };
+  if(p && z){
+    const sizeOf=x=>okZ(x.z)?x.z:(z||zk), tg=segsZ(n,z), W=tg.length;
+    const src=(x,f,fr)=>[...rangesOf(n,sizeOf(x),ints(x[f])).map((rg,i)=>({rg,g:ints(x[f])[i],x})), ...(Array.isArray(x[fr])?x[fr]:[]).filter(y=>okRange(y,n)).map(rg=>({rg,g:null,x}))];
+    const holds=(L,t)=>L.find(o=>o.rg[0]<=t[0]&&o.rg[1]>=t[1]);
+    const cover=(f,fr)=>{ const L=[...src(a,f,fr),...src(b,f,fr)], out=[];
+      tg.forEach((t,i)=>{ if(holds(L,t)) out.push(i); });
+      // the whole poem recited in one go: only from a stretch of the whole poem
+      if(W>1 && L.some(o=>o.rg[0]===0&&o.rg[1]===n && (o.g===null || o.g>=segsZ(n,sizeOf(o.x)).length))) out.push(W);
+      // the stretches no memorised segment holds are kept as verses: partial evidence, never dropped
+      const held=rg=>out.some(i=>{ const t=i===W?[0,n]:tg[i]; return t[0]<=rg[0]&&rg[1]<=t[1]; });
+      const R=[]; for(const o of L) if(!held(o.rg) && !R.some(y=>y[0]===o.rg[0]&&y[1]===o.rg[1])) R.push(o.rg.slice());
+      return [out, R.slice(-50), L]; };
+    let L; [mem,memR,L]=cover('mem','memR'); [echoOk,echoR]=cover('echoOk','echoR');
+    // reviews: every entry of a copy counted in the kept size (the newer copy wins a segment both have);
+    // a segment memorised only through the other copy takes the entry of the stretch that holds it (the soonest, if several)
+    for(const x of [older,newer]) if(sizeOf(x)===z && x.rev&&typeof x.rev==='object') for(const g of Object.keys(x.rev)) if(/^\d{1,2}$/.test(g)&&+g<=W){ const v=revOf(x,g); if(v) rev[g]=v; }
+    for(const g of new Set([...mem, ...echoOk])){ if(rev[g]) continue; const t=g===W?[0,n]:tg[g];
+      const o=[...src(a,'mem','x'),...src(b,'mem','x'),...src(a,'echoOk','x'),...src(b,'echoOk','x')].filter(o=>o.g!==null&&o.rg[0]<=t[0]&&o.rg[1]>=t[1]).map(o=>revOf(o.x,o.g)).filter(Boolean).sort((u,v)=>u.due-v.due)[0];
+      if(o) rev[g]=o; }
+  } else {
+    // the poem is not on this device: its verses are unknown, so a copy counted in another size is kept aside whole (alt)
+    mem=[...new Set([...(same(a)?ints(a.mem):[]),...(same(b)?ints(b.mem):[])])]; echoOk=[...new Set([...(same(a)?ints(a.echoOk):[]),...(same(b)?ints(b.echoOk):[])])];
+    for(const x of [older,newer]) if(same(x)&&x.rev&&typeof x.rev==='object') for(const g of Object.keys(x.rev)) if(/^\d{1,2}$/.test(g)){ const v=revOf(x,g); if(v) rev[g]=v; }
+    const rs=x=>(Array.isArray(x)?x:[]).filter(y=>okRange(y,1000)).slice(-50);
+    for(const x of [a,b]) if(!same(x)&&prog(x)) alt.push({z:x.z,mem:ints(x.mem),echoOk:ints(x.echoOk),memR:rs(x.memR),echoR:rs(x.echoR),rev:x.rev&&typeof x.rev==='object'?x.rev:{},last:num(x.last)});
+    for(const x of [a,b]) if(Array.isArray(x.alt)) alt.push(...x.alt.filter(y=>y&&typeof y==='object'));
+  }
+  // what waits for an adult, and the day's quiz scores, are kept from the copy counted in the size kept here
+  const keep=same;
+  const pend=[...new Set([...(keep(a)?ints(a.pend):[]),...(keep(b)?ints(b.pend):[])])].filter(g=>!mem.includes(g)), rpend=[...new Set([...(keep(a)?ints(a.rpend):[]),...(keep(b)?ints(b.rpend):[])])].filter(g=>mem.includes(g));
   // stumbled verses: the higher count wins; the day of each quiz's counted try: the later wins
   const weak={}; for(const x of [a,b]) if(x.weak&&typeof x.weak==='object') for(const [i,c] of Object.entries(x.weak)) if(/^\d{1,3}$/.test(i)&&num(c)>0) weak[i]=Math.max(num(weak[i]),Math.min(99,Math.floor(num(c))));
   const qday={}; for(const x of [a,b]) if(x.qday&&typeof x.qday==='object') for(const [t,d] of Object.entries(x.qday)) if(QT[t]&&Number.isFinite(+d)) qday[t]=Math.max(num(qday[t]),+d);
   const o={heard:(a.heard||b.heard)?1:0, rec:Math.max(num(a.rec),num(b.rec)), lvl:Math.max(0,Math.min(4,Math.max(num(a.lvl),num(b.lvl)))), quiz:Math.min(100,Math.max(num(a.quiz),num(b.quiz))),
     star:(a.star||b.star||(num(a.quiz)>=80&&!a.qz)||(num(b.quiz)>=80&&!b.qz))?1:0, qz:Object.fromEntries(Object.keys(QT).map(t=>[t,Math.min(100,Math.max(num((a.qz||{})[t]),num((b.qz||{})[t])))]).filter(([t,v])=>v>0)),
     mem, seen:[...new Set([...ints(a.seen),...ints(b.seen)])], seg:Math.max(0,Math.floor(num(newer.seg))), last:Math.max(num(a.last),num(b.last))};
-  if(z) o.z=z;
-  const rpendAt={}; for(const x of [a,b]) if(x.rpendAt&&typeof x.rpendAt==='object') for(const [g,t] of Object.entries(x.rpendAt)) if(rpend.includes(+g)&&Number.isFinite(+t)) rpendAt[g]=Math.max(num(rpendAt[g]),+t);
-  const qzs={}; for(const x of [a,b]) if(x.qzs&&typeof x.qzs==='object') for(const [g,q] of Object.entries(x.qzs)) if(/^\d{1,2}$/.test(g)&&q&&typeof q==='object') for(const [t,v] of Object.entries(q)) if(QT[t]&&num(v)>0) (qzs[g] ||= {})[t]=Math.min(100,Math.max(num((qzs[g]||{})[t]),num(v)));
+  if(z) o.z=z; if(memR.length) o.memR=memR; if(echoR.length) o.echoR=echoR;
+  if(alt.length){ const u=new Map(alt.map(y=>[JSON.stringify(y),y])); o.alt=[...u.values()].slice(-4); }
+  // the keys of the stamps already applied: a take is never counted twice, on either device
+  const done=[...new Set([...(Array.isArray(a.done)?a.done:[]),...(Array.isArray(b.done)?b.done:[])].filter(x=>typeof x==='string'&&x.length<40))].slice(-300); if(done.length) o.done=done;
+  const rpendAt={}; for(const x of [a,b]) if(keep(x)&&x.rpendAt&&typeof x.rpendAt==='object') for(const [g,t] of Object.entries(x.rpendAt)) if(rpend.includes(+g)&&Number.isFinite(+t)) rpendAt[g]=Math.max(num(rpendAt[g]),+t);
+  const qzs={}; for(const x of [a,b]) if(keep(x)&&x.qzs&&typeof x.qzs==='object') for(const [g,q] of Object.entries(x.qzs)) if(/^\d{1,2}$/.test(g)&&q&&typeof q==='object') for(const [t,v] of Object.entries(q)) if(QT[t]&&num(v)>0) (qzs[g] ||= {})[t]=Math.min(100,Math.max(num((qzs[g]||{})[t]),num(v)));
   if(Object.keys(rpendAt).length) o.rpendAt=rpendAt; if(Object.keys(qzs).length) o.qzs=qzs;
   if(Object.keys(rev).length) o.rev=rev; if(pend.length) o.pend=pend; if(rpend.length) o.rpend=rpend; if(echoOk.length) o.echoOk=echoOk; if(Object.keys(weak).length) o.weak=weak; if(Object.keys(qday).length) o.qday=qday; return o; }
+// progress counted in another segment size while its poem was not on this device (alt): counted once the poem is here
+function foldAlts(){ let ch=false; for(const [k,ps] of Object.entries(S)) if(ps&&typeof ps==='object') for(const [pid,x] of Object.entries(ps)) if(x&&Array.isArray(x.alt)&&poemById(pid)){ ps[pid]=mergeStat(x,{},pid,k); ch=true; } if(ch) saveS(); return ch; }
 // a recording's fields from a backup are kept only within their known values
 const STAMPS=['ok','okw','again','heard','rok','rweak','eok'];
 function cleanRec(x){ const {b64,id,size,...r}=x; ['dur','when','loud'].forEach(k=>r[k]=num(r[k])); r.lvl=Math.max(0,Math.min(4,Math.floor(num(r.lvl)))); r.seg=Math.max(0,Math.min(99,Math.floor(num(r.seg)))); if(!(Array.isArray(r.range)&&r.range.length===2&&r.range.every(v=>Number.isInteger(v)&&v>=0&&v<1000)&&r.range[0]<r.range[1])) delete r.range;
@@ -1887,9 +2084,11 @@ function cleanRec(x){ const {b64,id,size,...r}=x; ['dur','when','loud'].forEach(
   r.marks=Array.isArray(r.marks)?r.marks.filter(m=>Array.isArray(m)).slice(0,500).map(m=>[Math.max(0,Math.floor(num(m[0]))),num(m[1]),num(m[2])?1:0]):[];
   // only the fields the app knows travel: a strange backup cannot fill the list of recordings with anything else
   if(typeof r.by==='string') r.by=r.by.slice(0,40); else delete r.by;
-  if(!(r.inbox&&typeof r.inbox==='object'&&/^[0-9a-f]{24}$/.test(r.inbox.src||'')&&Number.isFinite(+r.inbox.rid))) delete r.inbox; else r.inbox={src:r.inbox.src,rid:+r.inbox.rid,family:String(r.inbox.family||'').slice(0,40)};
+  for(const [f,re] of [['uid',/^[0-9a-f]{24}$/],['sdev',/^[0-9a-f]{24}$/],['h',/^[0-9a-f]{64}$/]]) if(!(typeof r[f]==='string'&&re.test(r[f]))) delete r[f];
+  if(!Number.isFinite(r.revDue)) delete r.revDue;
+  if(!(r.inbox&&typeof r.inbox==='object'&&/^[0-9a-f]{24}$/.test(r.inbox.src||'')&&Number.isFinite(+r.inbox.rid))) delete r.inbox; else { const ib=r.inbox; r.inbox={src:ib.src,rid:+ib.rid,...(/^[0-9a-f]{24}$/.test(ib.uid||'')?{uid:ib.uid}:{}),...(/^[0-9a-f]{64}$/.test(ib.h||'')?{h:ib.h}:{}),...(/^[0-9a-f]{16}$/.test(ib.kid||'')?{kid:ib.kid}:{}),family:String(ib.family||'').slice(0,40)}; }
   return Object.fromEntries(Object.entries(r).filter(([k])=>REC_FIELDS.has(k))); }
-const REC_FIELDS=new Set(['poem','title','who','when','dur','type','lvl','seg','range','model','praise','echo','memCand','review','stamp','stampAt','weak','marks','loud','by','inbox']);
+const REC_FIELDS=new Set(['poem','title','who','when','dur','type','lvl','seg','range','model','praise','echo','memCand','review','stamp','stampAt','weak','marks','loud','by','inbox','uid','h','revDue','sdev']);
 // «نصوصي»: only the poems the parent typed, to carry to another device without typing them again
 $('#txExport').onclick=()=>{ if(!added.length) return toast('لا أناشيد مكتوبة بعد');
   const o={app:'anasheed',kind:'texts',v:1,poems:added.map(p=>({title:p.title,poet:p.poet,age:p.age0||p.age,verses:p.verses}))};
@@ -1900,7 +2099,7 @@ $('#txImport').onchange=async e=>{ const f=e.target.files[0]; e.target.value='';
   let n=0, same=0; const sig=p=>pnorm(p.title)+'|'+p.verses.map(v=>pnorm(v.join(' '))).join('|');
   for(const a of o.poems.slice(0,500)){ const c={...a,id:'u'+Date.now()+'_'+n+same}; if(!validPoem(c)) continue; const np=cleanPoem(c);
     if(added.some(b=>sig(b)===sig(np))){ same++; continue; } added.push(np); n++; }
-  applyPacks(); LS.set('added',added); renderAdded(); renderHome();
+  applyPacks(); foldAlts(); LS.set('added',added); renderAdded(); renderHome();
   toast(n?`أُضيف ${AR(n)} من نصوصك ✓${same?' (و'+AR(same)+' موجود من قبل)':''}`:'كل هذه النصوص موجودة من قبل',4000); };
 $('#aImportBtn').onclick=async()=>{ if(!await parentGate()) return; $('#aImport').click(); };
 $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value=''; if(!fs.length) return;
@@ -1909,7 +2108,7 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
   const have=new Set((await recMeta()).map(x=>x.who+'|'+x.poem+'|'+x.when));
   for(const f of fs){ let o, txt=''; try{ txt=await f.text(); o=JSON.parse(txt); }catch(x){ if(/^\s*\{"app":"anasheed"/.test(txt)) damaged++; else bad++; continue; }
     if(o && o.app==='anasheed' && o.kind==='texts'){ texts++; continue; }
-    if(o && o.app==='anasheed' && o.kind==='teacherKey'){ if(okName(o.name)&&/^[0-9a-f]{8,64}$/.test(o.secret||'')){ LS.set('iAmTeacher',{name:String(o.name).trim(),secret:o.secret}); special=`أهلاً ${String(o.name).trim()} 👩‍🏫: صار هذا التطبيق تطبيقكِ للحكم على تسجيلات الطلاب`; } continue; }
+    if(o && o.app==='anasheed' && o.kind==='teacherKey'){ if(okName(o.name)&&/^[0-9a-f]{8,64}$/.test(o.secret||'')){ const nm=addTeacherKey(o); special=`أهلاً ${nm} 👩‍🏫: صار هذا التطبيق تطبيقكِ للحكم على تسجيلات الطلاب${o.family?' من أسرة '+String(o.family).slice(0,40):''}`; } continue; }
     if(o && o.app==='anasheed' && o.kind==='takes'){ await receiveTakes(o); special=' '; continue; }
     if(o && o.app==='anasheed' && o.kind==='stamps'){ await receiveStamps(o); special=' '; continue; }
     if(!o || typeof o!=='object' || o.app!=='anasheed'){ bad++; continue; } any=true;
@@ -1923,10 +2122,13 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
       for(const f of ['path','hide']) if(Array.isArray(v[f])) x[f]=v[f].filter(id=>typeof id==='string'&&id.length<40).slice(0,200); if(['parent','teacher','child','both'].includes(v.pathBy)) x.pathBy=v.pathBy;
       if(Object.keys(x).length) kidInfo[k]=x; }
     // the adults (hashed PINs, the teacher's code) and the day off come along when this device has none yet
-    if(Array.isArray(o.adults) && !adults.length){ adults=o.adults.filter(a=>a&&typeof a==='object'&&okName(a.name)&&(a.role==='parent'||a.role==='teacher')).slice(0,10).map(a=>({role:a.role,name:String(a.name).trim(),...(typeof a.pin==='string'&&/^[0-9a-f]{64}$/.test(a.pin)&&typeof a.salt==='string'?{pin:a.pin,salt:a.salt.slice(0,40)}:{}),...(typeof a.secret==='string'&&/^[0-9a-f]{8,64}$/.test(a.secret)?{secret:a.secret}:{})})); saveAdults(); }
+    // the adults come along when this device has none yet (their PINs and the parent's recovery code, hashed); the teachers are added
+    // by name when missing. A teacher's secret is never in a backup: she gets a new key here (a backup copied by anyone cannot sign her stamps)
+    if(Array.isArray(o.adults)){ const H=/^[0-9a-f]{64}$/, inA=o.adults.filter(a=>a&&typeof a==='object'&&okName(a.name)&&(a.role==='parent'||a.role==='teacher')).slice(0,10).map(a=>({role:a.role,name:String(a.name).trim(),...(typeof a.pin==='string'&&H.test(a.pin)&&typeof a.salt==='string'?{pin:a.pin,salt:a.salt.slice(0,40),...(typeof a.rc==='string'&&H.test(a.rc)?{rc:a.rc}:{})}:{})}));
+      if(!adults.length) adults=inA; else for(const a of inA) if(a.role==='teacher' && !adults.some(b=>b.name===a.name)) adults.push(a); saveAdults(); }
     if(Number.isInteger(o.restDay) && o.restDay>=-1 && o.restDay<=6 && LS.get('restDay',-1)<0) LS.set('restDay',o.restDay);
     // progress is merged field by field: an older backup never wipes newer progress
-    if(o.stats && typeof o.stats==='object') for(const [k,ps] of Object.entries(o.stats)){ if(!okName(k) && k!=='—' || !ps || typeof ps!=='object') continue; const tgt=KS(k); for(const [pid,v] of Object.entries(ps)) if(okKey(pid)) tgt[pid]=mergeStat(own(tgt,pid)?tgt[pid]:null,v); }
+    if(o.stats && typeof o.stats==='object') for(const [k,ps] of Object.entries(o.stats)){ if(!okName(k) && k!=='—' || !ps || typeof ps!=='object') continue; const tgt=KS(k); for(const [pid,v] of Object.entries(ps)) if(okKey(pid)) tgt[pid]=mergeStat(own(tgt,pid)?tgt[pid]:null,v,pid,k); }
     if(typeof o.parentName==='string' && o.parentName && o.parentName.length<40 && !LS.get('parentName','')){ LS.set('parentName',o.parentName); $('#parentName').value=o.parentName; }
     if(Array.isArray(o.recs)) for(const x of o.recs){ if(!x||typeof x!=='object'||typeof x.b64!=='string'){ nFail++; continue; } const key=x.who+'|'+x.poem+'|'+x.when; if(have.has(key)){ nSkip++; continue; }
       try{ const bin=atob(x.b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); const rest=cleanRec(x);
@@ -1935,9 +2137,9 @@ $('#aImport').onchange=async e=>{ const fs=[...e.target.files]; e.target.value='
   // whatever was merged before a failure is kept, never left half-written in memory
   if(!any && !crash && special) return special.trim()&&toast(special,5000);
   if(!any && !crash) return toast(texts?'هذا ملف «نصوصي»: استورده من زر «📂 استورد نصوصي» في «أناشيد إضافية»':damaged?'ملف النسخة تالف أو ناقص (ربما انقطع تنزيله). صدّر النسخة مرة أخرى من الجهاز الأول':bad?'هذا ليس ملف نسخة احتياطية من «أنشودتي»':'لم يُستورد شيء',6000);
-  applyPacks(); LS.set('added',added); LS.set('kids',kids); LS.set('kidInfo',kidInfo); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome();
+  applyPacks(); LS.set('added',added); LS.set('kids',kids); LS.set('kidInfo',kidInfo); foldAlts(); saveS(); if(!kid&&kids[0]) setKid(kids[0]); renderParent(); renderHome();
   const missing=[]; for(const g of Object.values(groups)){ const max=g.last||Math.max(...g.parts); for(let i=1;i<=max;i++) if(!g.parts.has(i)) missing.push(i); if(!g.last) missing.push(max+1); }
-  const parts=['تم الاستيراد']; if(nOk) parts.push(tasjeelN(nOk)); if(nSkip) parts.push(AR(nSkip)+' موجود مسبقاً'); if(nFail) parts.push('⚠️ تعذّر '+AR(nFail)); if(bad) parts.push('⚠️ '+AR(bad)+' ملف غير صالح');
+  const parts=['تم الاستيراد']; if(nOk) parts.push(tasjeelN(nOk)); if(nSkip) parts.push('موجود مسبقاً: '+AR(nSkip)); if(nFail) parts.push('⚠️ تعذّر '+AR(nFail)); if(bad) parts.push('⚠️ ملف غير صالح: '+AR(bad));
   if(missing.length) parts.push('⚠️ ينقص من النسخة: الجزء '+missing.map(AR).join('، '));
   if(crash) parts.push('⚠️ توقّف الاستيراد: '+esc(crash));
   if(nFail||bad||missing.length||crash) openSheet(`<h3>⚠️ لم تكتمل الاستعادة</h3><p>${parts.join(' · ')}</p><p class="small">${missing.length?'اختر أجزاء النسخة كلها معاً ثم استوردها مرة أخرى. ':''}لا تحذف ملفات النسخة. جرّب مرة أخرى بعد إعادة تشغيل التطبيق.</p><div class="row"><button class="btn" onclick="closeSheet()">حسناً</button></div>`);
@@ -1952,7 +2154,8 @@ function lockTab(){ if(tabLocked) return; if((rec&&rec.state==='recording')||rec
 if(!isNative() && typeof BroadcastChannel!=='undefined'){ try{ const bc=new BroadcastChannel('anasheed-tabs'), me=Math.random().toString(36).slice(2);
   bc.onmessage=e=>{ const d=e.data||{}; if(d.t==='hi' && d.id!==me) lockTab(); }; bc.postMessage({t:'hi',id:me}); }catch(e){} }
 if(iosTab()) $('#iosWarn').innerHTML=`<div class="warn" style="margin-bottom:10px">📱 ${IOS_MSG}</div>`;
-applyKidPrefs(); renderKidChip(); renderHome();
+foldAlts(); migrateOutbox(); applyKidPrefs(); renderKidChip(); renderHome();
+setTimeout(reconcileStamps,300); // a stamp whose effect was lost when the app closed is applied now
 if(!kid) setTimeout(()=>kidSheet(true),400); else setTimeout(showNews,700);
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !isNative() && !/localhost|127\.0\.0\.1/.test(location.hostname)) navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});

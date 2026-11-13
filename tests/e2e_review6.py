@@ -100,9 +100,9 @@ async def main():
         check('أوقف التسجيل أولاً' in (await pg.text_content('#toast') or ''), 'echo refuses to start while recording')
         await pg.evaluate("rec=window.__r")
 
-        # ---- backups: segment sizes travel, and progress in another size is not mixed in ----
-        r = json.loads(await pg.evaluate("JSON.stringify(mergeStat({z:3,mem:[1],last:1},{z:4,mem:[2],last:2}))"))
-        check(r['z'] == 3 and r['mem'] == [1], f'a backup counted in another segment size does not mix its segments in {r}')
+        # ---- backups: segment sizes travel; progress in another size is not mixed in as numbers, and none of it is lost ----
+        r = json.loads(await pg.evaluate("JSON.stringify(mergeStat({z:3,mem:[1],last:1},{z:4,mem:[2],last:2},'٣٠','كريم'))"))
+        check(r['z'] == 3 and r['mem'] == [1] and r.get('memR') == [[8, 10]], f'a backup counted in another segment size: its verses are kept, not its numbers {r}')
         r = json.loads(await pg.evaluate("JSON.stringify(mergeStat({z:4,mem:[1],last:1},{z:4,mem:[2],qzs:{1:{order:90}},rpend:[1],rpendAt:{1:5},last:2}))"))
         check(sorted(r['mem']) == [1, 2] and r['qzs'] == {'1': {'order': 90}} and r['rpendAt'] == {'1': 5}, f'same size: merged {r}')
 
@@ -166,8 +166,9 @@ async def main():
         await pg.fill('#tCode', code); await pg.click('#tGo'); await pg.wait_for_timeout(100)
         check(await pg.evaluate("tLive() && tSess.name==='أ. آية'") and await pg.is_visible('#tBar'), 'the right code starts the session')
         await pg.evaluate("setKid('دلال'); closeSheet()")
-        rid = await pg.evaluate(PUT, {'poem': '٦', 'who': 'دلال', 'seg': 0, 'range': [0, 6], 'memCand': True})
-        await pg.evaluate(f"judgeNow({{id:{json.dumps(rid)},poem:'٦',title:'x',who:'دلال',seg:0,range:[0,6],memCand:true}})"); await pg.wait_for_timeout(100)
+        sg6 = await pg.evaluate("segments(poemById('٦'),'دلال')[0]")
+        rid = await pg.evaluate(PUT, {'poem': '٦', 'who': 'دلال', 'seg': 0, 'range': sg6, 'memCand': True})
+        await pg.evaluate(f"judgeNow({{id:{json.dumps(rid)},poem:'٦',title:'x',who:'دلال',seg:0,range:{json.dumps(sg6)},memCand:true}})"); await pg.wait_for_timeout(100)
         check('ما حكمكِ' in await pg.text_content('#sheet'), 'in a session, the teacher judges a take as soon as it is saved')
         await pg.click('#sheet [data-st="ok"]'); await pg.wait_for_timeout(200)
         check(await pg.evaluate("st('٦','دلال').mem.length") == 0 and 'ما حكمكِ' in await pg.text_content('#sheet'), 'without the teacher\'s code of the minute, the child cannot stamp')
@@ -189,7 +190,7 @@ async def main():
             await pg.evaluate("(()=>{ parentGate(); })()"); await pg.wait_for_timeout(50); await pg.fill('#gPin', '0000'); await pg.click('#gOk'); await pg.evaluate("closeSheet()")
         await pg.evaluate("(()=>{ parentGate(); })()"); await pg.wait_for_timeout(50); await pg.fill('#gPin', '2468'); await pg.click('#gOk'); await pg.wait_for_timeout(100)
         check(await pg.evaluate("Date.now()<gateUntil") is False, 'after five wrong tries, even the right PIN waits a minute')
-        await pg.evaluate("closeSheet(); gateLockUntil=0; gateUntil=Date.now()+6e5")
+        await pg.evaluate("closeSheet(); LS.set('lock_gate',null); gateUntil=Date.now()+6e5")
 
         # ---- «نصوصي»: the typed poems go to a file and come back without typing ----
         await pg.evaluate("closeSheet(); window.__f=null; $('#txExport').click()"); await pg.wait_for_timeout(200)
@@ -252,7 +253,8 @@ async def main():
         # ---- the teacher at a distance, by files: takes out, signed stamps back ----
         await pg.evaluate("adults=[{role:'parent',name:'بابا'},{role:'teacher',name:'أ. آية',secret:'0123456789abcdef01234567'}]; saveAdults(); window.__f=null; shareFiles=async(items)=>{ window.__f=await items[0].blob.text(); }; 0")
         await pg.evaluate("setKid('دلال'); closeSheet()")
-        rid = await pg.evaluate(PUT, {'poem': '١٨', 'who': 'دلال', 'seg': 0, 'range': [0, 4], 'memCand': True})
+        sg18 = await pg.evaluate("segments(poemById('١٨'),'دلال')[0]")
+        rid = await pg.evaluate(PUT, {'poem': '١٨', 'who': 'دلال', 'seg': 0, 'range': sg18, 'memCand': True})
         await pg.evaluate("teacherKeyFile(teachers()[0])"); await pg.wait_for_timeout(100); key = await pg.evaluate("window.__f")
         await pg.evaluate("sendTakes(teachers()[0])"); await pg.wait_for_timeout(800); takes = await pg.evaluate("window.__f")
         tk = json.loads(takes)
@@ -269,7 +271,7 @@ async def main():
         await t2.evaluate("show('parent'); renderParent()"); await t2.wait_for_timeout(500)
         check(n_in >= 1 and 'دلال' in await t2.text_content('#pQueue'), f'with her key, the takes arrive in her queue ({n_in})')
         # she stamps it (as her queue does): the stamp waits in her outbox, then goes out signed
-        await t2.evaluate(f"(async()=>{{ const r=(await recMeta()).find(x=>x.inbox&&x.inbox.rid==={json.dumps(rid)}); await recPatch(r.id,{{stamp:'ok',stampAt:Date.now(),weak:[],by:iAmTeacher().name}}); LS.set('tOut',[{{src:r.inbox.src,rid:r.inbox.rid,stamp:'ok',weak:[],at:Date.now()}}]); window.__f=null; shareFiles=async(items)=>{{ window.__f=await items[0].blob.text(); }}; sendStamps(); }})()"); await t2.wait_for_timeout(500)
+        await t2.evaluate(f"(async()=>{{ const r=(await recMeta()).find(x=>x.inbox&&x.inbox.rid==={json.dumps(rid)}); outboxPut(r,'ok',[]); await recPatch(r.id,{{stamp:'ok',stampAt:Date.now(),weak:[],by:iAmTeacher().name}}); window.__f=null; shareFiles=async(items)=>{{ window.__f=await items[0].blob.text(); return true; }}; sendStamps(); }})()"); await t2.wait_for_timeout(500)
         stamps = await t2.evaluate("window.__f"); await ctx2.close()
         so = json.loads(stamps)
         check(so['kind'] == 'stamps' and so['by'] == 'أ. آية' and len(so['sig']) == 64, 'her stamps go out signed')

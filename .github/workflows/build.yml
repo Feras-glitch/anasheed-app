@@ -47,6 +47,8 @@ jobs:
           scripts/ci_run.sh "e2e decisions" python tests/e2e_decisions.py
           scripts/ci_run.sh "e2e lesson" python tests/e2e_lesson.py
           scripts/ci_run.sh "e2e review 6" python tests/e2e_review6.py
+          scripts/ci_run.sh "e2e review 7" python tests/e2e_review7.py
+          scripts/ci_run.sh "service worker" node tests/sw_check.js www/sw.js
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: www, path: www }
       - run: cp "dist/أنشودتي.html" dist/Anasheed.html
@@ -144,6 +146,30 @@ jobs:
         with: { persist-credentials: false }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: android-test, path: apk }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: android, path: release }
+      - name: The published APK — its key, not debuggable, its version; and the previous release to update from
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # the certificate of the release key (public: anyone can read it from the APK), and the old key that was published by mistake
+          RELEASE_CERT: 8e26513c2f55e80b13e16deb97352552faf336dc5b57d89c7b66c9b7481e80d9
+          LEAKED_CERT: 4a2c9522830e406fc793fb11ccf21e942cdeb9dec76904ccde96b0dde4ae9856
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=$(ls release/*.apk | head -1)
+          "$BT/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
+          SHA=$(grep -i 'certificate SHA-256 digest' "$RUNNER_TEMP/certs.txt" | head -1 | awk '{print $NF}' | tr 'A-F' 'a-f')
+          if [ "$SHA" = "$LEAKED_CERT" ]; then echo "::error title=signing::the APK is signed with the old key that was published"; exit 1; fi
+          if [ "$SHA" != "$RELEASE_CERT" ]; then echo "::error title=signing::the APK is not signed with the release key ($SHA)"; exit 1; fi
+          "$BT/aapt2" dump badging "$APK" > "$RUNNER_TEMP/badging.txt"
+          if grep -q 'application-debuggable' "$RUNNER_TEMP/badging.txt"; then echo "::error title=debuggable::the release APK is debuggable"; exit 1; fi
+          grep -q "versionName='$APP_VERSION'" "$RUNNER_TEMP/badging.txt" || { echo "::error title=version::the APK is not version $APP_VERSION"; exit 1; }
+          echo "::notice title=release APK::signed with the release key, not debuggable, version $APP_VERSION"
+          mkdir -p prev
+          ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '[.assets[] | select(.name | endswith(".apk"))][0].id' 2>/dev/null || true)
+          if [ -n "$ID" ] && [ "$ID" != null ]; then gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$ID" > prev/previous.apk || rm -f prev/previous.apk; fi
+          if [ -s prev/previous.apk ]; then echo "previous release: $(stat -c %s prev/previous.apk) bytes"; else echo "::warning title=update::no previous release APK: the update over it is not tested"; fi
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -158,7 +184,9 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none -camera-front none
-          script: python3 tests/android_device.py apk/*.apk $RUNNER_TEMP/device
+          script: |
+            python3 tests/android_device.py apk/*.apk $RUNNER_TEMP/device
+            python3 tests/android_release.py release/*.apk $RUNNER_TEMP/device prev/previous.apk
       - name: Results summary
         if: always()
         run: echo "::notice title=device results::$(head -c 3500 $RUNNER_TEMP/device/results.json | awk 'BEGIN{ORS="%0A"}{print}')"
