@@ -86,6 +86,10 @@ def launch():
 
 R['install'] = adb('install', '-r', APK).strip()[-200:]
 adb('shell', 'pm', 'grant', PKG, 'android.permission.RECORD_AUDIO')
+# on a slow runner the emulator's own launcher can stop responding, and its «isn't responding» dialog took the keys meant
+# for the app (build 67: back and share failed, the app was fine). With error dialogs hidden, Android closes the stuck
+# process instead of asking. A crash of the app itself still fails the checks: they look at its window and its process.
+adb('shell', 'settings', 'put', 'global', 'hide_error_dialogs', '1')
 R['device'] = {'sdk': adb('shell', 'getprop', 'ro.build.version.sdk').strip(), 'webview': re.findall(r'versionName=(\S+)', adb('shell', 'dumpsys', 'package', 'com.google.android.webview'))[:1]}
 step('launch', launch)
 shot('01-first-launch')
@@ -104,7 +108,7 @@ time.sleep(1); shot('02-home')
 def back_test():
     ev("closeSheet(); show('home',true); renderHome(); 'ok'")
     tap('#grid .card[data-id="١"]'); shot('03-poem')
-    out = {'opened_by_tap': ev('screen')}
+    out = {'opened_by_tap': ev('screen'), 'focus_before_back': focus()}
     tap('#verses .w.has'); out['sheet_open'] = ev("document.querySelector('#pop').classList.contains('on')")
     adb('shell', 'input', 'keyevent', '4'); time.sleep(1.2)
     out['back1_sheet_closed'] = ev("!document.querySelector('#pop').classList.contains('on')"); out['back1_screen'] = ev('screen')
