@@ -247,7 +247,8 @@ async def main():
 
         # ---- ⭐ needs two kinds of quiz; the young hear a verse in the parent's voice and pick its picture ----
         await pg.click('#back'); await pg.evaluate("gateUntil=Date.now()+6e5"); await pg.click('#goParent'); await pg.wait_for_timeout(400)
-        # ---- praise in the parent's voice ----
+        # ---- praise in the parent's voice (its section is folded under its title: the parent opens it) ----
+        await pg.click('#secPraise > summary'); await pg.wait_for_timeout(100)
         await pg.click('#praiseRec'); await pg.wait_for_timeout(1800); await pg.click('#praiseStop'); await pg.wait_for_timeout(1200)
         check(await pg.locator('#praiseList [data-pp]').count() == 1, 'the parent records a praise phrase')
         await pg.click('#modelList [data-m="٣٢"]'); await pg.wait_for_timeout(400)

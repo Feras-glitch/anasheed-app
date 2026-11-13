@@ -150,6 +150,9 @@ body.young .badges span:not(.on){display:none}
 /* a child of seven or younger, who cannot read yet: fewer buttons, bigger ones, no reading quizzes or lessons */
 body.young #lessonBtn, body.prereader #hint, body.young #paceT, body.prereader #quizBox [data-q="complete"], body.prereader #quizBox [data-q="order"], body.prereader #quizBox [data-q="sense"]{display:none!important}
 body.young #modelBtn, body.young #echoBtn, body.young #modeStory{font-size:20px;padding:12px 18px}
+/* six and under: no written filters on the home screen, no written tags on the cards; a big 🦜 where a voice can lead him */
+body.prereader #ages, body.prereader #poets, body.prereader .card .poet, body.prereader .card .meta .tag{display:none!important}
+body.prereader .card.voiced::after{content:"🦜";position:absolute;top:8px;left:8px;width:52px;height:52px;display:grid;place-items:center;font-size:32px;background:#fff;border-radius:50%;box-shadow:var(--shadow)}
 body.young .rec{width:76px;height:76px;font-size:32px}
 .tBar{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:40;background:#5b3f8c;color:#fff;border-radius:999px;padding:6px 14px;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .menu .btn .small{background:#fff;color:#2b2118;border-radius:999px;padding:0 8px;font-size:13px}
@@ -185,6 +188,15 @@ body.young .rec{width:76px;height:76px;font-size:32px}
 .kidb .kic{font-size:22px}
 .waitModel{background:#eee6d6;color:#5c4a28;border-radius:999px;padding:6px 14px;font-size:15px;display:inline-flex;align-items:center;gap:6px;min-height:44px}
 .pIndex{position:sticky;top:60px;z-index:8;background:var(--bg);padding:4px 0;margin:0 0 6px}
+/* the parent page: what is used rarely is folded under its title, with a line saying where it stands; nothing is removed */
+.psec>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.psec>summary::-webkit-details-marker{display:none}
+.psec>summary h2{margin-bottom:4px}
+.psec>summary h2::after{content:" ▾";font-size:.7em;opacity:.55}
+.psec:not([open])>summary h2::after{content:" ◂"}
+.psum{opacity:.8}
+.howTo{margin:6px 0}
+.howTo>summary{cursor:pointer;font-weight:600}
 .tablock{position:fixed;inset:0;z-index:100;background:rgba(251,246,236,.97);display:grid;place-items:center;text-align:center;padding:24px}
 </style>
 </head>
@@ -281,18 +293,20 @@ body.young .rec{width:76px;height:76px;font-size:32px}
     <h2 class="sec" id="secKids">👨‍👧 الأطفال</h2>
     <div class="row"><button class="btn" id="kidAdd">➕ أضف طفلاً</button><button class="btn d" id="kidDel">🗑 احذف الطفل المختار</button></div>
     <label>يوم الراحة الأسبوعي (لا يُطلب فيه مراجعة)</label><div class="chips" id="restChips"></div>
-    <h2 class="sec" id="secAdults">🔐 الكبار والمعلّمة</h2>
+    <details class="psec" id="secAdults"><summary><h2 class="sec">🔐 الكبار والمعلّمة</h2><span class="small psum" id="sumAdults"></span></summary>
     <div id="adultsBox"></div>
+    </details>
     <h2 class="sec" id="secModels">🔊 النماذج الصوتية</h2>
     <p class="small">سجّل الأناشيد بصوتك نموذجاً للأطفال. اضغط ⬇ مع بداية كل بيت وأنت تُنشد، فيصير للطفل «ردّد بعدي» بيتاً بيتاً.</p>
     <div class="row"><button class="btn g" id="modelSession">🎙 ابدأ جلسة تسجيل النماذج</button></div>
     <label>اسمك كما يظهر على النماذج</label><input id="parentName" placeholder="بابا">
     <div class="mlist" id="modelList"></div>
-    <h2 class="sec" id="secPraise">🎉 مديح بصوتك</h2>
+    <details class="psec" id="secPraise"><summary><h2 class="sec">🎉 مديح بصوتك</h2><span class="small psum" id="sumPraise"></span></summary>
     <p class="small">سجّل من ثلاث إلى خمس عبارات قصيرة، مثل «أحسنت يا بطل!» و«أنا فخور بك!». تُسمع بعد كل إنجاز مع نغمة الاحتفال، عبارة مختلفة كل مرة.</p>
     <div class="mlist" id="praiseList"></div>
     <div class="row"><button class="btn g" id="praiseRec">🎙 سجّل عبارة</button></div>
-    <h2 class="sec" id="secAdd">➕ أناشيد إضافية</h2>
+    </details>
+    <details class="psec" id="secAdd"><summary><h2 class="sec">➕ أناشيد إضافية</h2><span class="small psum" id="sumAdd"></span></summary>
     <p class="small">اكتب كل بيت في سطر، وافصل بين الشطرين بعلامة <b>/</b>. يُحفظ في هذا الجهاز.</p>
     <label>العنوان</label><input id="aTitle" placeholder="مثال: موطني">
     <label>الشاعر</label><input id="aPoet" placeholder="مثال: إبراهيم طوقان">
@@ -304,6 +318,7 @@ body.young .rec{width:76px;height:76px;font-size:32px}
     <div id="packList" class="small note" style="margin-top:10px"></div>
     <p class="small" style="margin-top:12px">📄 <b>نصوصي:</b> احفظ نصوص الأناشيد التي كتبتها في ملف صغير، ثم استورده على أي جهاز (أو عند المعلّمة) فلا تكتبها مرة أخرى.</p>
     <div class="row"><button class="btn s" id="txExport">📄 احفظ نصوصي في ملف</button><button class="btn s" id="txImportBtn">📂 استورد نصوصي</button><input type="file" id="txImport" accept=".json,application/json" style="display:none"></div>
+    </details>
     <h2 class="sec" id="secBackup">💾 نسخة احتياطية</h2>
     <p class="small">تحفظ بيانات الأطفال وتقدّمهم والأناشيد المضافة والمعاني المعدّلة، ومعها التسجيلات إن اخترت ذلك. كل ما في التطبيق محفوظ في هذا الجهاز وحده.</p>
     <div id="backupInfo"></div>
@@ -502,7 +517,7 @@ function ageSheet(name){ return new Promise(res=>{ let done=false; const fin=v=>
 // the buttons a child reads speak to a girl as a girl
 function genderLabels(){ $('#modelBtn').textContent='🔊 '+gw('اسمع النموذج','اسمعي النموذج'); $('#echoBtn').textContent='🦜 '+gw('ردّد بعدي','ردّدي بعدي');
   $('#modeQuiz').textContent='❓ '+gw('اختبر نفسك','اختبري نفسك'); $('#hint').textContent=gw('المس كلمة لترى معناها · الكلمات المظلّلة لها صورة · المس بيتاً لتبدأ منه','المسي كلمة لتري معناها · الكلمات المظلّلة لها صورة · المسي بيتاً لتبدئي منه'); }
-function applyKidPrefs(){ genderLabels(); const a=kidAge(); document.body.classList.toggle('young', !!(a && a<=7)); document.body.classList.toggle('prereader', !!(a && a<=6)); $('#ageMe').style.display = a?'':'none'; if(!a){ if(ageF==='me') ageF='all'; } else { $('#ageMe').textContent=kidLevel()!==a?'لمستواي ('+AR(kidLevel())+')':'لعمري ('+AR(a)+')'; ageF='me'; $('#speed').value = a<=7?1:a<=9?2:3; }
+function applyKidPrefs(){ genderLabels(); const a=kidAge(); document.body.classList.toggle('young', !!(a && a<=7)); document.body.classList.toggle('prereader', !!(a && a<=6)); if(a && a<=6) poetF='all'; $('#ageMe').style.display = a?'':'none'; if(!a){ if(ageF==='me') ageF='all'; } else { $('#ageMe').textContent=kidLevel()!==a?'لمستواي ('+AR(kidLevel())+')':'لعمري ('+AR(a)+')'; ageF='me'; $('#speed').value = a<=7?1:a<=9?2:3; }
   $$('#ages .chip').forEach(c=>c.classList.toggle('on',c.dataset.age===ageF)); }
 function setKid(k){ kid=k; LS.set('kid',k); applyKidPrefs(); renderKidChip(); renderHome(); setTimeout(showNews,300); }
 // what the parent decided while the child was away, shown once with a happy tune
@@ -705,7 +720,11 @@ function parentGate(){ if(Date.now()<gateUntil) return Promise.resolve(true);
       const go=()=>{ const a=tryPin($('#gPin').value.trim()); if(!a){ $('#gPin').value=''; return a===null&&toast('الرقم غير صحيح'); } open(a); };
       $('#gOk').onclick=go; $('#gPin').onkeydown=e=>{ if(e.key==='Enter') go(); }; $('#gateNo').onclick=()=>closeSheet(); setTimeout(()=>$('#gPin')&&$('#gPin').focus(),50);
       // a forgotten PIN: the recovery code, typed in this same sheet
-      $('#gForgot').onclick=e=>{ e.preventDefault(); e.target.parentNode.innerHTML=`<label>رمز الاسترجاع (ظهر حين اخترت الرقم)</label><input id="gRc" autocomplete="off" placeholder="XXXX-XXXX" style="text-align:center;direction:ltr"><div class="row"><button class="btn" id="gRcOk">تحقّق</button></div>`;
+      $('#gForgot').onclick=e=>{ e.preventDefault(); e.target.parentNode.innerHTML=`<label>رمز الاسترجاع (ظهر حين اخترت الرقم)</label><input id="gRc" autocomplete="off" placeholder="XXXX-XXXX" style="text-align:center;direction:ltr"><div class="row"><button class="btn" id="gRcOk">تحقّق</button></div><p class="small" style="text-align:center"><a href="#" id="gNoRc">لا أجد رمز الاسترجاع أيضاً</a></p>`;
+        // the PIN and its code both lost: nothing opens, but nothing is lost either. A full backup without the PINs is saved here;
+        // a fresh install restores it and asks for a new PIN (importing and deleting stay behind the PIN, so a child gains nothing)
+        $('#gNoRc').onclick=ev=>{ ev.preventDefault(); ev.target.parentNode.innerHTML=`<div class="note" style="text-align:right">لا تُفتح صفحة الوالد بلا الرقم أو رمزه، لكن بيانات الأطفال لا تضيع:<ol style="margin:6px 0;padding-inline-start:22px"><li>احفظ الآن نسخة كاملة: الأصوات والتقدّم، بلا الرقم السري.</li><li>احذف التطبيق وثبّته من جديد، أو امسح بياناته.</li><li>استورد النسخة من صفحة الوالد، واختر رقماً جديداً.</li></ol></div><div class="row"><button class="btn p" id="gSave">💾 احفظ نسخة كاملة الآن</button></div>`;
+          $('#gSave').onclick=()=>{ fin(false); doExport(true,{noPins:true}); }; };
         $('#gRcOk').onclick=()=>{ const c=$('#gRc').value, w=lockWait('gate'); if(w) return toast(waitMsg(w),3500);
           if(!par.rc || pinOf(c.replace(/[^0-9a-f]/gi,'').toUpperCase(),par.salt)!==par.rc){ lockFail('gate'); return toast(par.rc?'رمز الاسترجاع غير صحيح':'لا رمز استرجاع محفوظ على هذا الجهاز',3500); }
           open(par); setTimeout(()=>setParentPin(),300); }; };
@@ -917,8 +936,10 @@ function renderAdults(){ const box=$('#adultsBox'); if(!box) return;
     <div class="row"><button class="btn s ${par&&par.pin?'':'p'}" id="adPin">${par&&par.pin?'🔐 غيّر رقمي السري':'🔐 اختر رقماً سرياً'}</button><button class="btn s g" id="adT">👩‍🏫 أضف معلّمة</button></div>
     ${teachers().map((t,i)=>t.secret?`<div class="r"><span class="t">👩‍🏫 <b>${esc(t.name)}</b> ${t.pin?'· لها رقم سري':''}</span><button class="btn s" data-tf="${i}" title="ملف الرمز للجلسة المباشرة">📤 ملف الرمز</button><button class="btn s" data-tk="${i}" title="مفتاح تطبيقها، مرة واحدة">🔑 مفتاح تطبيقها</button><button class="btn s g" data-tt="${i}" title="تسجيلات تنتظر الحكم">📤 أرسل التسجيلات</button><button class="btn s" data-tr="${i}" title="إن ضاع ملفها أو وصل إلى غيرها">↻ مفتاح جديد</button><button class="btn s d" data-td="${i}">حذف</button></div>`
       :`<div class="r"><span class="t">👩‍🏫 <b>${esc(t.name)}</b> · <span class="small">مفتاحها لا ينتقل مع النسخة الاحتياطية: أعطها مفتاحاً جديداً</span></span><button class="btn s p" data-tr="${i}">🔑 مفتاح جديد</button><button class="btn s d" data-td="${i}">حذف</button></div>`).join('')}
-    <p class="small"><b>بالملفات (في أي وقت):</b> أرسل لها «🔑 مفتاح تطبيقها» مرة واحدة لتفتحه في نسختها من التطبيق. ثم «📤 أرسل التسجيلات» متى شئت؛ فتسمعها وتختمها، وترسل لك ملف الأختام فتستورده هنا. الأختام موقّعة بمفتاحها، فلا يزوّرها أحد.</p>
-    <p class="small"><b>في الجلسة المباشرة:</b> أرسل لها «ملف الرمز» مرة واحدة. في الجلسة يلمس الطفل «👩‍🏫 جلسة المعلّمة» في شاشة «من سينشد؟»، وتقول المعلّمة رمزها، فتحكم على كل تسجيل حين يُحفظ. وفي البيت: تدخل صفحة الوالد برقمها السري، فيُكتب اسمها على كل ختم.</p>`;
+    <details class="small howTo"><summary>كيف تعمل المعلّمة؟ في الجلسة المباشرة، وبالملفات</summary><p class="small"><b>بالملفات (في أي وقت):</b> أرسل لها «🔑 مفتاح تطبيقها» مرة واحدة لتفتحه في نسختها من التطبيق. ثم «📤 أرسل التسجيلات» متى شئت؛ فتسمعها وتختمها، وترسل لك ملف الأختام فتستورده هنا. الأختام موقّعة بمفتاحها، فلا يزوّرها أحد.</p>
+    <p class="small"><b>في الجلسة المباشرة:</b> أرسل لها «ملف الرمز» مرة واحدة. في الجلسة يلمس الطفل «👩‍🏫 جلسة المعلّمة» في شاشة «من سينشد؟»، وتقول المعلّمة رمزها، فتحكم على كل تسجيل حين يُحفظ. وفي البيت: تدخل صفحة الوالد برقمها السري، فيُكتب اسمها على كل ختم.</p></details>`;
+  const nT=teachers().length; $('#sumAdults').textContent=[par&&par.pin?'لك رقم سري ✓':'بلا رقم سري', nT?(nT===1?'معلّمة واحدة':nT===2?'معلّمتان':AR(nT)+' معلّمات'):'لا معلّمة'].join(' · ');
+  if(!(par&&par.pin) || iAmTeacher() || teachers().some(t=>!t.secret)) $('#secAdults').open=true;
   $('#adPin').onclick=async()=>{ if(await setParentPin()) renderAdults(); };
   $('#adT').onclick=async()=>{ const n=await prompt2('اسم المعلّمة كما يراه الأطفال','مثال: أ. آية'); if(!n) return; if(!okName(n)) return toast('اختر اسماً آخر');
     const t={role:'teacher',name:n.trim(),secret:rid()};
@@ -985,7 +1006,7 @@ function renderHome(){
   $$('#grid .card').forEach(c=>c.onclick=()=>openPoem(c.dataset.id));
   // 🦜 marks the poems a parent has recorded verse by verse: those a non-reader can learn alone
   recMeta().then(ms=>{ const has=new Set(ms.filter(r=>r.model&&(r.marks||[]).length>1).map(r=>String(r.poem)));
-    $$('#grid .card').forEach(c=>{ if(has.has(c.dataset.id)) c.querySelector('.mtag').innerHTML='<span class="tag" title="فيه صوت للتعلّم">🦜 بصوت '+esc(LS.get('parentName','')||'الوالد')+'</span>'; }); });
+    $$('#grid .card').forEach(c=>{ if(has.has(c.dataset.id)){ c.classList.add('voiced'); c.querySelector('.mtag').innerHTML='<span class="tag" title="فيه صوت للتعلّم">🦜 بصوت '+esc(LS.get('parentName','')||'الوالد')+'</span>'; } }); });
 }
 $$('#ages .chip').forEach(c=>c.onclick=()=>{ $('#ages .on').classList.remove('on'); c.classList.add('on'); ageF=c.dataset.age; renderHome(); });
 
@@ -1506,6 +1527,7 @@ const praiseAll = () => recMeta().then(a=>a.filter(r=>r.praise).sort((x,y)=>x.wh
 async function renderPraise(){ const ps=await praiseAll();
   $('#praiseList').innerHTML = ps.length ? ps.map((r,i)=>`<div class="r"><span class="t">🎉 عبارة ${AR(i+1)} · ${fmt(r.dur)}</span><button class="btn s p" data-pp="${i}" title="استمع">▶</button><button class="btn s d" data-pd="${i}" title="حذف">🗑</button></div>`).join('') : '<p class="small">لا عبارات بعد. بلا عبارات يَسمع الطفل نغمة الاحتفال وحدها.</p>';
   const full=ps.length>=PRAISE_MAX; $('#praiseRec').disabled=full; $('#praiseRec').textContent = full ? 'خمس عبارات تكفي' : '🎙 سجّل عبارة';
+  $('#sumPraise').textContent = ps.length ? countAr(ps.length,'عبارة واحدة','عبارتان','عبارات','عبارة') : 'لا عبارات بعد';
   $$('#praiseList [data-pp]').forEach(b=>b.onclick=()=>playRecSheet(ps[+b.dataset.pp],'<h3>🎉 عبارة مديح</h3>'));
   $$('#praiseList [data-pd]').forEach(b=>b.onclick=async()=>{ if(!await ask('حذف هذه العبارة؟','احذف')) return; await recDel(ps[+b.dataset.pd].id); renderPraise(); }); }
 $('#praiseRec').onclick=async()=>{ if((await praiseAll()).length>=PRAISE_MAX) return;
@@ -1516,7 +1538,7 @@ $('#praiseRec').onclick=async()=>{ if((await praiseAll()).length>=PRAISE_MAX) re
     renderPraise(); toast('حُفظت العبارة ✓ ستُسمع بعد الإنجاز القادم'); };
   openSheet(`<div class="stars">🔴</div><h3 style="text-align:center">قل العبارة الآن</h3><p class="small" style="text-align:center">مثل: «أحسنت يا بطل!» · «ما شاء الله، حفظتَ!» · «أنا فخور بك!»</p><div style="text-align:center"><button class="btn p" id="praiseStop">⏹ انتهيت</button></div>`,()=>fin(),true);
   $('#praiseStop').onclick=fin; const t=setTimeout(fin,6000); };
-$$('#pIndex [data-go]').forEach(c=>c.onclick=()=>{ const t=document.getElementById(c.dataset.go); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); });
+$$('#pIndex [data-go]').forEach(c=>c.onclick=()=>{ const t=document.getElementById(c.dataset.go); if(!t) return; if(t.tagName==='DETAILS') t.open=true; t.scrollIntoView({behavior:'smooth',block:'start'}); });
 $('#parentName').value=LS.get('parentName','');
 $('#parentName').onchange=()=>LS.set('parentName',$('#parentName').value.trim());
 async function modelCoverage(){ const ms=(await recMeta()).filter(r=>r.model&&(r.marks||[]).length>1); const cov={};
@@ -1985,14 +2007,17 @@ $('#aSave').onclick=()=>{
 function renderAdded(){ $('#addedList').innerHTML = added.map(p=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0"><span style="flex:1">${esc(p.title)} — ${esc(p.poet)} (${abyat(p.verses.length)})${p.pack?' 📦':''}</span><button class="btn s d" data-id="${esc(p.id)}">حذف</button></div>`).join('')||'لا أناشيد مضافة بعد.';
   const ready=Object.values(PACKS).filter(k=>!added.some(p=>p.pack&&PACKS[p.pack]===k));
   $('#packList').style.display = ready.length?'':'none';
-  $('#packList').innerHTML = ready.length ? `<b>📦 أناشيد شرحها جاهز</b><br>اكتب أحدها هنا كما في كتاب المدرسة، فيظهر معه تلقائياً معنى كل بيت ومعاني الكلمات وحكايته ونشاطاته وصوره:`+ready.map(k=>`<div>• «${esc(k.title)}» — ${esc(k.poet)}: ${esc(k.how||'')}</div>`).join('') : '';
+  $('#packList').innerHTML = ready.length ? `<b>📦 أناشيد شرحها جاهز</b><br>اكتب أحدها هنا كما في كتاب المدرسة، فيظهر معه تلقائياً معنى كل بيت ومعاني الكلمات وحكايته ونشاطاته وصوره. المس اسم النشيد لترى كيف يُكتب:`+ready.map(k=>`<details class="howTo"><summary>• «${esc(k.title)}» — ${esc(k.poet)}</summary><div>${esc(k.how||'')}</div></details>`).join('') : '';
+  $('#sumAdd').textContent = [added.length?(added.length===1?'نشيد واحد مضاف':added.length===2?'نشيدان مضافان':AR(added.length)+(added.length<=10?' أناشيد مضافة':' نشيداً مضافاً')):'', ready.length?(ready.length===1?'نشيد شرحه جاهز ينتظر نصّه':ready.length===2?'نشيدان شرحهما جاهز ينتظران نصّهما':AR(ready.length)+' أناشيد شرحها جاهز تنتظر نصوصها'):''].filter(Boolean).join(' · ');
+  if(ready.length) $('#secAdd').open=true;
   $$('#addedList button').forEach(b=>b.onclick=async()=>{ if(await ask('حذف هذا النشيد؟','احذف')){added=added.filter(p=>p.id!==b.dataset.id);LS.set('added',added);renderAdded();renderHome()} }); }
 $('#aExport').onclick=()=>{ openSheet(`<h3>💾 نسخة احتياطية</h3><p class="small">«مع التسجيلات» ينقل أصوات الأطفال إلى جهاز آخر أو بعد إعادة تثبيت التطبيق. إن كثرت التسجيلات تُقسَم النسخة ملفات، فاحفظها كلها معاً.</p><div class="row"><button class="btn p" id="exAll">مع التسجيلات</button><button class="btn" id="exLite">بلا تسجيلات</button></div>`);
   $('#exAll').onclick=()=>doExport(true); $('#exLite').onclick=()=>doExport(false); };
 // the backup is built from pieces and split into files of at most 60 MB: one giant string fails silently on large libraries
-async function doExport(withRecs){
+async function doExport(withRecs,opt={}){
   closeSheet(); const base='أنشودتي-نسخة-'+new Date().toISOString().slice(0,10), bid=Date.now();
-  const head={added,meanings:LS.get('meanings',{}),kids,kidInfo,stats:S,parentName:LS.get('parentName',''),adults:adults.map(({secret,...a})=>a),restDay:LS.get('restDay',-1)};
+  // a teacher's secret never travels; the PINs stay out too when the backup is the way out of a lost PIN
+  const head={added,meanings:LS.get('meanings',{}),kids,kidInfo,stats:S,parentName:LS.get('parentName',''),adults:adults.map(({secret,...a})=>opt.noPins?(({pin,salt,rc,...b})=>b)(a):a),restDay:LS.get('restDay',-1)};
   const items=[]; let pieces=[], size=0, partNo=1, nRec=0;
   const open_=()=>{ pieces=[JSON.stringify({app:'anasheed',v:4,backup:bid,part:partNo}).slice(0,-1)+(partNo===1?','+JSON.stringify(head).slice(1,-1):'')+',"recs":[']; size=0; };
   const close_=last=>{ pieces.push(last?'],"last":true}':'],"last":false}'); items.push(new Blob(pieces,{type:'application/json'})); partNo++; };

@@ -3,6 +3,8 @@ name: build
 on:
   push:
     branches: [main]
+    # a change to the documents alone builds and publishes nothing (content/texts.md is content: it builds)
+    paths-ignore: ['docs/**', 'README.md']
   workflow_dispatch:
 
 # read-only by default; only the jobs that publish get write access
@@ -19,11 +21,11 @@ env:
 
 jobs:
   web:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { persist-credentials: false }
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with: { node-version: 22 }
       - name: Fetch fonts (Amiri, Cairo) to embed offline
         # versions come from deps/fonts (with its lockfile when present): the CSS of these packages goes into the app
@@ -32,7 +34,7 @@ jobs:
           if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; else npm install --ignore-scripts --no-audit --no-fund; fi
       - name: Build
         run: scripts/ci_run.sh "build.py" python3 build.py
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with: { python-version: '3.12' }
       - name: End-to-end test (Chromium, fake mic)
         run: |
@@ -48,11 +50,12 @@ jobs:
           scripts/ci_run.sh "e2e lesson" python tests/e2e_lesson.py
           scripts/ci_run.sh "e2e review 6" python tests/e2e_review6.py
           scripts/ci_run.sh "e2e review 7" python tests/e2e_review7.py
+          scripts/ci_run.sh "e2e review 8" python tests/e2e_review8.py
           scripts/ci_run.sh "service worker" node tests/sw_check.js www/sw.js
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with: { name: www, path: www }
       - run: cp "dist/أنشودتي.html" dist/Anasheed.html
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with: { name: html, path: dist/Anasheed.html }
 
   webkit:
@@ -61,11 +64,11 @@ jobs:
     runs-on: ubuntu-24.04   # Playwright's WebKit libraries are packaged for 24.04
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { name: www, path: www }
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with: { python-version: '3.12' }
       - name: Install Playwright
         timeout-minutes: 3
@@ -87,13 +90,13 @@ jobs:
 
   android:
     needs: web
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { name: www, path: www }
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with: { node-version: 22 }
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with: { distribution: temurin, java-version: 21 }
@@ -119,7 +122,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       - run: scripts/ci_run.sh "cap sync" npx cap sync android
-      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
       - name: Gradle assemble (retries if Maven Central rate-limits)
         working-directory: android
         env:
@@ -132,21 +135,21 @@ jobs:
           mkdir -p out test-apk
           cp android/app/build/outputs/apk/release/app-release.apk "out/Anasheed-${APP_VERSION}.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk test-apk/anasheed-debug.apk
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with: { name: android, path: out/*.apk }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with: { name: android-test, path: test-apk/*.apk }
 
   android-device:
     needs: android
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { name: android-test, path: apk }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { name: android, path: release }
       - name: The published APK — its key, not debuggable, its version; and the previous release to update from
         env:
@@ -190,7 +193,7 @@ jobs:
       - name: Results summary
         if: always()
         run: echo "::notice title=device results::$(head -c 3500 $RUNNER_TEMP/device/results.json | awk 'BEGIN{ORS="%0A"}{print}')"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with: { name: device-results, path: '${{ runner.temp }}/device' }
 
@@ -199,11 +202,11 @@ jobs:
     needs: android-device
     # it publishes the device screenshots even when the device test failed, but not when no APK was ever built
     if: always() && needs.android-device.result != 'skipped' && needs.android-device.result != 'cancelled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { name: device-results, path: device }
       - name: Publish results to branch ci-device
         run: |
@@ -216,14 +219,14 @@ jobs:
     needs: web
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { name: html, path: electron/app }
       - name: The Windows app uses the self-contained page (pictures inside, works from file://)
         shell: bash
         run: mv electron/app/Anasheed.html electron/app/index.html
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with: { node-version: 22 }
       - name: Build Windows installer + portable exe
         working-directory: electron
@@ -245,12 +248,12 @@ jobs:
           if [ ! -f smoke.json ]; then echo "::error title=windows smoke::no smoke.json%0A$(tail -n 30 run.log | awk 'BEGIN{ORS="%0A"}{print}')"; exit 1; fi
           echo "::notice title=smoke result::$(cat smoke.json) $(head -c 1500 smoke.json.log 2>/dev/null | awk 'BEGIN{ORS="%0A"}{print}')"
           node -e "const f=require('./smoke.json'); const bad=['secure','mic','recorder','idb','amiri'].filter(k=>!f[k]); if((f.cards||0)<30||bad.length){console.log('::error title=windows smoke::'+JSON.stringify(f)); process.exit(1)} console.log('windows smoke ok')"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with: { name: windows, path: electron/out/*.exe }
 
   pages:
     needs: [web, webkit]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     permissions:
       pages: write
@@ -259,26 +262,26 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { name: www, path: www }
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with: { path: www }
       - id: deploy
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   release:
     # nothing ships unless every test passed: Chromium, Safari's engine, the APK on the emulator, and the Windows app
     needs: [web, webkit, android, android-device, windows]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with: { path: art }
       - run: ls -R art | grep -E "apk|exe|html"
       # the release action is pinned to one exact version; it only uploads the files built and tested above
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: v${{ env.APP_VERSION }}
           name: أنشودتي ${{ env.APP_VERSION }}
